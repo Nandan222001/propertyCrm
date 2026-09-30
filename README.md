@@ -19,6 +19,7 @@ npm run dev
 - Agent performance and profile summary; commission eligibility, approval and payout views.
 - Sales, plots, booking, collection, ageing, agent, commission, daily, ledger and cancellation report library.
 - Sample document management, notification/follow-up queue, permission matrix/role preview, admin settings and activity log.
-- CSV export and browser-persisted demo bookings/plot changes (`localStorage`). Responsive layout for desktop and mobile.
+- CSV export and browser-persisted demo bookings/plot changes (`localStorage`). Responsive layout for desktop, tablet, mobile and narrow screens.
+- React Router deep links: `/`, `/projects-plots`, `/bookings`, `/payments`, `/customers`, `/customers/detail`, `/agents`, `/commissions`, `/reports`, `/documents`, `/notifications`, `/user-roles` and `/administration`. Vercel SPA rewrites support direct links and refresh.
 
 All records and figures are illustrative. This is a front-end demo with local browser state; production authentication, multi-user persistence, real payment processing, messaging, uploads, and server-backed reporting require a backend integration.
