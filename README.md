@@ -23,3 +23,7 @@ npm run dev
 - React Router deep links: `/`, `/projects-plots`, `/bookings`, `/payments`, `/customers`, `/customers/detail`, `/agents`, `/commissions`, `/reports`, `/documents`, `/notifications`, `/user-roles` and `/administration`. Vercel SPA rewrites support direct links and refresh.
 
 All records and figures are illustrative. This is a front-end demo with local browser state; production authentication, multi-user persistence, real payment processing, messaging, uploads, and server-backed reporting require a backend integration.
+
+## CRUD demo behavior
+
+Every module route now includes a module-scoped record workspace with create, view, edit and delete controls. Module records, bookings, plots and payments are stored in browser `localStorage` for the client demo. Delete asks for confirmation. This is intentionally client-side; these records are not shared between users or devices until a server API/database is connected.
