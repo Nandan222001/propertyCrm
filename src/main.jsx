@@ -1,29 +1,1603 @@
-import React,{useState,useEffect} from 'react';import{createRoot}from'react-dom/client';import{LayoutDashboard,Map,ClipboardList,Wallet,Users,Handshake,Percent,ChartNoAxesCombined,FolderOpen,Bell,Settings,Shield,Search,Plus,Download,ChevronDown,ChevronRight,Menu,X,ArrowUpRight,MoreHorizontal,CalendarDays,Building2,House,Receipt,FileText,Clock3,CheckCircle2,AlertCircle,SlidersHorizontal,Send,Eye,Edit2,LockKeyhole,RefreshCw,FileSpreadsheet,MapPin,IndianRupee,Mail,Phone,Activity,Trash2,LogOut}from'lucide-react';import{BrowserRouter,useLocation,useNavigate}from'react-router-dom';import'./style.css';
-const nav=['Overview','Projects & plots','Bookings','Payments','Customers','Agents','Commissions','Reports','Documents','Notifications','User & role management','Administration'],icons=[LayoutDashboard,Map,ClipboardList,Wallet,Users,Handshake,Percent,ChartNoAxesCombined,FolderOpen,Bell,Shield,Settings],projects=[['Green Meadows','Phase II · Mumbai','128','38','22','12.6 Cr'],['Silver Oaks','West Zone · Pune','104','24','16','8.4 Cr'],['Park View','North District · Thane','88','12','10','5.2 Cr'],['River Enclave','East Corridor · Mumbai','64','8','6','3.8 Cr']],seedBookings=[['BK-2026-0148','Rajesh Sharma','Green Meadows','A-012','28 Sep 2026','18,40,000','14,72,000','Confirmed','M. Kumar'],['BK-2026-0147','Anita Verma','Silver Oaks','B-104','27 Sep 2026','12,60,000','6,30,000','Processing','S. Patel'],['BK-2026-0146','Deepak Iyer','Park View','C-078','27 Sep 2026','25,20,000','25,20,000','Confirmed','M. Kumar'],['BK-2026-0145','Priya Nair','Green Meadows','A-101','26 Sep 2026','9,60,000','4,80,000','Agreement','R. Gupta'],['BK-2026-0144','Sneha Mehta','Green Meadows','B-033','25 Sep 2026','14,00,000','8,40,000','Confirmed','M. Kumar']],seedPlots=[['A-012','Layout A — East','2,400','East','18,40,000','BOOKED','Rajesh Sharma','M. Kumar'],['B-104','Layout B — West','1,800','West','12,60,000','AVAILABLE','—','M. Kumar'],['C-031','Layout C — Park','3,000','North','24,75,000','HOLD','—','S. Patel'],['A-045','Layout A — East','2,400','East','18,40,000','SOLD','Anita Verma','S. Patel'],['B-022','Layout B — West','2,000','South','14,00,000','AVAILABLE','—','—'],['C-078','Layout C — Park','3,000','North-East','25,20,000','BOOKED','Deepak Iyer','M. Kumar'],['A-101','Layout A — East','1,200','East','9,60,000','SOLD','Priya Nair','R. Gupta'],['B-057','Layout B — West','2,400','West','16,80,000','HOLD','—','R. Gupta'],...Array.from({length:32},(_,i)=>[`A-${String(i+13).padStart(3,'0')}`,['Layout A — East','Layout B — West','Layout C — Park'][i%3],['1,800','2,400','3,000'][i%3],['East','West','North'][i%3],['16,80,000','18,40,000','24,75,000'][i%3],['AVAILABLE','AVAILABLE','BOOKED','SOLD','HOLD'][i%5],'—',['M. Kumar','S. Patel','R. Gupta'][i%3]])],seedPays=[['Rajesh Sharma','A-012','Green Meadows','18,40,000','18,40,000','0','—','PAID','M. Kumar'],['Anita Verma','A-045','Green Meadows','18,40,000','11,04,000','7,36,000','12 Oct 2026','PARTIALLY PAID','S. Patel'],['Deepak Iyer','C-078','Park View','25,20,000','25,20,000','0','—','PAID','M. Kumar'],['Priya Nair','A-101','Green Meadows','9,60,000','4,80,000','4,80,000','05 Oct 2026','PENDING','R. Gupta'],['Sneha Mehta','B-033','Green Meadows','14,00,000','8,40,000','5,60,000','18 Sep 2026','OVERDUE','M. Kumar'],['Vikram Joshi','C-015','Silver Oaks','24,75,000','12,37,500','12,37,500','12 Sep 2026','OVERDUE','S. Patel'],['Karan Rao','B-104','Silver Oaks','12,60,000','6,30,000','6,30,000','22 Oct 2026','PENDING','R. Gupta']],agents=[['M. Kumar','AG-014','9','1.12 Cr','70.4 L','2.24 L'],['S. Patel','AG-008','7','86.0 L','55.2 L','1.72 L'],['R. Gupta','AG-021','4','52.5 L','31.5 L','1.05 L'],['A. Khan','AG-003','3','38.4 L','19.2 L','0.77 L'],['N. Bose','AG-017','2','24.0 L','12.0 L','0.48 L']];
-const seedCrud={'Overview':[{name:'Daily business report',reference:'RPT-2026-0928',category:'Daily report',amount:'4.2 L',status:'Ready',notes:'Sales, collection and operations summary'}],'Projects & plots':[{name:'Green Meadows',reference:'PRJ-001',category:'Mumbai · Phase II',amount:'128 plots',status:'Active',notes:'Master project record'},{name:'Silver Oaks',reference:'PRJ-002',category:'Pune · West Zone',amount:'104 plots',status:'Active',notes:'Master project record'}],'Bookings':[{name:'Rajesh Sharma',reference:'BK-2026-0148',category:'Green Meadows · A-012',amount:'18,40,000',status:'Confirmed',notes:'12 monthly installments'}],'Payments':[{name:'Sneha Mehta',reference:'PAY-0214',category:'Green Meadows · B-033',amount:'5,60,000',status:'Overdue',notes:'Payment follow-up required'}],'Customers':[{name:'Rajesh Sharma',reference:'CUS-0148',category:'Green Meadows · A-012',amount:'18,40,000',status:'Active',notes:'Assigned agent M. Kumar'}],'Agents':[{name:'M. Kumar',reference:'AG-014',category:'Green Meadows · Silver Oaks',amount:'7.68 L',status:'Active',notes:'96 assigned plots'}],'Commissions':[{name:'M. Kumar',reference:'COM-0148',category:'Green Meadows · A-012',amount:'36,800',status:'Approved',notes:'2.0% commission'}],'Reports':[{name:'Daily business report',reference:'RPT-2026-0928',category:'Daily report',amount:'4.2 L',status:'Ready',notes:'Illustrative daily report'}],'Documents':[{name:'Booking Form',reference:'DOC-0148',category:'Rajesh Sharma · A-012',amount:'PDF',status:'Filed',notes:'Customer booking document'}],'Notifications':[{name:'Payment overdue · Sneha Mehta',reference:'NTF-0024',category:'Follow-up',amount:'5,60,000',status:'Open',notes:'10 days overdue'}],'User & role management':[{name:'Arjun Shah',reference:'USR-001',category:'Administrator',amount:'—',status:'Active',notes:'Full administration access'}],'Administration':[{name:'Payment preferences',reference:'CFG-PAY',category:'Configuration',amount:'—',status:'Enabled',notes:'Receipts and installment rules'}]};const seedUsers=[{id:'USR-001',name:'Arjun Shah',email:'admin@nmtsolution.demo',phone:'+91 98765 00001',role:'ADMIN',status:'Active'},{id:'USR-002',name:'Meera Kumar',email:'meera@nmtsolution.demo',phone:'+91 98765 00002',role:'SALES MANAGER',status:'Active'},{id:'USR-003',name:'Sanjay Patel',email:'sanjay@nmtsolution.demo',phone:'+91 98765 00003',role:'SALES AGENT',status:'Active'},{id:'USR-004',name:'Neha Desai',email:'neha@nmtsolution.demo',phone:'+91 98765 00004',role:'ACCOUNTS',status:'Active'},{id:'USR-005',name:'Board View',email:'management@nmtsolution.demo',phone:'—',role:'MANAGEMENT',status:'Active'}];const pathFor={'Overview':'/','Projects & plots':'/projects-plots','Bookings':'/bookings','Payments':'/payments','Customers':'/customers','Customer detail':'/customers/detail','Agents':'/agents','Commissions':'/commissions','Reports':'/reports','Documents':'/documents','Notifications':'/notifications','User & role management':'/user-roles','Administration':'/administration'};function App(){const location=useLocation(),navigate=useNavigate(),page=Object.keys(pathFor).find(k=>pathFor[k]===location.pathname)||'Overview',[mobile,M]=useState(false),[modal,D]=useState(''),[toast,T]=useState(''),[search,S]=useState(''),[period,Q]=useState('This month'),[project,PR]=useState('All projects'),[role,R]=useState('ADMIN'),[tab,TB]=useState('Plots'),[filter,F]=useState('All status'),[selected,SEL]=useState(null),[session,SESSION]=useState(localStorage.getItem('nmt_session')||''),[userEdit,UEDIT]=useState(null),[users,USERS]=useState(()=>JSON.parse(localStorage.getItem('nmt_users')||'null')||seedUsers);const[bookings,B]=useState(()=>JSON.parse(localStorage.getItem('nmt_bookings')||'null')||seedBookings),[plots,PL]=useState(()=>JSON.parse(localStorage.getItem('nmt_plots')||'null')||seedPlots),[pays,PAY]=useState(()=>JSON.parse(localStorage.getItem('nmt_payments')||'null')||seedPays),[fups,FUP]=useState({}),[crud,CR]=useState(()=>{const saved=JSON.parse(localStorage.getItem('nmt_module_crud')||'null')||seedCrud;return Object.fromEntries(Object.entries(saved).map(([k,rows])=>[k,rows.map((r,i)=>({...r,id:r.id||`${k}-${i+1}`}))]))}),[crudPage,CP]=useState('Overview'),[editRecord,ER]=useState(null);useEffect(()=>localStorage.setItem('nmt_bookings',JSON.stringify(bookings)),[bookings]);useEffect(()=>localStorage.setItem('nmt_plots',JSON.stringify(plots)),[plots]);useEffect(()=>localStorage.setItem('nmt_payments',JSON.stringify(pays)),[pays]);useEffect(()=>localStorage.setItem('nmt_module_crud',JSON.stringify(crud)),[crud]);useEffect(()=>localStorage.setItem('nmt_users',JSON.stringify(users)),[users]);useEffect(()=>{if(session)R(session)},[session]);useEffect(()=>{if(page==='Projects & plots')TB('Plots');if(page==='Bookings')TB('All bookings')},[page]);useEffect(()=>{if(toast){let t=setTimeout(()=>T(''),2800);return()=>clearTimeout(t)}},[toast]);const notify=t=>T(t),go=p=>{navigate(pathFor[p]||'/');S('');M(false);if(p!=='Customer detail')SEL(null);TB(p==='Projects & plots'?'Plots':'All bookings')};const meta={'Overview':['Good morning, Arjun','Here’s what’s happening across your projects today.'],'Projects & plots':['Project & plot management','Your project portfolio, plot availability and customer allocations.'],'Bookings':['Sales booking management','A structured, auditable path from enquiry to customer receipt.'],'Payments':['Payment & collection management','Every rupee booked, collected and pending — reconciled daily.'],'Customers':['Customer & booking records','Customer details, plot allocation, payment history and documents.'],'Agents':['Sales agent management','Agent activity, output and earnings — tracked to the plot level.'],'Commissions':['Commission management','Review eligibility, approvals and agent payouts.'],'Reports':['Reports & business intelligence','Daily, weekly and periodic views across every project.'],'Documents':['Document management','Booking forms, agreements, allotment letters and receipts.'],'Notifications':['Notifications & follow-ups','Keep payment reminders and operational alerts moving.'],'User & role management':['Role-based access & control','Every user sees exactly what their role demands.'],'Administration':['Administration & settings','Configure projects, users, permissions and business preferences.']};const exportCsv=()=>{let rows=page==='Payments'?pays.map(x=>x.join(',')):bookings.map(x=>x.join(',')),head=page==='Payments'?'Customer,Plot,Project,Booking value,Paid,Pending,Due date,Status,Agent':'Booking ID,Customer,Project,Plot,Date,Value,Paid,Status,Agent';let a=document.createElement('a');a.href=URL.createObjectURL(new Blob([[head,...rows].join('\n')],{type:'text/csv'}));a.download=`nmt-${page.toLowerCase().replaceAll(' ','-')}.csv`;a.click();notify('CSV report downloaded')};const save=d=>{if(modal==='user'){USERS(userEdit?users.map(u=>u.id===userEdit.id?{...u,...d}:u):[{...d,id:`USR-${crypto.randomUUID()}`,status:d.status||'Active'},...users]);notify(userEdit?'User updated':'User created');UEDIT(null)}else if(modal==='record'){let prior=editRecord;CR({...crud,[crudPage]:prior?(crud[crudPage]||[]).map(x=>x.id===prior.id?{...d,id:prior.id,updatedAt:new Date().toLocaleString()}:x):[{...d,id:crypto.randomUUID(),createdAt:new Date().toLocaleString()},...(crud[crudPage]||[])]});notify(prior?'Record updated':'Record created');ER(null)}else if(modal==='booking'){let id=`BK-2026-${String(149+bookings.length-seedBookings.length).padStart(4,'0')}`,b=[id,d.customer,d.project,d.plot,'28 Sep 2026',d.amount,'0','Processing',d.agent];B([b,...bookings]);PL(plots.map(x=>x[0]===d.plot?[...x.slice(0,5),'BOOKED',d.customer,d.agent]:x));notify('Booking created and plot marked booked')}else if(modal==='payment'){let due=Number(d.total.replaceAll(',',''))-Number(d.paid.replaceAll(',',''));PAY([[d.customer,d.plot,d.project,d.total,d.paid,due.toLocaleString('en-IN'),d.due||'—',due?'PENDING':'PAID',d.agent||'M. Kumar'],...pays]);notify('Payment recorded in customer ledger')}else notify(`${modal} saved successfully`);D('')};let heading=meta[page]||[page,'Customer profile and linked operational records.'];if(!session)return <LoginScreen onLogin={r=>{SESSION(r);R(r);localStorage.setItem('nmt_session',r)}}/>;return <div className="app-shell"><aside className={`sidebar ${mobile?'open':''}`}><div className="brand"><div className="brand-mark">N</div><div><b>NMT <span>ERP</span></b><small>REAL ESTATE OPERATIONS</small></div><button className="sidebar-close" onClick={()=>M(false)}><X size={18}/></button></div><button className="workspace" onClick={()=>PR(project==='All projects'?'Green Meadows':'All projects')}><span className="workspace-icon">GM</span><span><b>{project==='All projects'?'Green Meadows':project}</b><small>Phase II · Mumbai</small></span><ChevronDown size={15}/></button><div className="nav-label">WORKSPACE</div><nav>{nav.slice(0,7).map((n,i)=>{let I=icons[i];return <button className={`nav-item ${page===n?'active':''}`} key={n} onClick={()=>go(n)}><I size={16}/>{n}{n==='Bookings'&&<i>6</i>}{n==='Payments'&&<i className="alert-count">24</i>}</button>})}</nav><div className="nav-label nav-gap">INSIGHTS</div><nav>{nav.slice(7).map((n,j)=>{let I=icons[j+7];return <button className={`nav-item ${page===n?'active':''}`} key={n} onClick={()=>go(n)}><I size={16}/>{n}</button>})}</nav><div className="sidebar-bottom"><div className="help-card"><div className="help-symbol">✳</div><b>Need a hand?</b><p>Visit the help center for quick answers and guides.</p><button onClick={()=>notify('Help center coming soon')}>Open help center ↗</button></div><div className="user-profile"><div className="avatar avatar-indigo">AS</div><div><b>Arjun Shah</b><small>{role}</small></div><select value={role} onChange={e=>{R(e.target.value);SESSION(e.target.value);localStorage.setItem('nmt_session',e.target.value);notify(`Role switched to ${e.target.value}`)}}><option>ADMIN</option><option>SUPER ADMIN</option><option>SALES MANAGER</option><option>SALES AGENT</option><option>ACCOUNTS</option><option>MANAGEMENT</option></select><button className="logout-button" title="Sign out" onClick={()=>{SESSION('');localStorage.removeItem('nmt_session')}}><LogOut size={14}/></button></div></div></aside><main className="main"><header className="topbar"><button className="menu-toggle" onClick={()=>M(true)}><Menu size={19}/></button><div className="breadcrumb">Workspace <span>/</span> <b>{page}</b></div><div className="top-actions"><div className="global-search"><Search size={14}/><input placeholder="Search anything..." value={search} onChange={e=>S(e.target.value)}/></div><button className="top-icon" onClick={()=>go('Notifications')}><Bell size={17}/><em/></button><div className="top-divider"/><div className="top-user"><div className="avatar avatar-indigo">AS</div><span>Arjun Shah</span><ChevronDown size={14}/></div></div></header><div className="content"><div className="page-heading"><div><div className="eyebrow"><i className="live-dot"/> MONDAY, 28 SEPTEMBER 2026</div><h1>{heading[0]} {page==='Overview'&&<span className="wave">✳</span>}</h1><p>{heading[1]}</p></div><div className="heading-actions"><button className="button button-white" onClick={exportCsv}><Download size={14}/> Export</button><button className="button button-primary" onClick={()=>{if(page==='User & role management'){UEDIT(null);D('user')}else{CP(page);ER(null);D(page==='Payments'?'payment':page==='Bookings'?'booking':'record')}}}><Plus size={15}/>{page==='Payments'?'Record payment':page==='Projects & plots'?'Add project':page==='Agents'?'Add agent':page==='Customers'?'Add customer':page==='User & role management'?'Add team member':'New booking'}</button></div></div><div className="filters"><label><span>PROJECT</span><select value={project} onChange={e=>PR(e.target.value)}><option>All projects</option>{projects.map(p=><option key={p[0]}>{p[0]}</option>)}</select></label><label><span>PERIOD</span><select value={period} onChange={e=>Q(e.target.value)}><option>This month</option><option>Last month</option><option>This quarter</option><option>This year</option></select></label><label className="search-filter"><Search size={14}/><input placeholder={`Search ${page.toLowerCase()}...`} value={search} onChange={e=>S(e.target.value)}/></label><div className="filter-meta"><i className="live-dot"/> {project==='All projects'?'All projects':project} <span className="meta-divider"/> {period} <span className="meta-divider"/> Live data</div></div>
-{page==='Overview'&&<RoleDashboard role={role} bookings={bookings} pays={pays} go={go} D={D} notify={notify}/>}{page==='Projects & plots'&&<Projects plots={plots} search={search} project={project} filter={filter} F={F} tab={tab} TB={TB} notify={notify} projects={projects}/>}{page==='Bookings'&&<Bookings bookings={bookings} project={project} search={search} tab={tab} TB={TB} setSelected={SEL} go={go}/>}{page==='Payments'&&<Payments pays={pays} project={project} search={search} filter={filter} F={F} D={D} notify={notify}/>}{page==='Customers'&&<Customers bookings={bookings} project={project} search={search} go={go} setSelected={SEL} selected={selected}/>}{page==='Agents'&&<Agents search={search} notify={notify}/>}{page==='Commissions'&&<Commissions search={search} notify={notify}/>}{page==='Reports'&&<Reports notify={notify}/>}{page==='Documents'&&<Documents notify={notify}/>}{page==='Notifications'&&<Notifications fups={fups} FUP={FUP} notify={notify}/>}{page==='User & role management'&&<><UsersAdmin users={users} create={()=>{UEDIT(null);D('user')}} edit={u=>{UEDIT(u);D('user')}} remove={u=>{if(window.confirm(`Delete ${u.name}?`)){USERS(users.filter(x=>x.id!==u.id));notify('User deleted')}}}/><Roles role={role} notify={notify}/></>}{page==='Administration'&&<Administration notify={notify}/>}{page==='Customer detail'&&<CustomerDetail selected={selected||bookings[0]} notify={notify}/>}
-<CrudWorkspace page={page} records={crud[page]||[]} project={project} search={search} create={()=>{CP(page);ER(null);D('record')}} edit={r=>{CP(page);ER(r);D('record')}} view={r=>notify(`${r.name} · ${r.reference} · ${r.status} · ${r.notes}`)} remove={r=>{if(window.confirm(`Delete ${r.name}?`)){CR({...crud,[page]:(crud[page]||[]).filter(x=>x.id!==r.id)});notify('Record deleted')}}}/><footer><span>© 2026 NMT Solution <i/> Real Estate ERP</span><span>Demo environment · Illustrative data</span></footer></div></main>{modal&&<Modal kind={modal} close={()=>{D('');ER(null)}} save={save} context={crudPage} initial={modal==='user'?userEdit:editRecord}/>}<div className={`toast ${toast?'show':''}`}><CheckCircle2 size={16}/><b>{toast}</b></div></div>}
-function Avatar({name,i=0}){return <div className={`avatar avatar-${['peach','mint','lilac','sky','rose'][i%5]}`}>{(name||'NA').split(' ').slice(0,2).map(x=>x[0]).join('').toUpperCase()}</div>}function Badge({children}){let s=String(children).toLowerCase();return <span className={`badge ${s.includes('paid')||s.includes('confirmed')||s==='available'||s==='approved'||s==='active'? 'badge-green':s.includes('overdue')||s.includes('hold')||s.includes('pending')||s.includes('processing')?'badge-amber':s.includes('sold')?'badge-purple':'badge-blue'}`}>{children}</span>}function Mini({title,value,color=''}){return <div className="mini-stat"><small>{title}</small><b className={color}>{value}</b></div>}function Table({headers,rows}){return <div className="table-scroll data-table"><table><thead><tr>{headers.map((h,i)=><th key={i}>{h}</th>)}</tr></thead><tbody>{rows.length?rows.map((r,i)=><tr key={i}>{r.map((c,j)=><td key={j}>{c}</td>)}</tr>):<tr><td colSpan={headers.length} className="empty-cell">No records match your search.</td></tr>}</tbody></table></div>}
-function Dashboard({bookings,pays,go,D,notify}){const[chartRange,setChartRange]=useState('Last 6 months');return <><div className="stats-grid">{[['Total sales value','₹12.6','Cr','↗ 12.8%','indigo'],['Total collection','₹7.9','Cr','↗ 8.2%','green'],['Pending payments','₹4.7','Cr','↓ 3.4%','amber'],['Available plots','176','/ 384 plots','','blue']].map(([a,b,c,d,e])=><article className="stat-card" key={a}><div className="stat-top">{a}<span className={`stat-icon ${e}`}>{e==='green'?'₹':e==='amber'?'◷':e==='blue'?'⌂':'↗'}</span></div><div className="stat-value">{b}<span>{c}</span></div>{e==='blue'&&<div className="progress-track"><span/></div>}<div className="stat-foot">{e==='blue'?<>46% inventory available <span className="trend neutral">4 projects</span></>:<><b className={`trend ${e==='amber'?'down':'up'}`}>{d}</b>vs last month<div className={`sparkline spark-${e}`}>{[25,34,42,53,45,68,60,80,73,100].map((x,i)=><i key={i} style={{height:x+'%'}}/>)}</div></>}</div></article>)}</div><div className="overview-grid"><article className="panel sales-panel"><div className="panel-head"><div><h2>Sales overview</h2><p>Sales value and collection over time</p></div><select className="select-mini" value={chartRange} onChange={e=>setChartRange(e.target.value)}><option>Last 6 months</option><option>This year</option></select></div><div className="chart-legend"><span><i className="legend-dot indigo-dot"/>Sales value</span><span><i className="legend-dot green-dot"/>Collection</span></div><div className="chart-wrap"><div className="y-labels"><span>₹4 Cr</span><span>₹3 Cr</span><span>₹2 Cr</span><span>₹1 Cr</span><span>₹0</span></div><div className="chart"><div className="grid-lines"><i/><i/><i/><i/><i/></div><div className="bars">{[.9,1.4,1.8,2.4,2.9,3.2].map((v,i)=><div className="bar-group" key={i}><div className="bar" style={{height:v/4*100+'%'}} title={`Sales ₹${v} Cr`}/><div className="bar collection" style={{height:[.8,1,.9,1.2,1.4,1.6][i]/4*100+'%'}} title="Collection"/></div>)}</div></div><div className="x-labels">{['Apr','May','Jun','Jul','Aug','Sep'].map(x=><span key={x}>{x}</span>)}</div></div></article><article className="panel inventory-panel"><div className="panel-head"><div><h2>Plot inventory</h2><p>Availability across all projects</p></div><button className="text-button" onClick={()=>go('Projects & plots')}>View plots <ArrowUpRight size={13}/></button></div><div className="donut-area"><div className="donut"><div className="donut-center"><b>384</b><small>Total plots</small></div></div><div className="donut-legend">{[['Available','176','46%','available-dot'],['Booked','94','24%','booked-dot'],['Sold','82','21%','sold-dot'],['On hold','32','9%','hold-dot']].map(x=><div key={x[0]}><i className={`legend-dot ${x[3]}`}/><span>{x[0]}</span><b>{x[1]} <small>{x[2]}</small></b></div>)}</div></div><div className="inventory-footer">{projects.map((p,i)=><div key={p[0]}><i className={`project-swatch swatch-${i}`}/><span>{p[0]}</span><b>{p[2]}</b></div>)}</div></article></div><div className="bottom-grid"><article className="panel activity-panel"><div className="panel-head"><div><h2>Recent bookings</h2><p>Latest customer plot bookings</p></div><button className="text-button" onClick={()=>go('Bookings')}>View all →</button></div><Table headers={['CUSTOMER','PROJECT / PLOT','BOOKING DATE','AMOUNT','STATUS']} rows={bookings.slice(0,4).map((b,i)=>[<div className="customer-cell"><Avatar name={b[1]} i={i}/><span><b>{b[1]}</b><small>{b[0]}</small></span></div>,<><b>{b[2]}</b><small className="subline">Plot {b[3]}</small></>,b[4],`₹${b[5]}`,<Badge>{b[7]}</Badge>])}/></article><article className="panel dues-panel"><div className="panel-head"><div><h2>Payment follow-ups</h2><p>Customers with upcoming dues</p></div><button className="text-button" onClick={()=>go('Payments')}>View all →</button></div><div className="dues-list">{pays.filter(p=>p[7]==='OVERDUE'||p[7]==='PENDING').slice(0,3).map((p,i)=><div className="due-row" key={p[0]}><div className="due-person"><Avatar name={p[0]} i={i}/><div><b>{p[0]}</b><small>{p[2]} · {p[1]}</small></div></div><div className="due-amount"><b>₹{p[5]}</b><small className={p[7]==='OVERDUE'?'overdue':''}>{p[7]==='OVERDUE'?'Overdue':`Due ${p[6]}`}</small></div><button className="row-more" onClick={()=>notify('Follow-up noted') }><MoreHorizontal size={15}/></button></div>)}</div><button className="reminder-button" onClick={()=>notify('Payment reminders queued for pending customers')}><Send size={13}/> Send payment reminders <ArrowUpRight size={13}/></button></article></div><div className="bottom-strip"><div className="strip-item"><span className="strip-icon green"><IndianRupee size={15}/></span><div><small>TODAY'S COLLECTION</small><b>₹4.2 L</b></div><span className="trend up">+8.4%</span></div><div className="strip-item"><span className="strip-icon purple"><Users size={15}/></span><div><small>ACTIVE SALES AGENTS</small><b>14 of 18</b></div><a onClick={()=>go('Agents')}>View team →</a></div><div className="strip-item"><span className="strip-icon orange"><Percent size={15}/></span><div><small>COMMISSION GENERATED</small><b>₹48.2 L</b></div><Badge>₹6.4 L pending</Badge></div></div></>}
-function Projects({plots,search,project,filter,F,tab,TB,notify,projects}) {
- const list=plots.filter(p=>p.join(" ").toLowerCase().includes(search.toLowerCase())&&(project==="All projects"||((p[0].startsWith("A-")?"Green Meadows":p[0].startsWith("B-")?"Silver Oaks":"Park View")===project))&&(filter==="All status"||p[5]===filter.toUpperCase()));
- const plotRows=list.map(p=>[<b>{p[0]}</b>,p[1],p[2],p[3],`₹${p[4]}`,<Badge>{p[5]}</Badge>,p[6],p[7],<button className="icon-action" onClick={()=>notify(`Plot ${p[0]} details opened`)}><Eye size={14}/></button>]);
- return <><div className="mini-stats four"><Mini title="TOTAL PROJECTS" value="4"/><Mini title="TOTAL PLOTS" value="384"/><Mini title="AVAILABLE" value="176" color="green-text"/><Mini title="ON HOLD" value="32" color="amber-text"/></div><div className="panel section-panel"><div className="tabs">{["Plots","Layout","Projects"].map(t=><button className={tab===t?"selected":""} key={t} onClick={()=>TB(t)}>{t==="Plots"?"Plot inventory":t==="Layout"?"Visual layout":"Projects"}</button>)}<div className="table-tools"><select value={filter} onChange={e=>F(e.target.value)}>{["All status","Available","Booked","Sold","Hold"].map(x=><option key={x}>{x}</option>)}</select></div></div>{tab==="Layout"?<div className="layout-view"><div className="layout-heading"><div><h3>Green Meadows — Phase II</h3><p>Illustrative sample plotted layout · Select a plot to inspect status</p></div><div className="layout-legend"><span>Available</span><span>Hold</span><span>Booked</span><span>Sold</span></div></div><div className="plot-layout-grid">{plots.slice(0,40).map(p=><button key={p[0]} className={`plot-tile ${p[5].toLowerCase()}`} onClick={()=>notify(`${p[0]} · ${p[5]} · ₹${p[4]}`)}><b>{p[0]}</b><small>{p[2]} sq.ft</small></button>)}</div></div>:tab==="Projects"?<Table headers={["PROJECT","LOCATION","PLOTS","SOLD","BOOKED","SALES VALUE","STATUS"]} rows={projects.map(p=>[<b>{p[0]}</b>,p[1],p[2],p[3],p[4],`₹${p[5]}`,<Badge>Active</Badge>])}/>:<Table headers={["PLOT NO.","LAYOUT","AREA (SQ.FT)","FACING","PRICE","STATUS","CUSTOMER","AGENT","ACTIONS"]} rows={plotRows}/>}</div></>
+import React, { useState, useEffect } from 'react';
+import { createRoot } from 'react-dom/client';
+import { BrowserRouter, useLocation, useNavigate } from 'react-router-dom';
+import {
+  LayoutDashboard, Map, ClipboardList, Wallet, Users, Handshake, Percent,
+  ChartNoAxesCombined, FolderOpen, Bell, Settings, Shield, Search, Plus,
+  Download, ChevronDown, ChevronRight, Menu, X, ArrowUpRight, MoreHorizontal,
+  CalendarDays, Building2, House, Receipt, FileText, Clock3, CheckCircle2,
+  AlertCircle, SlidersHorizontal, Send, Eye, Edit2, LockKeyhole, RefreshCw,
+  FileSpreadsheet, MapPin, IndianRupee, Mail, Phone, Activity, Trash2, LogOut,
+  Sparkles, Check, CheckCircle
+} from 'lucide-react';
+
+import './style.css';
+import './components/RoleThemeStyles.css';
+
+import {
+  projects, seedBookings, seedPlots, seedPays, agents, seedUsers, seedCrud, roleConfigs
+} from './data/seedData';
+
+import { SuperAdminDashboard } from './components/dashboards/SuperAdminDashboard';
+import { AdminDashboard } from './components/dashboards/AdminDashboard';
+import { SalesManagerDashboard } from './components/dashboards/SalesManagerDashboard';
+import { SalesAgentDashboard } from './components/dashboards/SalesAgentDashboard';
+import { AccountsDashboard } from './components/dashboards/AccountsDashboard';
+import { ManagementDashboard } from './components/dashboards/ManagementDashboard';
+import { RoleContextBanner } from './components/RoleContextBanner';
+import { LoginScreen } from './components/LoginScreen';
+
+const pathFor = {
+  'Overview': '/',
+  'Projects & plots': '/projects-plots',
+  'Bookings': '/bookings',
+  'Payments': '/payments',
+  'Customers': '/customers',
+  'Customer detail': '/customers/detail',
+  'Agents': '/agents',
+  'Commissions': '/commissions',
+  'Reports': '/reports',
+  'Documents': '/documents',
+  'Notifications': '/notifications',
+  'User & role management': '/user-roles',
+  'Administration': '/administration'
+};
+
+const iconMap = {
+  'Overview': LayoutDashboard,
+  'Projects & plots': Map,
+  'Bookings': ClipboardList,
+  'Payments': Wallet,
+  'Customers': Users,
+  'Agents': Handshake,
+  'Commissions': Percent,
+  'Reports': ChartNoAxesCombined,
+  'Documents': FolderOpen,
+  'Notifications': Bell,
+  'User & role management': Shield,
+  'Administration': Settings
+};
+
+export function App() {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const page = Object.keys(pathFor).find(k => pathFor[k] === location.pathname) || 'Overview';
+
+  // Navigation & UI state
+  const [mobile, setMobile] = useState(false);
+  const [modal, setModal] = useState('');
+  const [toast, setToast] = useState('');
+  const [search, setSearch] = useState('');
+  const [period, setPeriod] = useState('This month');
+  const [project, setProject] = useState('All projects');
+  const [tab, setTab] = useState('Plots');
+  const [filter, setFilter] = useState('All status');
+  const [selected, setSelected] = useState(null);
+
+  // Authentication & Role state
+  const [session, setSession] = useState(() => localStorage.getItem('nmt_session') || 'ADMIN');
+  const [role, setRole] = useState(() => localStorage.getItem('nmt_role') || 'ADMIN');
+  const [users, setUsers] = useState(() => JSON.parse(localStorage.getItem('nmt_users') || 'null') || seedUsers);
+  const [currentUser, setCurrentUser] = useState(() => {
+    const saved = JSON.parse(localStorage.getItem('nmt_current_user') || 'null');
+    return saved || roleConfigs['ADMIN'].defaultUser;
+  });
+
+  // Core ERP Domain Data
+  const [bookings, setBookings] = useState(() => JSON.parse(localStorage.getItem('nmt_bookings') || 'null') || seedBookings);
+  const [plots, setPlots] = useState(() => JSON.parse(localStorage.getItem('nmt_plots') || 'null') || seedPlots);
+  const [pays, setPays] = useState(() => JSON.parse(localStorage.getItem('nmt_payments') || 'null') || seedPays);
+  const [fups, setFups] = useState({});
+  const [crud, setCrud] = useState(() => {
+    const saved = JSON.parse(localStorage.getItem('nmt_module_crud') || 'null') || seedCrud;
+    return Object.fromEntries(
+      Object.entries(saved).map(([k, rows]) => [k, rows.map((r, i) => ({ ...r, id: r.id || `${k}-${i + 1}` }))])
+    );
+  });
+  const [crudPage, setCrudPage] = useState('Overview');
+  const [editRecord, setEditRecord] = useState(null);
+  const [userEdit, setUserEdit] = useState(null);
+
+  // Sync to localStorage
+  useEffect(() => localStorage.setItem('nmt_bookings', JSON.stringify(bookings)), [bookings]);
+  useEffect(() => localStorage.setItem('nmt_plots', JSON.stringify(plots)), [plots]);
+  useEffect(() => localStorage.setItem('nmt_payments', JSON.stringify(pays)), [pays]);
+  useEffect(() => localStorage.setItem('nmt_module_crud', JSON.stringify(crud)), [crud]);
+  useEffect(() => localStorage.setItem('nmt_users', JSON.stringify(users)), [users]);
+  useEffect(() => localStorage.setItem('nmt_role', role), [role]);
+  useEffect(() => localStorage.setItem('nmt_current_user', JSON.stringify(currentUser)), [currentUser]);
+
+  useEffect(() => {
+    if (page === 'Projects & plots') setTab('Plots');
+    if (page === 'Bookings') setTab('All bookings');
+  }, [page]);
+
+  useEffect(() => {
+    if (toast) {
+      const t = setTimeout(() => setToast(''), 3000);
+      return () => clearTimeout(t);
+    }
+  }, [toast]);
+
+  const notify = (msg) => setToast(msg);
+
+  const go = (p) => {
+    navigate(pathFor[p] || '/');
+    setSearch('');
+    setMobile(false);
+    if (p !== 'Customer detail') setSelected(null);
+    setTab(p === 'Projects & plots' ? 'Plots' : 'All bookings');
+  };
+
+  const handleRoleChange = (newRole) => {
+    setRole(newRole);
+    localStorage.setItem('nmt_role', newRole);
+    const matchedUser = users.find(u => u.role === newRole) || roleConfigs[newRole]?.defaultUser || {
+      name: `${newRole} User`,
+      email: `${newRole.toLowerCase().replace(' ', '')}@nmtsolution.demo`,
+      role: newRole
+    };
+    setCurrentUser(matchedUser);
+    notify(`Switched perspective to ${newRole}`);
+  };
+
+  const handleLogin = (selectedRole, userObj) => {
+    setRole(selectedRole);
+    setSession(selectedRole);
+    localStorage.setItem('nmt_session', selectedRole);
+    localStorage.setItem('nmt_role', selectedRole);
+    const user = userObj || users.find(u => u.role === selectedRole) || roleConfigs[selectedRole].defaultUser;
+    setCurrentUser(user);
+    notify(`Welcome to NMT ERP! Logged in as ${user.name} (${selectedRole}).`);
+    go('Overview');
+  };
+
+  const handleRegister = (newUser) => {
+    setUsers([newUser, ...users]);
+    setRole(newUser.role);
+    setSession(newUser.role);
+    setCurrentUser(newUser);
+    localStorage.setItem('nmt_session', newUser.role);
+    localStorage.setItem('nmt_role', newUser.role);
+    notify(`Welcome, ${newUser.name}! Your ${newUser.role} workspace is ready.`);
+    go('Overview');
+  };
+
+  const handleLogout = () => {
+    setSession('');
+    localStorage.removeItem('nmt_session');
+    notify('Logged out of workspace session.');
+  };
+
+  const exportCsv = () => {
+    const rows = page === 'Payments' ? pays.map(x => x.join(',')) : bookings.map(x => x.join(','));
+    const head = page === 'Payments'
+      ? 'Customer,Plot,Project,Booking value,Paid,Pending,Due date,Status,Agent'
+      : 'Booking ID,Customer,Project,Plot,Date,Value,Paid,Status,Agent';
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([[head, ...rows].join('\n')], { type: 'text/csv' }));
+    a.download = `nmt-${page.toLowerCase().replaceAll(' ', '-')}.csv`;
+    a.click();
+    notify('CSV report exported successfully');
+  };
+
+  const saveRecord = (d) => {
+    if (modal === 'record') {
+      const prior = editRecord;
+      setCrud({
+        ...crud,
+        [crudPage]: prior
+          ? (crud[crudPage] || []).map(x => x.id === prior.id ? { ...d, id: prior.id, updatedAt: new Date().toLocaleString() } : x)
+          : [{ ...d, id: crypto.randomUUID(), createdAt: new Date().toLocaleString() }, ...(crud[crudPage] || [])]
+      });
+      notify(prior ? 'Record updated' : 'Record created');
+      setEditRecord(null);
+    } else if (modal === 'booking') {
+      const id = `BK-2026-${String(149 + bookings.length - seedBookings.length).padStart(4, '0')}`;
+      const b = [id, d.customer, d.project, d.plot, '28 Sep 2026', d.amount, d.paid || '0', 'Processing', d.agent || currentUser.name];
+      setBookings([b, ...bookings]);
+      setPlots(plots.map(x => x[0] === d.plot ? [...x.slice(0, 5), 'BOOKED', d.customer, d.agent || currentUser.name] : x));
+      notify(`Booking created for ${d.customer} · Plot ${d.plot} marked BOOKED`);
+    } else if (modal === 'payment') {
+      const due = Number(d.total.replaceAll(',', '')) - Number(d.paid.replaceAll(',', ''));
+      setPays([[
+        d.customer, d.plot, d.project, d.total, d.paid,
+        due.toLocaleString('en-IN'), d.due || '—', due <= 0 ? 'PAID' : 'PARTIALLY PAID', d.agent || currentUser.name
+      ], ...pays]);
+      notify(`Payment of ₹${d.paid} recorded for ${d.customer}`);
+    } else if (modal === 'user') {
+      if (userEdit) {
+        setUsers(users.map(u => u.id === userEdit.id ? { ...u, ...d } : u));
+        notify(`Team member ${d.name} updated`);
+      } else {
+        const nu = { id: `USR-${String(users.length + 1).padStart(3, '0')}`, ...d, status: d.status || 'Active' };
+        setUsers([...users, nu]);
+        notify(`Team member ${d.name} invited as ${d.role}`);
+      }
+      setUserEdit(null);
+    } else {
+      notify(`${modal} saved successfully`);
+    }
+    setModal('');
+  };
+
+  // If no active session, show the interactive Auth screen with generated real estate photography
+  if (!session) {
+    return <LoginScreen onLogin={handleLogin} onRegister={handleRegister} />;
+  }
+
+  // Active role config & navigation definitions
+  const currentRoleConfig = roleConfigs[role] || roleConfigs['ADMIN'];
+  const workspaceNav = currentRoleConfig.workspaceNav || ['Overview', 'Projects & plots', 'Bookings', 'Payments'];
+  const insightsNav = currentRoleConfig.insightsNav || ['Reports', 'Documents', 'Notifications'];
+
+  const getNavBadge = (itemName) => {
+    if (role === 'SALES AGENT') {
+      if (itemName === 'Bookings') return { text: '3', alert: false };
+      if (itemName === 'Notifications') return { text: '2', alert: false };
+    } else if (role === 'ACCOUNTS') {
+      if (itemName === 'Payments') return { text: '14', alert: true };
+      if (itemName === 'Commissions') return { text: '3', alert: false };
+      if (itemName === 'Notifications') return { text: '6', alert: false };
+    } else if (role === 'SALES MANAGER') {
+      if (itemName === 'Bookings') return { text: '6', alert: false };
+      if (itemName === 'Commissions') return { text: '3 pending', alert: false };
+      if (itemName === 'Notifications') return { text: '4', alert: false };
+    } else if (role === 'SUPER ADMIN') {
+      if (itemName === 'Notifications') return { text: '5', alert: false };
+      if (itemName === 'User & role management') return { text: `${users.length}`, alert: false };
+    } else if (role === 'ADMIN') {
+      if (itemName === 'Bookings') return { text: '6', alert: false };
+      if (itemName === 'Payments') return { text: '24', alert: true };
+      if (itemName === 'Notifications') return { text: '3', alert: false };
+    } else if (role === 'MANAGEMENT') {
+      if (itemName === 'Notifications') return { text: '2', alert: false };
+    }
+    return null;
+  };
+
+  const meta = {
+    'Overview': [currentRoleConfig.title, currentRoleConfig.subtitle],
+    'Projects & plots': ['Project & Plot Inventory', 'Master portfolio, layout availability, plot dimensions and customer allocations.'],
+    'Bookings': ['Sales Booking Operations', 'Auditable transaction lifecycle from token advance to registered conveyance.'],
+    'Payments': ['Collections, Dues & Treasury', 'Every rupee booked, collected and pending — daily banking reconciliations.'],
+    'Customers': ['Customer Master Directory', 'Comprehensive client files, plot allocations, milestone payments, and documents.'],
+    'Agents': ['Sales Force & Agency Roster', 'Agent productivity, active bookings, commission tiering, and performance metrics.'],
+    'Commissions': ['Agent Commissions & Payouts', 'Eligibility rules, manager approvals, TDS tax compliance, and bank disbursements.'],
+    'Reports': ['Reports & Business Intelligence', 'Real-time financial, operational, sales funnel and portfolio BI.'],
+    'Documents': ['Document Vault & Contracts', 'Booking forms, allotment letters, agreement copies, and tax invoices.'],
+    'Notifications': ['Operational Follow-ups & Alerts', 'Payment overdue warnings, customer reminders, and system notifications.'],
+    'User & role management': ['Identity & Role-Based Access (RBAC)', 'Assign permissions, manage workspaces, and invite team members.'],
+    'Administration': ['System Configuration & Master Rules', 'Tax rules, plot layout schemas, banking preferences, and company profiles.']
+  };
+
+  const heading = meta[page] || [page, 'Customer profile and linked operational records.'];
+
+  return (
+    <div className="app-shell">
+      {/* Toast Notification */}
+      {toast && (
+        <div className="app-toast">
+          <CheckCircle size={15} className="green-text" />
+          <span>{toast}</span>
+        </div>
+      )}
+
+      {/* Dynamic Role-Based Sidebar */}
+      <aside className={`sidebar ${mobile ? 'open' : ''}`}>
+        <div className="brand">
+          <div className="brand-mark">N</div>
+          <div>
+            <b>NMT <span>ERP</span></b>
+            <small>ENTERPRISE REAL ESTATE</small>
+          </div>
+          <button className="sidebar-close" onClick={() => setMobile(false)}>
+            <X size={18} />
+          </button>
+        </div>
+
+        {/* Project & Role Chip */}
+        <div className="workspace-card">
+          <button
+            className="workspace"
+            onClick={() => setProject(project === 'All projects' ? 'Green Meadows' : 'All projects')}
+            title="Switch project filter"
+          >
+            <span className="workspace-icon">GM</span>
+            <span>
+              <b>{project === 'All projects' ? 'Green Meadows' : project}</b>
+              <small>Phase II · Mumbai</small>
+            </span>
+            <ChevronDown size={14} />
+          </button>
+
+          <div className="sidebar-role-tag" style={{ borderLeftColor: currentRoleConfig.color }}>
+            <span className="role-dot" style={{ background: currentRoleConfig.color }} />
+            <div className="role-tag-info">
+              <b>{role}</b>
+              <small>{currentRoleConfig.badge}</small>
+            </div>
+          </div>
+        </div>
+
+        {/* Dynamic Nav: Workspace Section */}
+        <div className="nav-label">WORKSPACE</div>
+        <nav>
+          {workspaceNav.map((n) => {
+            const Icon = iconMap[n] || LayoutDashboard;
+            const badge = getNavBadge(n);
+            return (
+              <button
+                className={`nav-item ${page === n ? 'active' : ''}`}
+                key={n}
+                onClick={() => go(n)}
+              >
+                <Icon size={16} />
+                <span>{n}</span>
+                {badge && (
+                  <i className={badge.alert ? 'alert-count' : ''}>
+                    {badge.text}
+                  </i>
+                )}
+              </button>
+            );
+          })}
+        </nav>
+
+        {/* Dynamic Nav: Insights Section */}
+        {insightsNav.length > 0 && (
+          <>
+            <div className="nav-label nav-gap">INSIGHTS & GOVERNANCE</div>
+            <nav>
+              {insightsNav.map((n) => {
+                const Icon = iconMap[n] || FileText;
+                const badge = getNavBadge(n);
+                return (
+                  <button
+                    className={`nav-item ${page === n ? 'active' : ''}`}
+                    key={n}
+                    onClick={() => go(n)}
+                  >
+                    <Icon size={16} />
+                    <span>{n}</span>
+                    {badge && (
+                      <i className={badge.alert ? 'alert-count' : ''}>
+                        {badge.text}
+                      </i>
+                    )}
+                  </button>
+                );
+              })}
+            </nav>
+          </>
+        )}
+
+        {/* Sidebar Footer with Role Switcher & User Profile */}
+        <div className="sidebar-bottom">
+          <div className="user-profile">
+            <div className="avatar avatar-indigo">
+              {currentUser.name ? currentUser.name.substring(0, 2).toUpperCase() : 'AS'}
+            </div>
+            <div className="user-info">
+              <b>{currentUser.name || 'Arjun Shah'}</b>
+              <small>{role}</small>
+            </div>
+
+            {/* Quick Role Switcher */}
+            <select
+              value={role}
+              onChange={(e) => handleRoleChange(e.target.value)}
+              title="Change user perspective"
+            >
+              {['SUPER ADMIN', 'ADMIN', 'SALES MANAGER', 'SALES AGENT', 'ACCOUNTS', 'MANAGEMENT'].map((r) => (
+                <option key={r} value={r}>{r}</option>
+              ))}
+            </select>
+
+            <button
+              className="logout-button"
+              onClick={handleLogout}
+              title="Sign out of workspace"
+            >
+              <LogOut size={14} />
+            </button>
+          </div>
+        </div>
+      </aside>
+
+      {/* Main Workspace Body */}
+      <main className="main">
+        {/* Top Header Bar */}
+        <header className="topbar">
+          <button className="menu-toggle" onClick={() => setMobile(true)}>
+            <Menu size={19} />
+          </button>
+
+          <div className="breadcrumb">
+            Workspace <span>/</span> <b>{page}</b>
+          </div>
+
+          <div className="top-actions">
+            {/* Active Role Indicator in Topbar */}
+            <div className="topbar-role-pill" style={{ background: currentRoleConfig.bg, color: currentRoleConfig.color }}>
+              <Shield size={12} />
+              <span>{role}</span>
+            </div>
+
+            {/* Global Search */}
+            <div className="global-search">
+              <Search size={14} />
+              <input
+                placeholder="Search plots, clients, deals..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+              <kbd>⌘K</kbd>
+            </div>
+
+            {/* Quick Perspective Switcher */}
+            <div className="role-switch-quick">
+              <select
+                value={role}
+                onChange={(e) => handleRoleChange(e.target.value)}
+                className="select-mini role-topbar-select"
+              >
+                {['SUPER ADMIN', 'ADMIN', 'SALES MANAGER', 'SALES AGENT', 'ACCOUNTS', 'MANAGEMENT'].map((r) => (
+                  <option key={r} value={r}>Role: {r}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Notifications Shortcut */}
+            <button className="top-icon" onClick={() => go('Notifications')} title="View alerts">
+              <Bell size={17} />
+              <em />
+            </button>
+
+            <div className="top-divider" />
+
+            {/* User Details & Logout */}
+            <div className="top-user" onClick={handleLogout} title="Click to log out">
+              <div className="avatar avatar-indigo">
+                {currentUser.name ? currentUser.name.substring(0, 2).toUpperCase() : 'AS'}
+              </div>
+              <span>{currentUser.name || 'Arjun Shah'}</span>
+              <LogOut size={13} className="logout-inline-icon" />
+            </div>
+          </div>
+        </header>
+
+        {/* Content Body */}
+        <div className="content">
+          {/* Page Heading & Actions */}
+          <div className="page-heading">
+            <div>
+              <div className="eyebrow">
+                <i className="live-dot" /> ENTERPRISE REAL ESTATE OPERATIONS · LIVE
+              </div>
+              <h1>
+                {heading[0]} {page === 'Overview' && <span className="wave">✳</span>}
+              </h1>
+              <p>{heading[1]}</p>
+            </div>
+
+            <div className="heading-actions">
+              <button className="button button-white" onClick={exportCsv}>
+                <Download size={14} /> Export CSV
+              </button>
+
+              {/* Role-tailored primary CTA */}
+              {role === 'SALES AGENT' && (
+                <button className="button button-primary" onClick={() => setModal('booking')}>
+                  <Plus size={15} /> Quick Book Plot
+                </button>
+              )}
+              {role === 'ACCOUNTS' && (
+                <button className="button button-primary" onClick={() => setModal('payment')}>
+                  <Plus size={15} /> Record Payment
+                </button>
+              )}
+              {(role === 'ADMIN' || role === 'SUPER ADMIN' || role === 'SALES MANAGER') && (
+                <button
+                  className="button button-primary"
+                  onClick={() => {
+                    setCrudPage(page);
+                    setEditRecord(null);
+                    setModal(page === 'Payments' ? 'payment' : page === 'Bookings' ? 'booking' : 'record');
+                  }}
+                >
+                  <Plus size={15} />
+                  {page === 'Payments' ? 'Record Payment' : page === 'Projects & plots' ? 'Add Project' : page === 'Agents' ? 'Add Agent' : page === 'Customers' ? 'Add Customer' : 'New Booking'}
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Filters Bar */}
+          <div className="filters">
+            <label>
+              <span>PROJECT</span>
+              <select value={project} onChange={(e) => setProject(e.target.value)}>
+                <option>All projects</option>
+                {projects.map(p => <option key={p[0]}>{p[0]}</option>)}
+              </select>
+            </label>
+
+            <label>
+              <span>PERIOD</span>
+              <select value={period} onChange={(e) => setPeriod(e.target.value)}>
+                <option>This month</option>
+                <option>Last month</option>
+                <option>This quarter</option>
+                <option>This year</option>
+              </select>
+            </label>
+
+            <label className="search-filter">
+              <Search size={14} />
+              <input
+                placeholder={`Search ${page.toLowerCase()}...`}
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+            </label>
+
+            <div className="filter-meta">
+              <i className="live-dot" /> Live Data
+              <span className="meta-divider" />
+              Role: <b>{role}</b>
+            </div>
+          </div>
+
+          {/* OVERVIEW: Distinct Dashboard per Role */}
+          {page === 'Overview' && (
+            <>
+              {role === 'SUPER ADMIN' && (
+                <SuperAdminDashboard go={go} notify={notify} users={users} />
+              )}
+              {role === 'ADMIN' && (
+                <AdminDashboard bookings={bookings} pays={pays} go={go} D={setModal} notify={notify} />
+              )}
+              {role === 'SALES MANAGER' && (
+                <SalesManagerDashboard go={go} D={setModal} notify={notify} agents={agents} />
+              )}
+              {role === 'SALES AGENT' && (
+                <SalesAgentDashboard go={go} D={setModal} notify={notify} bookings={bookings} plots={plots} />
+              )}
+              {role === 'ACCOUNTS' && (
+                <AccountsDashboard go={go} D={setModal} notify={notify} pays={pays} />
+              )}
+              {role === 'MANAGEMENT' && (
+                <ManagementDashboard go={go} notify={notify} projects={projects} />
+              )}
+            </>
+          )}
+
+          {/* OTHER PAGES: Customized & Role-Adapted */}
+          {page === 'Projects & plots' && (
+            <Projects
+              plots={plots}
+              search={search}
+              project={project}
+              filter={filter}
+              F={setFilter}
+              tab={tab}
+              TB={setTab}
+              notify={notify}
+              projects={projects}
+              role={role}
+              D={setModal}
+            />
+          )}
+
+          {page === 'Bookings' && (
+            <Bookings
+              bookings={bookings}
+              project={project}
+              search={search}
+              tab={tab}
+              TB={setTab}
+              setSelected={setSelected}
+              go={go}
+              role={role}
+              D={setModal}
+              notify={notify}
+            />
+          )}
+
+          {page === 'Payments' && (
+            <Payments
+              pays={pays}
+              project={project}
+              search={search}
+              filter={filter}
+              F={setFilter}
+              D={setModal}
+              notify={notify}
+              role={role}
+            />
+          )}
+
+          {page === 'Customers' && (
+            <Customers
+              bookings={bookings}
+              project={project}
+              search={search}
+              go={go}
+              setSelected={setSelected}
+              selected={selected}
+              role={role}
+            />
+          )}
+
+          {page === 'Agents' && (
+            <Agents
+              search={search}
+              notify={notify}
+              role={role}
+            />
+          )}
+
+          {page === 'Commissions' && (
+            <Commissions
+              search={search}
+              notify={notify}
+              role={role}
+            />
+          )}
+
+          {page === 'Reports' && (
+            <Reports
+              notify={notify}
+              role={role}
+            />
+          )}
+
+          {page === 'Documents' && (
+            <Documents
+              notify={notify}
+              role={role}
+            />
+          )}
+
+          {page === 'Notifications' && (
+            <Notifications
+              fups={fups}
+              FUP={setFups}
+              notify={notify}
+              role={role}
+            />
+          )}
+
+          {page === 'User & role management' && (
+            <Roles
+              role={role}
+              notify={notify}
+              users={users}
+              create={() => { setUserEdit(null); setModal('user'); }}
+              edit={(u) => { setUserEdit(u); setModal('user'); }}
+              remove={(u) => { setUsers(users.filter(x => x.id !== u.id)); notify(`Removed user ${u.name}`); }}
+            />
+          )}
+
+          {page === 'Administration' && (
+            <Administration
+              notify={notify}
+              role={role}
+            />
+          )}
+
+          {page === 'Customer detail' && (
+            <CustomerDetail
+              selected={selected || bookings[0]}
+              notify={notify}
+              role={role}
+            />
+          )}
+
+          {/* Module CRUD Records View */}
+          {page !== 'Overview' && page !== 'Customer detail' && page !== 'User & role management' && (
+            <CrudWorkspace
+              page={page}
+              records={crud[page] || []}
+              project={project}
+              search={search}
+              role={role}
+              create={() => { setCrudPage(page); setEditRecord(null); setModal('record'); }}
+              edit={(r) => { setCrudPage(page); setEditRecord(r); setModal('record'); }}
+              view={(r) => notify(`Inspecting ${r.name}`)}
+              remove={(r) => {
+                setCrud({ ...crud, [page]: (crud[page] || []).filter(x => x.id !== r.id) });
+                notify(`Deleted ${r.name}`);
+              }}
+            />
+          )}
+        </div>
+      </main>
+
+      {/* Modal Dialog */}
+      {modal && (
+        <Modal
+          kind={modal}
+          close={() => { setModal(''); setEditRecord(null); setUserEdit(null); }}
+          save={saveRecord}
+          context={crudPage}
+          initial={editRecord || userEdit}
+          role={role}
+        />
+      )}
+    </div>
+  );
 }
-function Bookings({bookings,project,search,tab,TB,setSelected,go}){let statuses=['All bookings','Confirmed','Processing','Agreement'],rows=bookings.filter(b=>b.join(' ').toLowerCase().includes(search.toLowerCase())&&(project==='All projects'||b[2]===project)&&(tab==='All bookings'||b[7].toLowerCase()===tab.toLowerCase()));return <><div className="mini-stats four"><Mini title="TOTAL BOOKINGS" value="176"/><Mini title="THIS MONTH" value="23" color="green-text"/><Mini title="BOOKING VALUE" value="₹12.6 Cr"/><Mini title="AGREEMENTS PENDING" value="6" color="amber-text"/></div><div className="panel section-panel"><div className="tabs">{statuses.map(t=><button key={t} className={tab===t?'selected':''} onClick={()=>TB(t)}>{t}</button>)}</div><Table headers={['CUSTOMER','PROJECT / PLOT','BOOKING DATE','BOOKING VALUE','PAID','AGENT','STATUS','']} rows={rows.map((b,i)=>[<div className="customer-cell"><Avatar name={b[1]} i={i}/><span><b>{b[1]}</b><small>{b[0]}</small></span></div>,<><b>{b[2]}</b><small className="subline">Plot {b[3]}</small></>,b[4],`₹${b[5]}`,`₹${b[6]}`,b[8],<Badge>{b[7]}</Badge>,<button className="icon-action" onClick={()=>{setSelected(b);go('Customer detail')}}><Eye size={14}/></button>])}/><div className="table-pagination">Showing {rows.length} bookings <span>1–{rows.length} of 176　‹　›</span></div></div></>}
-function Payments({pays,project,search,filter,F,D,notify}){let list=pays.filter(p=>p.join(' ').toLowerCase().includes(search.toLowerCase())&&(project==='All projects'||p[2]===project)&&(filter==='All status'||p[7]===filter.toUpperCase()));return <><div className="mini-stats five">{[['TOTAL BOOKING VALUE','₹12.6 Cr'],['TOTAL COLLECTION','₹7.9 Cr'],["TODAY'S COLLECTION",'₹4.2 L'],['PENDING AMOUNT','₹4.7 Cr'],['OVERDUE AMOUNT','₹86.4 L']].map((x,i)=><Mini key={x[0]} title={x[0]} value={x[1]} color={i===1||i===2?'green-text':i>2?'amber-text':''}/>)}</div><div className="panel section-panel"><div className="status-legend"><b>STATUS LEGEND</b><Badge>PAID</Badge><Badge>PARTIALLY PAID</Badge><Badge>PENDING</Badge><Badge>OVERDUE</Badge></div><div className="tabs"><span className="section-title">Customer payment ledger</span><div className="table-tools"><select value={filter} onChange={e=>F(e.target.value)}>{['All status','Paid','Partially Paid','Pending','Overdue'].map(x=><option>{x}</option>)}</select><button className="button button-primary small-button" onClick={()=>D('payment')}><Plus size={13}/> Record payment</button></div></div><Table headers={['CUSTOMER','PLOT NO.','BOOKING VALUE','PAID','PENDING','NEXT DUE DATE','STATUS','']} rows={list.map((p,i)=>[<div className="customer-cell"><Avatar name={p[0]} i={i}/><span><b>{p[0]}</b><small>{p[2]}</small></span></div>,p[1],`₹${p[3]}`,`₹${p[4]}`,<b>₹{p[5]}</b>,p[6],<Badge>{p[7]}</Badge>,<button className="icon-action" onClick={()=>notify(`Ledger opened for ${p[0]}`)}><Eye size={14}/></button>])}/><div className="table-pagination">Showing {list.length} of 24 customers <span>1–{list.length} of 24　‹　›</span></div></div></>}
-function Customers({bookings,project,search,go,setSelected,selected}){return selected&&selected.length?<CustomerDetail selected={selected} notify={()=>{}}/>:<><div className="mini-stats four"><Mini title="TOTAL CUSTOMERS" value="176"/><Mini title="ACTIVE BOOKINGS" value="152" color="green-text"/><Mini title="DOCUMENTS ON FILE" value="438"/><Mini title="FOLLOW-UPS DUE" value="24" color="amber-text"/></div><div className="panel section-panel"><div className="tabs"><span className="section-title">Customer directory</span></div><Table headers={['CUSTOMER','PROJECT','PLOT ALLOCATION','BOOKING ID','PAYMENT PLAN','BOOKING VALUE','OUTSTANDING','']} rows={bookings.filter(b=>b.join(' ').toLowerCase().includes(search.toLowerCase())&&(project==='All projects'||b[2]===project)).map((b,i)=>[<div className="customer-cell"><Avatar name={b[1]} i={i}/><span><b>{b[1]}</b><small>+91 98•••• •••42</small></span></div>,b[2],`${b[3]} · 2,400 sq.ft`,b[0],'12 monthly installments',`₹${b[5]}`,`₹${Math.max(0,Number(b[5].replaceAll(',',''))-Number(b[6].replaceAll(',',''))).toLocaleString('en-IN')}`,<button className="icon-action" onClick={()=>{setSelected(b);go('Customer detail')}}><Eye size={14}/></button>])}/></div></>}
-function CustomerDetail({selected,notify}){let b=selected;return <div className="customer-detail"><div className="panel customer-summary"><Avatar name={b[1]}/><div><span className="eyebrow">CUSTOMER PROFILE</span><h2>{b[1]}</h2><p>+91 98•••• •••42　 ·　 {b[8]} (AG-014)</p></div><button className="button button-white" onClick={()=>notify('Edit customer profile opened')}><Edit2 size={14}/> Edit profile</button></div><div className="mini-stats four"><Mini title="PROJECT" value={b[2]}/><Mini title="PLOT ALLOCATION" value={`${b[3]} · 2,400 sqft`}/><Mini title="BOOKING ID" value={b[0]}/><Mini title="OUTSTANDING" value={`₹${Math.max(0,Number(b[5].replaceAll(',',''))-Number(b[6].replaceAll(',',''))).toLocaleString('en-IN')}`} color="amber-text"/></div><div className="bottom-grid"><div className="panel section-panel"><div className="tabs"><span className="section-title">Booking & payment timeline</span></div>{[['Booking created',b[4]],['Booking amount received',`₹${b[6]}`],['Next installment due','12 Oct 2026'],['Agreement signed','18 Jun 2026']].map(x=><div className="audit-row" key={x[0]}><span className="plot-dot available"/><div><b>{x[0]}</b><small>{x[1]}</small></div></div>)}</div><div className="panel section-panel"><div className="tabs"><span className="section-title">Documents</span></div>{['Booking Form','Allotment Letter','Agreement','Receipt #0211'].map(x=><div className="document-row" key={x}><FileText size={17}/><b>{x}</b><button className="icon-action" onClick={()=>notify(`Opened ${x}`)}><Eye size={14}/></button></div>)}</div></div></div>}
-function Agents({search,notify}){return <><div className="mini-stats four"><Mini title="ACTIVE AGENTS" value="14" color="green-text"/><Mini title="BOOKINGS THIS MONTH" value="23"/><Mini title="SALES VALUE" value="₹3.84 Cr"/><Mini title="PENDING COMMISSION" value="₹1.92 L" color="amber-text"/></div><div className="panel agent-feature"><div className="agent-profile"><Avatar name="M. Kumar"/><div><span className="eyebrow">FEATURED AGENT · AG-014</span><h2>M. Kumar</h2><p>Green Meadows · Silver Oaks</p></div><button className="button button-white" onClick={()=>notify('Agent profile opened')}><Eye size={14}/> View profile</button></div><div className="agent-kpis">{[['ASSIGNED PLOTS','96'],['CUSTOMER BOOKINGS','31 active'],['TOTAL BOOKING VALUE','₹3.84 Cr'],['COLLECTION GENERATED','₹2.41 Cr'],['COMMISSION GENERATED','₹7.68 L']].map(x=><div key={x[0]}><small>{x[0]}</small><b>{x[1]}</b></div>)}</div></div><div className="panel section-panel"><div className="tabs"><span className="section-title">Agent performance · This month</span></div><Table headers={['#','AGENT','AGENT CODE','BOOKINGS','SALES VALUE','COLLECTION','COMMISSION','STATUS']} rows={agents.filter(a=>a.join(' ').toLowerCase().includes(search.toLowerCase())).map((a,i)=>[i+1,<div className="customer-cell"><Avatar name={a[0]} i={i}/><b>{a[0]}</b></div>,a[1],a[2],`₹${a[3]}`,`₹${a[4]}`,`₹${a[5]}`,<Badge>Active</Badge>])}/></div></>}
-function Commissions({search,notify}){let data=[['M. Kumar','Green Meadows','A-012','18,40,000','2.0%','36,800','APPROVED'],['S. Patel','Green Meadows','C-078','25,20,000','2.0%','50,400','PAYABLE'],['R. Gupta','Silver Oaks','B-104','12,60,000','1.5%','18,900','PAID'],['A. Khan','Green Meadows','A-101','9,60,000','2.0%','19,200','APPROVED'],['N. Bose','Silver Oaks','B-033','14,00,000','1.5%','21,000','PENDING']];return <><div className="mini-stats four">{[['COMMISSION GENERATED','₹48.2 L'],['APPROVED','₹31.4 L'],['PENDING APPROVAL','₹10.4 L'],['PAID THIS MONTH','₹6.4 L']].map((x,i)=><Mini title={x[0]} value={x[1]} color={i===1||i===3?'green-text':i===2?'amber-text':''}/>)}</div><div className="panel section-panel"><div className="commission-flow">{['Booking approval','Eligibility calculation','Commission payable','Commission paid'].map((x,i)=><div key={x}><span>0{i+1}</span><b>{x}</b>{i<3&&<ChevronRight size={14}/>}</div>)}</div><div className="tabs"><span className="section-title">Commission ledger</span><button className="button button-primary small-button" onClick={()=>notify('Selected commission payouts approved')}><CheckCircle2 size={13}/> Approve payout</button></div><Table headers={['AGENT','PROJECT','PLOT','BOOKING VALUE','COMMISSION %','COMMISSION AMOUNT','STATUS','']} rows={data.filter(x=>x.join(' ').toLowerCase().includes(search.toLowerCase())).map(a=>[<b>{a[0]}</b>,a[1],a[2],`₹${a[3]}`,a[4],`₹${a[5]}`,<Badge>{a[6]}</Badge>,<button className="icon-action" onClick={()=>notify(`Commission for ${a[0]} reviewed`)}><Eye size={14}/></button>])}/></div></>}
-function Reports({notify}){const[dateRange,setDateRange]=useState('This month'),[reportProject,setReportProject]=useState('All projects'),[reportAgent,setReportAgent]=useState('All agents');let reports=[['Sales reports','Bookings, sales and cancellations',ChartNoAxesCombined],['Plot reports','Inventory, status movement and pricing',Map],['Booking reports','Booking funnel and conversion',ClipboardList],['Collection reports','Daily and periodic collections',Wallet],['Pending payment reports','Ageing and follow-up views',Clock3],['Agent performance','Sales and collections by agent',Handshake],['Commission reports','Eligibility, approvals and payouts',Percent],['Daily reports','Auto-generated end-of-day briefs',CalendarDays],['Customer ledger','Per-customer debit, credit and balance',Users],['Cancellation reports','Cancelled bookings and refunds',RefreshCw]];return <><div className="report-toolbar panel"><div><b>Daily Business Report — Mon, 28 Sep 2026</b><small>Illustrative data · All projects</small></div><div><button className="button button-white" onClick={()=>notify('Date range filter opened')}><CalendarDays size={14}/> 28 Sep 2026</button><button className="button button-white" onClick={()=>notify('Report downloaded')}><Download size={14}/> Export PDF</button><button className="button button-white" onClick={()=>notify('Excel report downloaded')}><FileSpreadsheet size={14}/> Export Excel</button></div></div><div className="report-kpis">{[['New bookings','6'],['Daily collection','₹4.2 L'],['Pending collection','₹38.6 L'],['Commission generated','₹1.1 L'],['Receipts issued','11'],['Cancellations','1']].map(x=><Mini title={x[0]} value={x[1]}/>)}</div><div className="report-cards">{reports.map(([t,d,I])=><button className="report-card" key={t} onClick={()=>notify(`${t} opened`)}><span><I size={17}/></span><b>{t}</b><p>{d}</p><ArrowUpRight size={14}/></button>)}</div><div className="panel section-panel"><div className="tabs"><span className="section-title">Report filters</span><span className="report-scope">Showing {dateRange} · {reportProject} · {reportAgent}</span></div><div className="report-filters"><label>Date range<select value={dateRange} onChange={e=>setDateRange(e.target.value)}><option>This month</option><option>Last month</option><option>Custom range</option></select></label><label>Project<select value={reportProject} onChange={e=>setReportProject(e.target.value)}><option>All projects</option>{projects.map(p=><option key={p[0]}>{p[0]}</option>)}</select></label><label>Agent<select value={reportAgent} onChange={e=>setReportAgent(e.target.value)}><option>All agents</option>{agents.map(p=><option key={p[0]}>{p[0]}</option>)}</select></label></div></div></>}
-function Documents({notify}){let docs=[['Booking Form','Rajesh Sharma · A-012','12 Jun 2026','Booking'],['Allotment Letter','Rajesh Sharma · A-012','14 Jun 2026','Allocation'],['Agreement','Rajesh Sharma · A-012','18 Jun 2026','Agreement'],['Receipt #0211','Rajesh Sharma · ₹4,80,000','20 Sep 2026','Receipt'],['Booking Form','Anita Verma · B-104','27 Sep 2026','Booking'],['Agreement','Deepak Iyer · C-078','27 Sep 2026','Agreement']];return <><div className="mini-stats four"><Mini title="TOTAL DOCUMENTS" value="438"/><Mini title="AGREEMENTS" value="126"/><Mini title="RECEIPTS" value="284" color="green-text"/><Mini title="NEEDS SIGNATURE" value="6" color="amber-text"/></div><div className="panel section-panel"><div className="tabs"><span className="section-title">Project documents</span><button className="button button-primary small-button" onClick={()=>notify('Document upload panel opened')}><Plus size={14}/> Upload document</button></div><div className="document-list">{docs.map((d,i)=><div className="document-row" key={i}><span className="doc-icon"><FileText size={18}/></span><div className="doc-title"><b>{d[0]}</b><small>{d[1]}</small></div><Badge>{d[3]}</Badge><span className="doc-date">{d[2]}</span><button className="icon-action" onClick={()=>notify(`${d[0]} preview opened`)}><Eye size={14}/></button><button className="icon-action" onClick={()=>notify(`${d[0]} download started`)}><Download size={14}/></button></div>)}</div></div></>}
-function Notifications({fups,FUP,notify}){let data=[['Payment overdue · Sneha Mehta','Plot B-033 · ₹5,60,000 is 10 days overdue.','Today, 9:42 AM','alert'],['Installment due · Priya Nair','Plot A-101 · ₹4,80,000 due on 05 Oct 2026.','Today, 8:15 AM','warn'],['New booking confirmed · Rajesh Sharma','Green Meadows · Plot A-012 · ₹18,40,000','Yesterday, 4:32 PM','success'],['Commission approved · S. Patel','₹50,400 payable for Green Meadows, plot C-078.','Yesterday, 2:18 PM','success'],['Daily report ready','Business report for 27 Sep 2026 is ready to view.','Yesterday, 6:00 PM','info']];return <><div className="mini-stats four"><Mini title="NEEDS ATTENTION" value="8" color="amber-text"/><Mini title="PAYMENT FOLLOW-UPS" value="24"/><Mini title="NEW BOOKINGS" value="6" color="green-text"/><Mini title="SYSTEM ALERTS" value="2"/></div><div className="panel section-panel"><div className="tabs"><span className="section-title">Recent notifications</span><button className="text-button" onClick={()=>notify('All notifications marked as read')}>Mark all as read</button></div><div className="notification-list">{data.map((x,i)=><div className="notification-row" key={i}><span className={`notification-symbol ${x[3]}`}>{x[3]==='alert'?<AlertCircle size={17}/>:x[3]==='warn'?<Clock3 size={17}/>:<CheckCircle2 size={17}/>}</span><div><b>{x[0]}</b><p>{x[1]}</p><small>{x[2]}</small></div><button className="button button-white small-button" onClick={()=>{FUP({...fups,[i]:true});notify(fups[i]?'Already followed up':'Follow-up logged')}}>{fups[i]?'Followed up':'Follow up'}</button></div>)}</div></div></>}
-function Roles({role,notify}){let matrix=[['SUPER ADMIN','✓','✓','✓','✓','✓','✓','✓','✓'],['ADMIN','✓','✓','✓','✓','✓','✓','✓','✓'],['SALES MANAGER','●','✓','●','✓','●','✓','✓','—'],['SALES AGENT','—','●','—','●','—','●','●','—'],['ACCOUNTS','—','—','✓','—','✓','✓','✓','—'],['MANAGEMENT','—','—','—','—','—','✓','✓','—']];return <><div className="role-banner"><Shield size={20}/><div><b>Role-based access control</b><small>Switch the active demo role from the profile menu to preview permissions.</small></div><Badge>{role}</Badge></div><div className="role-cards">{[['SUPER ADMIN','Full system access'],['ADMIN','Projects, plots, sales, payments, reports'],['SALES MANAGER','Agents, bookings, sales and collections'],['SALES AGENT','Assigned plots, customers, bookings and follow-up'],['ACCOUNTS','Payments, receipts, outstanding and commission'],['MANAGEMENT','Dashboard and reports']].map(x=><div className="role-card" key={x[0]}><span><Shield size={16}/></span><b>{x[0]}</b><p>{x[1]}</p><button onClick={()=>notify(`${x[0]} role permissions`)}>View permissions <ChevronRight size={13}/></button></div>)}</div><div className="panel section-panel"><div className="tabs"><span className="section-title">Permission matrix · Role × module</span><button className="button button-white small-button" onClick={()=>notify('Permission editor opened')}><Edit2 size={13}/> Edit permissions</button></div><Table headers={['ROLE','PROJECTS & PLOTS','SALES & BOOKING','PAYMENTS','AGENTS','COMMISSION','REPORTS','DASHBOARD','ADMIN']} rows={matrix.map(a=>a.map((x,i)=>i===0?<b>{x}</b>:<span className={x==='✓'?'access-yes':x==='●'?'access-partial':'access-no'}>{x}</span>))}/><div className="access-legend">✓ Full access　 ● Assigned-only　 — No access</div></div></>}
-function Administration({notify}){let data=[['Organization profile','Company information and branding',Building2],['Projects & layouts','Projects, phases, layout plans and plot masters',Map],['User accounts','Add team members and control accounts',Users],['Roles & permissions','Configure module access',LockKeyhole],['Payment preferences','Receipt numbering, methods and due rules',Wallet],['Commission rules','Agent rates and approval workflow',Percent],['Notifications','Email, SMS and payment reminders',Bell],['Data & backups','Audit trail, exports and backups',RefreshCw]];return <><div className="settings-grid">{data.map(([a,b,I])=><button className="setting-card" key={a} onClick={()=>notify(`${a} settings opened`)}><span><I size={18}/></span><div><b>{a}</b><p>{b}</p></div><ChevronRight size={16}/></button>)}</div><div className="panel audit-panel"><div className="panel-head"><div><h2>Recent activity</h2><p>Audit trail · who changed what and when</p></div><button className="text-button" onClick={()=>notify('Full audit trail opened')}>View audit trail →</button></div>{[['Arjun Shah','Updated payment status for Rajesh Sharma','Today, 10:32 AM'],['M. Kumar','Created booking BK-2026-0148','Today, 9:14 AM'],['S. Patel','Uploaded agreement — Plot C-078','Yesterday, 4:15 PM']].map(x=><div className="audit-row" key={x[1]}><Avatar name={x[0]}/><div><b>{x[0]}</b><small>{x[1]}</small></div><span>{x[2]}</span></div>)}</div></>}
-function CrudWorkspace({page,records,project,search,create,edit,view,remove}){const rows=records.filter(r=>Object.values(r).join(' ').toLowerCase().includes(search.toLowerCase())&&(project==='All projects'||`${r.name} ${r.category}`.toLowerCase().includes(project.toLowerCase()))).map(r=>[<><b>{r.name}</b><small className="subline">{r.notes||'—'}</small></>,r.reference||'—',r.category||'—',r.amount?(/^\d[\d,]*(?:\.\d+)?(?:\s?(?:Cr|L))?$/i.test(String(r.amount))?`₹${r.amount}`:r.amount):'—',<Badge>{r.status||'Active'}</Badge>,<div className="crud-actions"><button className="icon-action" title="View" onClick={()=>view(r)}><Eye size={14}/></button><button className="icon-action" title="Edit" onClick={()=>edit(r)}><Edit2 size={14}/></button><button className="icon-action delete-action" title="Delete" onClick={()=>remove(r)}><Trash2 size={14}/></button></div>]);return <section className="panel section-panel crud-panel"><div className="crud-heading"><div><h2>{page==='Overview'?'Quick records':'Manage '+page.toLowerCase()}</h2><p>Create, inspect, edit and remove records in this module. Changes save in this browser.</p></div><button className="button button-primary small-button" onClick={create}><Plus size={14}/> Create {page==='Overview'?'record':page==='Projects & plots'?'project':page==='Bookings'?'booking':page==='Payments'?'payment':page==='Agents'?'agent':page==='Customers'?'customer':'record'}</button></div><Table headers={['NAME / DETAILS','REFERENCE','CATEGORY','AMOUNT','STATUS','ACTIONS']} rows={rows}/><div className="table-pagination">{rows.length} {rows.length===1?'record':'records'} in {page}<span>Browser saved <CheckCircle2 size={12}/></span></div></section>}
-function LoginScreen({onLogin}){const[role,setRole]=useState('ADMIN'),[email,setEmail]=useState('admin@nmtsolution.demo'),[password,setPassword]=useState('demo123'),[error,setError]=useState('');function submit(e){e.preventDefault();if(!email.includes('@')||password.length<4){setError('Enter a valid email and demo password (4+ characters).');return}onLogin(role)}return <main className="login-screen"><section className="login-art"><div className="login-brand"><div className="brand-mark">N</div><div><b>NMT <span>ERP</span></b><small>REAL ESTATE OPERATIONS</small></div></div><div className="login-pitch"><div className="eyebrow"><i className="live-dot"/> ONE PLATFORM · COMPLETE VISIBILITY</div><h1>Every plot.<br/>Every payment.<br/><em>One clear picture.</em></h1><p>Real estate operations, connected from project setup to the final receipt.</p><div className="login-metrics"><div><b>384</b><small>Plots in portfolio</small></div><div><b>4</b><small>Active projects</small></div><div><b>₹7.9 Cr</b><small>Collected to date</small></div></div></div><div className="login-foot">NMT Solution · Technology · Automation · Growth</div></section><section className="login-form-wrap"><form className="login-card" onSubmit={submit}><span className="login-kicker">WELCOME BACK</span><h2>Sign in to your workspace</h2><p>Choose a demo role and explore the right dashboard.</p><label>Email address<input type="email" value={email} onChange={e=>setEmail(e.target.value)} required/></label><label>Password<input type="password" value={password} onChange={e=>setPassword(e.target.value)} required minLength="4"/></label><label>Sign in as<select value={role} onChange={e=>setRole(e.target.value)}>{['ADMIN','SUPER ADMIN','SALES MANAGER','SALES AGENT','ACCOUNTS','MANAGEMENT'].map(x=><option key={x}>{x}</option>)}</select></label>{error&&<div className="login-error">{error}</div>}<button className="button button-primary login-submit">Sign in <ChevronRight size={15}/></button><div className="demo-credentials"><b>Demo access</b><span>admin@nmtsolution.demo　·　demo123</span><small>Illustrative demo only. No real authentication is connected.</small></div></form></section></main>}
-function RoleDashboard({role,bookings,pays,go,D,notify}){if(role==='ADMIN'||role==='SUPER ADMIN')return <Dashboard bookings={bookings} pays={pays} go={go} D={D} notify={notify}/>;const configs={'MANAGEMENT':{title:'Ownership snapshot',desc:'A high-level view of inventory, sales and cashflow.',metrics:[['TOTAL SALES VALUE','₹12.6 Cr'],['COLLECTION TO DATE','₹7.9 Cr'],['OUTSTANDING','₹4.7 Cr'],['PLOTS PORTFOLIO','384']],links:[['Management reports','Reports'],['Project inventory','Projects & plots'],['Daily collection','Payments']]},'SALES MANAGER':{title:'Sales team overview',desc:'Bookings, team activity and collections needing attention.',metrics:[['ACTIVE BOOKINGS','176'],['BOOKINGS THIS MONTH','23'],['AGENTS ACTIVE','14 / 18'],['SALES VALUE','₹3.84 Cr']],links:[['Bookings','Bookings'],['Agent performance','Agents'],['Payment follow-ups','Payments']]},'SALES AGENT':{title:'Your sales workspace',desc:'Your assigned plots, customer bookings and next follow-ups.',metrics:[['ASSIGNED PLOTS','96'],['ACTIVE BOOKINGS','31'],['YOUR SALES VALUE','₹3.84 Cr'],['FOLLOW-UPS DUE','8']],links:[['My bookings','Bookings'],['Assigned inventory','Projects & plots'],['Customer records','Customers']]},'ACCOUNTS':{title:'Collections & accounts',desc:'Payment receipts, overdue amounts and commission activity.',metrics:[['COLLECTED TO DATE','₹7.9 Cr'],['TODAY’S COLLECTION','₹4.2 L'],['PENDING COLLECTION','₹4.7 Cr'],['OVERDUE AMOUNT','₹86.4 L']],links:[['Payment ledger','Payments'],['Commission payouts','Commissions'],['Collection reports','Reports']]}},cfg=configs[role]||configs.ADMIN;return <><div className="role-welcome"><div><span className="eyebrow">{role} DASHBOARD</span><h2>{cfg.title}</h2><p>{cfg.desc}</p></div><span className="role-chip"><Shield size={13}/>{role}</span></div><div className="mini-stats four">{cfg.metrics.map(([title,value],i)=><Mini key={title} title={title} value={value} color={i===1?'green-text':i===3?'amber-text':''}/>)}</div><div className="role-dash-grid"><section className="panel"><div className="panel-head"><div><h2>{role==='SALES AGENT'?'Your recent bookings':role==='ACCOUNTS'?'Payment items needing attention':'Latest activity'}</h2><p>Illustrative live workspace data</p></div><button className="text-button" onClick={()=>go(role==='ACCOUNTS'?'Payments':'Bookings')}>Open module →</button></div><Table headers={['CUSTOMER / ITEM','PROJECT · PLOT','VALUE','STATUS']} rows={(role==='ACCOUNTS'?pays.slice(0,4).map(p=>[p[0],`${p[2]} · ${p[1]}`,`₹${p[5]}`,p[7]]):bookings.slice(0,4).map(b=>[b[1],`${b[2]} · ${b[3]}`,`₹${b[5]}`,b[7]])).map((r,i)=>[<div className="customer-cell"><Avatar name={r[0]} i={i}/><b>{r[0]}</b></div>,r[1],r[2],<Badge>{r[3]}</Badge>])}/></section><section className="panel role-quick-links"><div className="panel-head"><div><h2>Quick access</h2><p>Modules assigned to your role</p></div></div>{cfg.links.map(([label,path],i)=><button key={path} onClick={()=>go(path)}><span className={`quick-index q-${i}`}>{String(i+1).padStart(2,'0')}</span><b>{label}</b><ArrowUpRight size={14}/></button>)}{role==='SALES AGENT'&&<button className="agent-quick-create" onClick={()=>D('booking')}><Plus size={14}/> Create a booking</button>}</section></div></>}
-function UsersAdmin({users,create,edit,remove}){const active=users.filter(u=>u.status==='Active').length;return <><div className="mini-stats four"><Mini title="TEAM MEMBERS" value={users.length}/><Mini title="ACTIVE USERS" value={active} color="green-text"/><Mini title="ACCESS ROLES" value="6"/><Mini title="INVITATIONS PENDING" value={users.filter(u=>u.status==='Invited').length} color="amber-text"/></div><section className="panel section-panel users-panel"><div className="crud-heading"><div><h2>Team members</h2><p>Manage workspace accounts, role assignments and access status.</p></div><button className="button button-primary small-button" onClick={create}><Plus size={14}/> Add team member</button></div><Table headers={['USER','EMAIL','MOBILE','ROLE','STATUS','ACTIONS']} rows={users.map((u,i)=>[<div className="customer-cell"><Avatar name={u.name} i={i}/><b>{u.name}</b></div>,u.email,u.phone,<Badge>{u.role}</Badge>,<Badge>{u.status}</Badge>,<div className="crud-actions"><button className="icon-action" title="Edit user" onClick={()=>edit(u)}><Edit2 size={14}/></button><button className="icon-action delete-action" title="Delete user" onClick={()=>remove(u)}><Trash2 size={14}/></button></div>])}/><div className="table-pagination">{users.length} team members <span>Role-based access is enabled</span></div></section></>}
-function Modal({kind,close,save,context,initial}){let pay=kind==='payment',record=kind==='record',title=kind==='user'?`${initial?'Edit':'Add'} team member`:record?`${initial?'Edit':'Create'} ${context==='Projects & plots'?'project':context==='Bookings'?'booking':context==='Payments'?'payment':context==='Agents'?'agent':context==='Customers'?'customer':'record'}`:kind==='booking'?'Create a new booking':pay?'Record a payment':kind==='project'?'Add a project':kind==='agent'?'Add sales agent':'Add customer',fields=kind==='user'?[['name','Full name','text','Enter full name'],['email','Email address','email','name@company.com'],['phone','Mobile number','tel','+91 98765 43210'],['role','Role','select',['ADMIN','SUPER ADMIN','SALES MANAGER','SALES AGENT','ACCOUNTS','MANAGEMENT']],['status','Account status','select',['Active','Invited','Suspended']]]:record?[['name','Name / title','text','e.g. New customer or project'],['reference','Reference / ID','text','e.g. REF-001'],['category','Category / relationship','text','Project, plot, agent or type'],['amount','Amount / value','text','e.g. 18,40,000'],['status','Status','select',['Active','Pending','Processing','Confirmed','Overdue','Paid','Approved','On hold','Complete']],['notes','Notes / details','text','Add useful details']]:pay?[['customer','Customer name','text','Rajesh Sharma'],['plot','Plot number','text','A-012'],['project','Project','select',['Green Meadows','Silver Oaks','Park View','River Enclave']],['total','Booking value (₹)','text','18,40,000'],['paid','Amount received (₹)','text','2,00,000'],['due','Next due date','date',''],['agent','Received by','select',['M. Kumar','S. Patel','R. Gupta','N. Bose']]]:kind==='booking'?[['customer','Customer name','text','Neha Kapoor'],['mobile','Mobile number','tel','+91 98765 43210'],['project','Project','select',['Green Meadows','Silver Oaks','Park View','River Enclave']],['plot','Plot number','text','A-024'],['amount','Booking value (₹)','text','18,40,000'],['agent','Assigned agent','select',['M. Kumar','S. Patel','R. Gupta','N. Bose']],['plan','Payment plan','select',['12 monthly installments','6 monthly installments','Paid in full']]]:[['name',kind==='project'?'Project name':kind==='agent'?'Agent name':'Customer name','text','Enter name'],['mobile','Mobile number','tel','+91 98765 43210'],['email','Email address','email','name@example.com'],['details','Details','text','Enter details']];function submit(e){e.preventDefault();let d=Object.fromEntries(new FormData(e.currentTarget));if(kind==='booking')d.value=d.amount;save(d)}return <div className="modal-backdrop" onMouseDown={e=>e.target===e.currentTarget&&close()}><div className="modal"><div className="modal-head"><div><span className="modal-kicker">NMT ERP · {context||'WORKSPACE'}</span><h2>{title}</h2><p>{record?'Manage this module’s records. Changes are saved locally in this browser.':pay?'Add a customer payment to the ledger.':'Enter details to get started.'}</p></div><button className="modal-close" onClick={close}><X size={17}/></button></div><form onSubmit={submit}><div className="form-grid">{fields.map(([n,label,type,placeholder])=><label key={n}>{label}{type==='select'?<select name={n} defaultValue={initial?.[n]||placeholder[0]}>{placeholder.map(x=><option key={x}>{x}</option>)}</select>:<input name={n} type={type} placeholder={placeholder} defaultValue={initial?.[n]||''} required={record?n==='name':['customer','plot','amount','paid','total','name'].includes(n)}/>}</label>)}</div><div className="modal-actions"><button type="button" className="button button-white" onClick={close}>Cancel</button><button className="button button-primary">{initial?'Save changes':pay?'Record payment':kind==='booking'?'Create booking':'Save'} <ChevronRight size={14}/></button></div></form></div></div>}
-createRoot(document.getElementById('root')).render(<React.StrictMode><BrowserRouter><App/></BrowserRouter></React.StrictMode>);
+
+// --------------------------------------------------------------------------
+// REUSABLE PRESENTATIONAL COMPONENTS
+// --------------------------------------------------------------------------
+
+function Avatar({ name, i = 0 }) {
+  return (
+    <div className={`avatar avatar-${['peach', 'mint', 'lilac', 'sky', 'rose'][i % 5]}`}>
+      {(name || 'NA').split(' ').slice(0, 2).map(x => x[0]).join('')}
+    </div>
+  );
+}
+
+function Badge({ children }) {
+  const s = String(children).toLowerCase();
+  return (
+    <span className={`badge ${s.includes('paid') || s.includes('confirmed') || s === 'available' || s === 'active' || s === 'ready' ? 'badge-green' : s.includes('overdue') || s === 'suspended' ? 'badge-red' : s.includes('hold') || s.includes('processing') || s.includes('invited') ? 'badge-amber' : 'badge-indigo'}`}>
+      {children}
+    </span>
+  );
+}
+
+function Mini({ title, value, color = '' }) {
+  return (
+    <div className="mini-stat">
+      <small>{title}</small>
+      <b className={color}>{value}</b>
+    </div>
+  );
+}
+
+function Table({ headers, rows }) {
+  return (
+    <div className="table-scroll data-table">
+      <table>
+        <thead>
+          <tr>{headers.map((h, i) => <th key={i}>{h}</th>)}</tr>
+        </thead>
+        <tbody>
+          {rows.map((r, i) => (
+            <tr key={i}>{r.map((c, j) => <td key={j}>{c}</td>)}</tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+// --------------------------------------------------------------------------
+// ROLE-ADAPTED MODULE PAGES
+// --------------------------------------------------------------------------
+
+function Projects({ plots, search, project, filter, F, tab, TB, notify, projects, role, D }) {
+  const isAgent = role === 'SALES AGENT';
+  const isAccounts = role === 'ACCOUNTS';
+  const isManager = role === 'SALES MANAGER';
+
+  const list = plots.filter(p => {
+    const textMatch = p.join(' ').toLowerCase().includes(search.toLowerCase());
+    const projectMatch = project === 'All projects' || ((p[0].startsWith('A-') ? 'Green Meadows' : p[0].startsWith('B-') ? 'Silver Oaks' : 'Park View') === project);
+    const statusMatch = filter === 'All status' || p[5] === filter.toUpperCase();
+    return textMatch && projectMatch && statusMatch;
+  });
+
+  const plotRows = list.map(p => {
+    const isAvail = p[5] === 'AVAILABLE';
+    return [
+      <b>{p[0]}</b>,
+      p[1],
+      p[2],
+      p[3],
+      `₹${p[4]}`,
+      <Badge>{p[5]}</Badge>,
+      p[6],
+      p[7],
+      <div className="table-actions-cell" key={p[0]}>
+        <button className="icon-action" onClick={() => notify(`Plot ${p[0]} specifications opened`)} title="View Specs">
+          <Eye size={14} />
+        </button>
+        {isAgent && isAvail && (
+          <button className="button button-primary small-btn" onClick={() => D('booking')} title="Quick reserve plot">
+            Reserve
+          </button>
+        )}
+      </div>
+    ];
+  });
+
+  return (
+    <>
+      <RoleContextBanner role={role} page="Projects & plots" />
+
+      <div className="mini-stats four">
+        <Mini title="TOTAL PROJECTS" value="4" />
+        <Mini title="TOTAL PLOTS" value="384" />
+        <Mini title="AVAILABLE FOR SALE" value="176" color="green-text" />
+        <Mini title="ON HOLD / RESERVED" value="36" color="amber-text" />
+      </div>
+
+      <div className="panel section-panel">
+        <div className="tabs">
+          <button className={tab === 'Plots' ? 'active' : ''} onClick={() => TB('Plots')}>Plot layout ({list.length})</button>
+          <button className={tab === 'Projects' ? 'active' : ''} onClick={() => TB('Projects')}>Master projects (4)</button>
+          <div className="table-tools">
+            <span className="filter-label">FILTER STATUS:</span>
+            {['All status', 'AVAILABLE', 'BOOKED', 'HOLD', 'SOLD'].map(s => (
+              <button key={s} className={`filter-btn ${filter === s ? 'active' : ''}`} onClick={() => F(s)}>
+                {s}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {tab === 'Projects' ? (
+          <Table
+            headers={['PROJECT NAME', 'LOCATION & PHASE', 'TOTAL PLOTS', 'BOOKED', 'HOLD', 'EST. REVENUE', 'STATUS']}
+            rows={projects.map(p => [<b>{p[0]}</b>, p[1], p[2], p[3], p[4], `₹${p[5]}`, <Badge>Active</Badge>])}
+          />
+        ) : (
+          <Table
+            headers={['PLOT NO.', 'LAYOUT', 'AREA (SQ.FT)', 'FACING', 'PRICE', 'STATUS', 'CUSTOMER', 'AGENT', 'ACTIONS']}
+            rows={plotRows}
+          />
+        )}
+      </div>
+    </>
+  );
+}
+
+function Bookings({ bookings, project, search, tab, TB, setSelected, go, role, D, notify }) {
+  const isAgent = role === 'SALES AGENT';
+  const isManager = role === 'SALES MANAGER';
+  const isAccounts = role === 'ACCOUNTS';
+
+  const statuses = ['All bookings', 'Confirmed', 'Processing', 'Agreement'];
+  const rows = bookings.filter(b => {
+    const textMatch = b.join(' ').toLowerCase().includes(search.toLowerCase());
+    const projMatch = project === 'All projects' || b[2] === project;
+    const tabMatch = tab === 'All bookings' || b[7].toLowerCase() === tab.toLowerCase();
+    return textMatch && projMatch && tabMatch;
+  });
+
+  return (
+    <>
+      <RoleContextBanner role={role} page="Bookings" />
+
+      <div className="mini-stats four">
+        <Mini title="TOTAL BOOKINGS" value="176" />
+        <Mini title="CONFIRMED" value="142" color="green-text" />
+        <Mini title="UNDER PROCESSING" value="23" color="indigo-text" />
+        <Mini title="AGREEMENT STAGE" value="11" color="amber-text" />
+      </div>
+
+      <div className="panel section-panel">
+        <div className="tabs">
+          {statuses.map(s => (
+            <button key={s} className={tab === s ? 'active' : ''} onClick={() => TB(s)}>
+              {s}
+            </button>
+          ))}
+          {isAgent && (
+            <button className="button button-primary small-btn" onClick={() => D('booking')} style={{ marginLeft: 'auto' }}>
+              <Plus size={12} /> New Deal
+            </button>
+          )}
+        </div>
+
+        <Table
+          headers={['BOOKING ID', 'CUSTOMER', 'PROJECT & PLOT', 'DATE', 'VALUE', 'PAID', 'STATUS', 'AGENT', 'ACTIONS']}
+          rows={rows.map(b => [
+            <b>{b[0]}</b>,
+            <div className="customer-cell"><Avatar name={b[1]} /><b>{b[1]}</b></div>,
+            `${b[2]} · ${b[3]}`,
+            b[4],
+            `₹${b[5]}`,
+            `₹${b[6]}`,
+            <Badge>{b[7]}</Badge>,
+            b[8],
+            <div className="table-actions-cell" key={b[0]}>
+              <button className="icon-action" onClick={() => { setSelected(b); go('Customer detail'); }} title="View details">
+                <Eye size={14} />
+              </button>
+              {isManager && b[7] === 'Processing' && (
+                <button className="button button-white small-btn" onClick={() => notify(`Booking ${b[0]} approved and confirmed.`)}>
+                  Approve
+                </button>
+              )}
+              {isAccounts && (
+                <button className="button button-white small-btn" onClick={() => notify(`Tax invoice generated for ${b[0]}.`)}>
+                  Invoice
+                </button>
+              )}
+            </div>
+          ])}
+        />
+        <div className="table-pagination">
+          Showing {rows.length} bookings <span>Role-filtered view</span>
+        </div>
+      </div>
+    </>
+  );
+}
+
+function Payments({ pays, project, search, filter, F, D, notify, role }) {
+  const isAccounts = role === 'ACCOUNTS';
+  const isAgent = role === 'SALES AGENT';
+
+  const list = pays.filter(p => {
+    const textMatch = p.join(' ').toLowerCase().includes(search.toLowerCase());
+    const projMatch = project === 'All projects' || p[2] === project;
+    const filterMatch = filter === 'All status' || p[7] === filter.toUpperCase();
+    return textMatch && projMatch && filterMatch;
+  });
+
+  return (
+    <>
+      <RoleContextBanner role={role} page="Payments" />
+
+      <div className="mini-stats five">
+        <Mini title="TOTAL BOOKING VALUE" value="₹12.6 Cr" />
+        <Mini title="COLLECTED TO DATE" value="₹7.9 Cr" color="green-text" />
+        <Mini title="PENDING INSTALMENTS" value="₹4.7 Cr" color="indigo-text" />
+        <Mini title="OVERDUE RECOVERY" value="₹86.4 L" color="amber-text" />
+        <Mini title="TODAY'S COLLECTION" value="₹4.2 L" color="green-text" />
+      </div>
+
+      <div className="panel section-panel">
+        <div className="tabs">
+          <span className="filter-label">RECONCILIATION STATUS:</span>
+          {['All status', 'PAID', 'PARTIALLY PAID', 'PENDING', 'OVERDUE'].map(s => (
+            <button key={s} className={`filter-btn ${filter === s ? 'active' : ''}`} onClick={() => F(s)}>
+              {s}
+            </button>
+          ))}
+          {isAccounts && (
+            <button className="button button-primary small-btn" onClick={() => D('payment')} style={{ marginLeft: 'auto' }}>
+              <Plus size={12} /> Record Receipt
+            </button>
+          )}
+        </div>
+
+        <Table
+          headers={['CUSTOMER', 'PROJECT & PLOT', 'TOTAL VALUE', 'PAID TO DATE', 'PENDING BALANCE', 'NEXT DUE DATE', 'STATUS', 'AGENT', 'ACTIONS']}
+          rows={list.map(p => [
+            <b>{p[0]}</b>,
+            `${p[2]} · ${p[1]}`,
+            `₹${p[3]}`,
+            <span className="green-text">₹{p[4]}</span>,
+            `₹${p[5]}`,
+            p[6],
+            <Badge>{p[7]}</Badge>,
+            p[8],
+            <div className="table-actions-cell" key={p[0]}>
+              <button className="icon-action" onClick={() => notify(`Customer ledger opened for ${p[0]}`)} title="Inspect Ledger">
+                <Eye size={14} />
+              </button>
+              {isAccounts && p[7] === 'OVERDUE' && (
+                <button className="button button-white small-btn" onClick={() => notify(`Formal demand notice emailed to ${p[0]}.`)}>
+                  Notice
+                </button>
+              )}
+            </div>
+          ])}
+        />
+        <div className="table-pagination">
+          Showing {list.length} customer ledgers <span>Audited financial records</span>
+        </div>
+      </div>
+    </>
+  );
+}
+
+function Customers({ bookings, project, search, go, setSelected, selected, role }) {
+  if (selected && selected.length) {
+    return <CustomerDetail selected={selected} notify={() => {}} role={role} />;
+  }
+
+  const rows = bookings.filter(b => {
+    return b.join(' ').toLowerCase().includes(search.toLowerCase()) && (project === 'All projects' || b[2] === project);
+  });
+
+  return (
+    <>
+      <RoleContextBanner role={role} page="Customers" />
+
+      <div className="mini-stats four">
+        <Mini title="TOTAL CUSTOMERS" value="176" />
+        <Mini title="ACTIVE BOOKINGS" value="152" color="green-text" />
+        <Mini title="AVG DEAL SIZE" value="₹18.4 L" />
+        <Mini title="REPEAT BUYERS" value="28" color="indigo-text" />
+      </div>
+
+      <div className="panel section-panel">
+        <Table
+          headers={['CUSTOMER NAME', 'PROJECT · PLOT', 'BOOKING ID', 'ALLOTMENT DATE', 'TOTAL DEAL', 'OUTSTANDING', 'PROFILE']}
+          rows={rows.map(b => [
+            <div className="customer-cell"><Avatar name={b[1]} /><b>{b[1]}</b></div>,
+            `${b[2]} · ${b[3]}`,
+            b[0],
+            b[4],
+            `₹${b[5]}`,
+            `₹${(Number(b[5].replaceAll(',', '')) - Number(b[6].replaceAll(',', ''))).toLocaleString('en-IN')}`,
+            <button className="icon-action" onClick={() => { setSelected(b); go('Customer detail'); }} title="Open customer dossier">
+              <Eye size={14} />
+            </button>
+          ])}
+        />
+      </div>
+    </>
+  );
+}
+
+function CustomerDetail({ selected, notify, role }) {
+  const b = selected;
+  return (
+    <div className="customer-detail">
+      <RoleContextBanner role={role} page="Customers" />
+
+      <div className="panel customer-summary">
+        <Avatar name={b[1]} />
+        <div>
+          <span className="eyebrow">CUSTOMER PROFILE & DOSSIER</span>
+          <h2>{b[1]}</h2>
+          <p>+91 98•••• •••42 · Assigned Property Consultant: {b[8]}</p>
+        </div>
+        <button className="button button-white" onClick={() => notify(`Customer file for ${b[1]} downloaded.`)}>
+          <Download size={14} /> Dossier PDF
+        </button>
+      </div>
+
+      <div className="overview-grid">
+        <div className="panel">
+          <div className="panel-head">
+            <div>
+              <h2>Property Allocation</h2>
+              <p>Registered unit and project details</p>
+            </div>
+            <Badge>{b[7]}</Badge>
+          </div>
+          <div className="detail-rows">
+            <div><span>Project</span><b>{b[2]}</b></div>
+            <div><span>Unit / Plot</span><b>{b[3]}</b></div>
+            <div><span>Booking Date</span><b>{b[4]}</b></div>
+            <div><span>Booking Value</span><b>₹{b[5]}</b></div>
+            <div><span>Paid to Date</span><b className="green-text">₹{b[6]}</b></div>
+          </div>
+        </div>
+
+        <div className="panel">
+          <div className="panel-head">
+            <div>
+              <h2>Legal & Contract Documents</h2>
+              <p>Executed documents</p>
+            </div>
+          </div>
+          {['Booking Form', 'Allotment Letter', 'Agreement to Sale', 'Payment Receipt'].map(x => (
+            <div className="document-row" key={x}>
+              <FileText size={17} />
+              <b>{x}</b>
+              <button className="icon-action" onClick={() => notify(`Opened ${x} for ${b[1]}`)}>
+                <Eye size={14} />
+              </button>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Agents({ search, notify, role }) {
+  return (
+    <>
+      <RoleContextBanner role={role} page="Agents" />
+
+      <div className="mini-stats four">
+        <Mini title="ACTIVE SALES AGENTS" value="14" color="green-text" />
+        <Mini title="BOOKINGS THIS MONTH" value="23" />
+        <Mini title="SALES VALUE CLOSED" value="₹3.84 Cr" />
+        <Mini title="COMMISSION POOL" value="₹7.68 L" color="amber-text" />
+      </div>
+
+      <div className="panel section-panel">
+        <Table
+          headers={['RANK', 'AGENT NAME', 'CODE', 'DEALS CLOSED', 'GROSS SALES', 'COLLECTED', 'COMMISSION', 'STATUS']}
+          rows={agents.filter(a => a.join(' ').toLowerCase().includes(search.toLowerCase())).map((a, i) => [
+            i + 1,
+            <div className="customer-cell"><Avatar name={a[0]} i={i} /><b>{a[0]}</b></div>,
+            a[1],
+            a[2],
+            `₹${a[3]}`,
+            `₹${a[4]}`,
+            `₹${a[5]}`,
+            <Badge>Active</Badge>
+          ])}
+        />
+      </div>
+    </>
+  );
+}
+
+function Commissions({ search, notify, role }) {
+  const isAgent = role === 'SALES AGENT';
+  const isManager = role === 'SALES MANAGER';
+  const isAccounts = role === 'ACCOUNTS';
+
+  const data = [
+    ['M. Kumar', 'Green Meadows', 'A-012', '18,40,000', '2.0%', '36,800', 'APPROVED'],
+    ['S. Patel', 'Green Meadows', 'C-078', '25,20,000', '2.0%', '50,400', 'PAYABLE'],
+    ['R. Gupta', 'Silver Oaks', 'B-104', '12,60,000', '1.5%', '18,900', 'PAID'],
+    ['A. Khan', 'Green Meadows', 'A-101', '9,60,000', '2.0%', '19,200', 'PROCESSING'],
+    ['N. Bose', 'Park View', 'C-031', '24,75,000', '2.0%', '49,500', 'ON HOLD']
+  ];
+
+  return (
+    <>
+      <RoleContextBanner role={role} page="Commissions" />
+
+      <div className="mini-stats four">
+        <Mini title="TOTAL COMMISSIONS" value="₹7.68 L" />
+        <Mini title="DISBURSED TO DATE" value="₹4.82 L" color="green-text" />
+        <Mini title="READY FOR DISBURSAL" value="₹1.92 L" color="indigo-text" />
+        <Mini title="PENDING APPROVAL" value="₹94,000" color="amber-text" />
+      </div>
+
+      <div className="panel section-panel">
+        <Table
+          headers={['AGENT', 'PROJECT', 'PLOT', 'DEAL VALUE', 'COMM. SLAB', 'AMOUNT (₹)', 'STATUS', 'ACTIONS']}
+          rows={data.filter(a => a.join(' ').toLowerCase().includes(search.toLowerCase())).map(a => [
+            <b>{a[0]}</b>,
+            a[1],
+            a[2],
+            `₹${a[3]}`,
+            a[4],
+            `₹${a[5]}`,
+            <Badge>{a[6]}</Badge>,
+            <div className="table-actions-cell" key={a[0]}>
+              <button className="icon-action" onClick={() => notify(`Commission slip for ${a[0]} opened`)} title="Inspect calculation">
+                <Eye size={14} />
+              </button>
+              {isManager && a[6] === 'PROCESSING' && (
+                <button className="button button-white small-btn" onClick={() => notify(`Approved commission for ${a[0]}`)}>
+                  Approve
+                </button>
+              )}
+              {isAccounts && a[6] === 'APPROVED' && (
+                <button className="button button-primary small-btn" onClick={() => notify(`NEFT payout initiated for ${a[0]}`)}>
+                  Disburse
+                </button>
+              )}
+            </div>
+          ])}
+        />
+      </div>
+    </>
+  );
+}
+
+function Reports({ notify, role }) {
+  const [dateRange, setDateRange] = useState('This month');
+  const [reportProject, setReportProject] = useState('All projects');
+  const [reportAgent, setReportAgent] = useState('All agents');
+
+  return (
+    <>
+      <RoleContextBanner role={role} page="Reports" />
+
+      <div className="report-toolbar">
+        <div>
+          <h2>Business Intelligence & Periodic Reports</h2>
+          <p>Auditable operational and financial insights</p>
+        </div>
+        <div className="report-filters">
+          <label>
+            Scope
+            <select value={dateRange} onChange={e => setDateRange(e.target.value)}>
+              <option>This month</option>
+              <option>Last month</option>
+              <option>This quarter</option>
+              <option>Financial year 2026-27</option>
+            </select>
+          </label>
+          <label>
+            Project
+            <select value={reportProject} onChange={e => setReportProject(e.target.value)}>
+              <option>All projects</option>
+              {projects.map(p => <option key={p[0]}>{p[0]}</option>)}
+            </select>
+          </label>
+        </div>
+      </div>
+
+      <div className="stats-grid">
+        {[
+          ['Sales & Booking Velocity', 'Comprehensive contract report with installment breakdowns', 'sales'],
+          ['Accounts Receivable Aging', '0-30, 31-60, 61-90, 90+ days debtor schedule and demand notices', 'accounts'],
+          ['Project Inventory Absorption', 'Plots sold, reserved, hold and unsold yield analysis', 'inventory'],
+          ['TDS & Commission Payroll', 'Agent commissions, tax withholding (5%), and bank transfer ledger', 'tax']
+        ].map(([title, desc, key]) => (
+          <div className="stat-card report-card" key={key}>
+            <b>{title}</b>
+            <p>{desc}</p>
+            <button className="button button-white small-btn" onClick={() => notify(`${title} generated and downloaded.`)}>
+              <Download size={13} /> Download Report
+            </button>
+          </div>
+        ))}
+      </div>
+    </>
+  );
+}
+
+function Documents({ notify, role }) {
+  const docs = [
+    ['Booking Form', 'Rajesh Sharma · A-012', '12 Jun 2026', 'Booking'],
+    ['Allotment Letter', 'Rajesh Sharma · A-012', '14 Jun 2026', 'Allocation'],
+    ['Agreement to Sale', 'Rajesh Sharma · A-012', '18 Jun 2026', 'Agreement'],
+    ['Tax Receipt #0211', 'Rajesh Sharma · ₹4,80,000', '20 Sep 2026', 'Receipt'],
+    ['Booking Form', 'Anita Verma · B-104', '27 Sep 2026', 'Booking'],
+    ['Token Receipt #0212', 'Anita Verma · ₹6,30,000', '27 Sep 2026', 'Receipt']
+  ];
+
+  return (
+    <>
+      <RoleContextBanner role={role} page="Documents" />
+
+      <div className="panel section-panel">
+        <div className="panel-head">
+          <div>
+            <h2>Document Vault & Customer Files</h2>
+            <p>Audited records, signed conveyance deeds, and official receipts</p>
+          </div>
+        </div>
+
+        <div className="documents-list">
+          {docs.map((d, idx) => (
+            <div className="document-row" key={idx}>
+              <FileText size={18} className="indigo-text" />
+              <div>
+                <b>{d[0]}</b>
+                <small>{d[1]}</small>
+              </div>
+              <span className="doc-date">{d[2]}</span>
+              <Badge>{d[3]}</Badge>
+              <button className="icon-action" onClick={() => notify(`${d[0]} preview opened`)}>
+                <Eye size={14} />
+              </button>
+              <button className="icon-action" onClick={() => notify(`${d[0]} download started`)}>
+                <Download size={14} />
+              </button>
+            </div>
+          ))}
+        </div>
+      </div>
+    </>
+  );
+}
+
+function Notifications({ fups, FUP, notify, role }) {
+  const data = [
+    ['Payment overdue · Sneha Mehta', 'Plot B-033 · ₹5,60,000 is 10 days overdue.', 'Today, 9:42 AM', 'alert'],
+    ['Installment due · Priya Nair', 'Plot A-101 · ₹4,80,000 due on 05 Oct 2026.', 'Today, 8:15 AM', 'warn'],
+    ['New booking confirmed · Rajesh Sharma', 'Plot A-012 confirmed by sales manager.', 'Yesterday, 5:30 PM', 'info'],
+    ['Plot hold expiry · Plot C-031', 'Hold period expires in 4 hours for customer.', 'Yesterday, 2:10 PM', 'warn'],
+    ['System snapshot backup completed', 'Database cold archive backed up to S3 vault.', 'Yesterday, 1:00 AM', 'system']
+  ];
+
+  return (
+    <>
+      <RoleContextBanner role={role} page="Notifications" />
+
+      <div className="panel section-panel">
+        <div className="panel-head">
+          <div>
+            <h2>Alerts, Follow-ups & Reminders</h2>
+            <p>Operational queues filtered for your role</p>
+          </div>
+        </div>
+
+        <div className="notifications-list">
+          {data.map((item, i) => (
+            <div className="notification-row" key={i}>
+              <span className={`status-dot ${item[3] === 'alert' ? 'red' : item[3] === 'warn' ? 'amber' : 'green'}`} />
+              <div className="notification-info">
+                <b>{item[0]}</b>
+                <p>{item[1]}</p>
+                <small>{item[2]}</small>
+              </div>
+              <button
+                className="button button-white small-button"
+                onClick={() => {
+                  FUP({ ...fups, [i]: true });
+                  notify(fups[i] ? 'Already followed up' : 'Action logged in workspace');
+                }}
+              >
+                {fups[i] ? 'Followed up ✓' : 'Take Action'}
+              </button>
+            </div>
+          ))}
+        </div>
+      </div>
+    </>
+  );
+}
+
+function Roles({ role, notify, users = [], create, edit, remove }) {
+  const matrix = [
+    ['SUPER ADMIN', '✓', '✓', '✓', '✓', '✓', '✓', '✓', '✓'],
+    ['ADMIN', '✓', '✓', '✓', '✓', '✓', '✓', '✓', '✓'],
+    ['SALES MANAGER', '●', '✓', '●', '✓', '●', '✓', '✓', '—'],
+    ['SALES AGENT', '—', '●', '—', '●', '—', '●', '●', '—'],
+    ['ACCOUNTS', '—', '—', '✓', '—', '✓', '✓', '✓', '—'],
+    ['MANAGEMENT', '—', '—', '—', '—', '—', '✓', '✓', '—']
+  ];
+
+  return (
+    <>
+      <RoleContextBanner role={role} page="User & role management" />
+
+      {/* Users Admin Table */}
+      <div className="mini-stats four">
+        <Mini title="PROVISIONED USERS" value={users.length} />
+        <Mini title="ACTIVE SESSIONS" value={users.filter(u => u.status === 'Active').length} color="green-text" />
+        <Mini title="SECURITY ROLES" value="6" />
+        <Mini title="COMPLIANCE STATUS" value="SOC-2 Ready" color="green-text" />
+      </div>
+
+      <section className="panel section-panel users-panel">
+        <div className="crud-heading">
+          <div>
+            <h2>Workspace Team Accounts</h2>
+            <p>Manage credentials, role assignments, and active account statuses.</p>
+          </div>
+          <button className="button button-primary small-button" onClick={create}>
+            <Plus size={14} /> Add Team Member
+          </button>
+        </div>
+
+        <Table
+          headers={['USER', 'EMAIL', 'MOBILE', 'ROLE', 'STATUS', 'ACTIONS']}
+          rows={users.map((u, i) => [
+            <div className="customer-cell" key={u.id}><Avatar name={u.name} i={i} /><b>{u.name}</b></div>,
+            u.email,
+            u.phone,
+            <Badge>{u.role}</Badge>,
+            <Badge>{u.status}</Badge>,
+            <div className="crud-actions" key={u.id}>
+              <button className="icon-action" title="Edit user" onClick={() => edit(u)}>
+                <Edit2 size={14} />
+              </button>
+              <button className="icon-action delete-action" title="Delete user" onClick={() => remove(u)}>
+                <Trash2 size={14} />
+              </button>
+            </div>
+          ])}
+        />
+      </section>
+
+      {/* Permissions Matrix */}
+      <div className="panel section-panel" style={{ marginTop: 14 }}>
+        <div className="panel-head">
+          <div>
+            <h2>Role-Based Access Control (RBAC) Permissions Matrix</h2>
+            <p>Granular module privileges enforced across workspace endpoints</p>
+          </div>
+        </div>
+
+        <Table
+          headers={['ROLE', 'ALL PLOTS', 'BOOKINGS', 'PAYMENTS', 'CUSTOMERS', 'COMMISSIONS', 'REPORTS', 'DOCS', 'ADMIN']}
+          rows={matrix.map(row => row.map((x, i) => i === 0 ? <b>{x}</b> : (
+            <span className={x === '✓' ? 'access-yes' : x === '●' ? 'access-partial' : 'access-no'}>{x}</span>
+          )))}
+        />
+        <div className="access-legend">
+          ✓ Full access · ● Assigned records only · — Restricted
+        </div>
+      </div>
+    </>
+  );
+}
+
+function Administration({ notify, role }) {
+  const data = [
+    ['Organization profile', 'Company information and legal entity registration', Building2],
+    ['Projects & layout schemas', 'Phase layouts, plot master blueprints and base rates', Map],
+    ['User identity & IAM', 'Multi-factor authentication and role assignment policies', Users],
+    ['Tax & GST invoicing', 'Receipt numbering, state GST, TDS withholding percentages', Receipt],
+    ['Banking & payment gateways', 'Escrow account details, NEFT/RTGS accounts, virtual IDs', Wallet]
+  ];
+
+  return (
+    <>
+      <RoleContextBanner role={role} page="Administration" />
+
+      <div className="panel section-panel">
+        <div className="panel-head">
+          <div>
+            <h2>System Master Configuration</h2>
+            <p>Global parameters, project schemas, and compliance rules</p>
+          </div>
+        </div>
+
+        <div className="settings-grid">
+          {data.map(([title, desc, Icon]) => (
+            <div className="setting-card" key={title}>
+              <div className="setting-icon"><Icon size={20} /></div>
+              <div>
+                <b>{title}</b>
+                <p>{desc}</p>
+                <button className="text-button" onClick={() => notify(`${title} settings opened`)}>
+                  Configure module →
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </>
+  );
+}
+
+function CrudWorkspace({ page, records, project, search, create, edit, view, remove, role }) {
+  const rows = records.filter(r => {
+    return Object.values(r).join(' ').toLowerCase().includes(search.toLowerCase()) &&
+      (project === 'All projects' || `${r.name} ${r.category}`.toLowerCase().includes(project.toLowerCase()));
+  }).map(r => [
+    <b>{r.name}</b>,
+    <code>{r.reference}</code>,
+    r.category,
+    r.amount,
+    <Badge>{r.status}</Badge>,
+    <div className="crud-actions" key={r.id}>
+      <button className="icon-action" title="View details" onClick={() => view(r)}><Eye size={14} /></button>
+      <button className="icon-action" title="Edit record" onClick={() => edit(r)}><Edit2 size={14} /></button>
+      <button className="icon-action delete-action" title="Delete record" onClick={() => remove(r)}><Trash2 size={14} /></button>
+    </div>
+  ]);
+
+  return (
+    <section className="panel crud-panel">
+      <div className="crud-heading">
+        <div>
+          <h2>{page} Master Records</h2>
+          <p>Local in-browser record entries with instantaneous editing & verification.</p>
+        </div>
+        <button className="button button-white small-button" onClick={create}>
+          <Plus size={14} /> Add {page.slice(0, -1)}
+        </button>
+      </div>
+
+      <Table
+        headers={['RECORD NAME', 'REF CODE', 'CATEGORY / RELATION', 'VALUE', 'STATUS', 'ACTIONS']}
+        rows={rows}
+      />
+      <div className="table-pagination">
+        {rows.length} {rows.length === 1 ? 'record' : 'records'} in {page}
+        <span>Persisted in browser localStorage <CheckCircle2 size={12} className="green-text" /></span>
+      </div>
+    </section>
+  );
+}
+
+function Modal({ kind, close, save, context, initial, role }) {
+  const pay = kind === 'payment';
+  const record = kind === 'record';
+  const title = kind === 'user'
+    ? `${initial ? 'Edit' : 'Add'} Team Member`
+    : record
+    ? `${initial ? 'Edit' : 'Create'} ${context === 'Projects & plots' ? 'Project' : context === 'Bookings' ? 'Booking' : context === 'Payments' ? 'Payment' : 'Record'}`
+    : kind === 'booking'
+    ? 'Create Sales Booking'
+    : pay
+    ? 'Record Customer Payment'
+    : 'Save Record';
+
+  const fields = kind === 'user' ? [
+    ['name', 'Full Name', 'text', 'Enter full name'],
+    ['email', 'Email Address', 'email', 'name@company.com'],
+    ['phone', 'Mobile Number', 'tel', '+91 98765 43210'],
+    ['role', 'Role', 'select', ['ADMIN', 'SUPER ADMIN', 'SALES MANAGER', 'SALES AGENT', 'ACCOUNTS', 'MANAGEMENT']],
+    ['status', 'Account Status', 'select', ['Active', 'Invited', 'Suspended']]
+  ] : record ? [
+    ['name', 'Name / Title', 'text', 'e.g. Master record or phase'],
+    ['reference', 'Reference Code', 'text', 'e.g. REF-2026-01'],
+    ['category', 'Category / Phase', 'text', 'Project, plot or type'],
+    ['amount', 'Amount / Plots', 'text', 'e.g. 18,40,000'],
+    ['status', 'Status', 'select', ['Active', 'Pending', 'Processing', 'Confirmed', 'Overdue', 'Paid', 'Approved']],
+    ['notes', 'Details / Notes', 'text', 'Add relevant notes']
+  ] : pay ? [
+    ['customer', 'Customer Name', 'text', 'Rajesh Sharma'],
+    ['plot', 'Plot Number', 'text', 'A-012'],
+    ['project', 'Project', 'select', ['Green Meadows', 'Silver Oaks', 'Park View', 'River Enclave']],
+    ['total', 'Booking Value (₹)', 'text', '18,40,000'],
+    ['paid', 'Amount Received (₹)', 'text', '2,00,000'],
+    ['due', 'Next Due Date', 'date', ''],
+    ['agent', 'Received By', 'select', ['M. Kumar', 'S. Patel', 'R. Gupta', 'N. Bose']]
+  ] : kind === 'booking' ? [
+    ['customer', 'Customer Name', 'text', 'Neha Kapoor'],
+    ['mobile', 'Mobile Number', 'tel', '+91 98765 43210'],
+    ['project', 'Project', 'select', ['Green Meadows', 'Silver Oaks', 'Park View', 'River Enclave']],
+    ['plot', 'Plot Number', 'text', 'A-024'],
+    ['amount', 'Booking Value (₹)', 'text', '18,40,000'],
+    ['paid', 'Token Advance (₹)', 'text', '2,00,000'],
+    ['agent', 'Assigned Agent', 'select', ['M. Kumar', 'S. Patel', 'R. Gupta', 'N. Bose']],
+    ['plan', 'Installment Plan', 'select', ['12 monthly installments', '6 monthly installments', 'Paid in full']]
+  ] : [
+    ['name', 'Record Name', 'text', 'Enter name'],
+    ['details', 'Details', 'text', 'Enter details']
+  ];
+
+  function submit(e) {
+    e.preventDefault();
+    const d = Object.fromEntries(new FormData(e.currentTarget));
+    save(d);
+  }
+
+  return (
+    <div className="modal-backdrop" onMouseDown={e => e.target === e.currentTarget && close()}>
+      <div className="modal">
+        <div className="modal-head">
+          <div>
+            <span className="modal-kicker">NMT ERP · {context || 'WORKSPACE'}</span>
+            <h2>{title}</h2>
+            <p>Enter the details below to update live workspace records.</p>
+          </div>
+          <button className="modal-close" onClick={close}><X size={17} /></button>
+        </div>
+        <form onSubmit={submit}>
+          <div className="form-grid">
+            {fields.map(([n, label, type, placeholder]) => (
+              <label key={n}>
+                {label}
+                {type === 'select' ? (
+                  <select name={n} defaultValue={initial?.[n] || placeholder[0]}>
+                    {placeholder.map(x => <option key={x} value={x}>{x}</option>)}
+                  </select>
+                ) : (
+                  <input
+                    name={n}
+                    type={type}
+                    placeholder={placeholder}
+                    defaultValue={initial?.[n] || ''}
+                    required={['customer', 'plot', 'amount', 'total', 'name', 'email'].includes(n)}
+                  />
+                )}
+              </label>
+            ))}
+          </div>
+          <div className="modal-actions">
+            <button type="button" className="button button-white" onClick={close}>Cancel</button>
+            <button type="submit" className="button button-primary">
+              {initial ? 'Save Changes' : pay ? 'Record Payment' : kind === 'booking' ? 'Confirm Booking' : 'Save'}
+              <ChevronRight size={14} />
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// --------------------------------------------------------------------------
+// MOUNT APPLICATION ROOT
+// --------------------------------------------------------------------------
+
+createRoot(document.getElementById('root')).render(
+  <React.StrictMode>
+    <BrowserRouter>
+      <App />
+    </BrowserRouter>
+  </React.StrictMode>
+);
