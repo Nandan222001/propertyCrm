@@ -6,7 +6,7 @@ import {
 } from 'lucide-react';
 import { roleConfigs } from '../data/seedData';
 
-export function LoginScreen({ onLogin, onRegister }) {
+export function LoginScreen({ onLogin, onRegister, customers = [], users = [] }) {
   const [tab, setTab] = useState('login'); // 'login' | 'register'
   const [selectedImage, setSelectedImage] = useState(0); // 0, 1, 2
   const [showPassword, setShowPassword] = useState(false);
@@ -54,8 +54,10 @@ export function LoginScreen({ onLogin, onRegister }) {
     { role: 'SALES MANAGER', label: 'Sales Manager', icon: Target, desc: 'Team Pipeline & Quota Realization', color: '#0891b2', bg: '#e0f2fe' },
     { role: 'SALES AGENT', label: 'Sales Agent', icon: Users, desc: 'My Sales Desk, Deals & Commissions', color: '#16a34a', bg: '#dcfce7' },
     { role: 'ACCOUNTS', label: 'Accounts', icon: Wallet, desc: 'Financial Ledger & Aging Receivables', color: '#ea580c', bg: '#ffedd5' },
-    { role: 'MANAGEMENT', label: 'Management', icon: Briefcase, desc: 'Executive Boardroom & Portfolio GDV', color: '#be123c', bg: '#ffe4e6' }
+    { role: 'MANAGEMENT', label: 'Management', icon: Briefcase, desc: 'Executive Boardroom & Portfolio GDV', color: '#be123c', bg: '#ffe4e6' },
+    { role: 'CUSTOMER', label: 'Customer', icon: User, desc: 'My Plots, Payments, Bills & Registry (view only)', color: '#0d9488', bg: '#ccfbf1' }
   ];
+  const registerRoles = quickRoles.filter((r) => r.role === 'SALES AGENT' || r.role === 'CUSTOMER');
 
   const handleQuickLogin = (targetRole) => {
     const userForRole = roleConfigs[targetRole]?.defaultUser || {
@@ -76,8 +78,20 @@ export function LoginScreen({ onLogin, onRegister }) {
       setError('Password must be at least 4 characters.');
       return;
     }
+    const typed = email.trim().toLowerCase();
+    let user = roleConfigs[role]?.defaultUser || { name: 'Workspace User', email, role };
+    if (role === 'CUSTOMER') {
+      const c = customers.find((x) => (x.email || '').toLowerCase() === typed);
+      if (!c) {
+        setError('No customer account with this email. Try customer@nmtsolution.demo.');
+        return;
+      }
+      user = { name: c.name, email: c.email, role, customerName: c.name };
+    } else if (role === 'SALES AGENT') {
+      const u = users.find((x) => x.role === 'SALES AGENT' && x.email.toLowerCase() === typed);
+      if (u) user = u;
+    }
     setError('');
-    const user = roleConfigs[role]?.defaultUser || { name: 'Workspace User', email, role };
     onLogin(role, user);
   };
 
@@ -309,7 +323,7 @@ export function LoginScreen({ onLogin, onRegister }) {
               <div className="form-group">
                 <label>
                   Select Role View
-                  <select value={role} onChange={(e) => setRole(e.target.value)}>
+                  <select value={role} onChange={(e) => { setRole(e.target.value); setEmail(roleConfigs[e.target.value]?.defaultUser?.email || email); }}>
                     {quickRoles.map((r) => (
                       <option key={r.role} value={r.role}>{r.label} ({r.role})</option>
                     ))}
@@ -424,7 +438,7 @@ export function LoginScreen({ onLogin, onRegister }) {
                     value={regData.role} 
                     onChange={(e) => setRegData({ ...regData, role: e.target.value })}
                   >
-                    {quickRoles.map((r) => (
+                    {registerRoles.map((r) => (
                       <option key={r.role} value={r.role}>{r.label} — {r.desc}</option>
                     ))}
                   </select>

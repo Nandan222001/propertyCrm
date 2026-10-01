@@ -27,3 +27,14 @@ All records and figures are illustrative. Demo sign-in supports selectable roles
 ## CRUD demo behavior
 
 Every module route now includes a module-scoped record workspace with create, view, edit and delete controls. Module records, bookings, plots and payments are stored in browser `localStorage` for the client demo. Delete asks for confirmation. This is intentionally client-side; these records are not shared between users or devices until a server API/database is connected.
+
+## Workflow rules (demo)
+
+- **Bookings:** admins and sales agents create them. An agent's booking is `Pending Approval` (plot on hold) until an admin approves it on the **Approvals** page; admin bookings are confirmed immediately.
+- **Customers:** only sales agents add customers; each one needs admin approval before it can be booked.
+- **Payments:** accounts/admin pick the plot from a drop-down, confirm the *final price for the customer*, and record the amount. A bill is generated with an **office copy** and a **customer copy** (one A4 page when printed) and can be shared with the customer.
+- **Customer login** (`customer@nmtsolution.demo`): view-only portal with plots, registry status, payments, pending dues, bills and documents.
+- **Agent search** on the admin dashboard shows an agent's deals, sales, collection and commission.
+- **3D map:** *Projects & plots → 3D map* (tilt / rotate / zoom, click a plot).
+- **WhatsApp:** buttons open WhatsApp click-to-chat with a prefilled message (bills, reminders, booking notices). Automatic sending would need the WhatsApp Business API and a backend.
+- All data is stored in the browser (`localStorage`); there is no server.
