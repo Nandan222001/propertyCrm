@@ -1,0 +1,127 @@
+/* ---------- shared bits ---------- */
+.span-2{grid-column:1/-1}
+.field-hint{display:block;font-size:8px;color:#929baa;margin-top:4px;font-weight:500}
+.form-error{color:#b94d4d;font-size:10px;margin:12px 0 0}
+.form-grid input[readonly]{background:#f7f8fa;color:#69758a}
+.whatsapp-btn{background:#25d366;border-color:#25d366;color:#fff}
+.whatsapp-btn:hover{background:#1fb855}
+.small-btn{height:28px;padding:0 10px;font-size:9px}
+.sheet-h{font:700 10px Manrope;letter-spacing:.6px;color:#5a667a;margin:16px 0 6px;text-transform:uppercase}
+.badge-red{color:#c24a45;background:#fdecea}
+.pending-banner{display:flex;align-items:center;justify-content:space-between;gap:12px;background:#fff8ea;border:1px solid #f4e1b7;border-radius:8px;padding:11px 14px;margin-bottom:14px;font-size:11px;color:#8a6a24}
+.row-actions{display:flex;align-items:center;gap:4px;flex-wrap:wrap}
+.wa-icon{color:#1fa855}
+.empty-note{padding:26px;text-align:center;color:#8892a4;font-size:11px}
+
+/* ---------- agent lookup + info ---------- */
+.agent-lookup{position:relative;display:flex;align-items:center;gap:7px;height:36px;border:1px solid #e6e9ee;border-radius:7px;background:#fff;padding:0 10px;color:#8892a4}
+.agent-lookup input{border:0;outline:0;font-size:10px;width:130px;background:transparent;color:#414b5f}
+.agent-lookup-list{position:absolute;top:40px;left:0;right:0;min-width:200px;margin:0;padding:4px;list-style:none;background:#fff;border:1px solid #e6e9ee;border-radius:8px;box-shadow:0 12px 30px #1720331f;z-index:25}
+.agent-lookup-list li.empty{padding:10px;font-size:10px;color:#8892a4}
+.agent-lookup-list button{width:100%;display:flex;justify-content:space-between;gap:10px;border:0;background:transparent;padding:8px 9px;border-radius:6px;font-size:10px;text-align:left;color:#414b5f}
+.agent-lookup-list button:hover{background:#f3f5ff}
+.agent-lookup-list small{color:#929baa}
+.agent-modal{width:min(640px,100%)}
+.agent-tiles{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:18px}
+.agent-tiles div{border:1px solid #eaedf1;border-radius:8px;padding:11px 12px}
+.agent-tiles small{display:block;font-size:8px;color:#929baa;letter-spacing:.5px;text-transform:uppercase}
+.agent-tiles b{font:700 15px Manrope;display:block;margin-top:5px}
+@media(max-width:520px){.agent-tiles{grid-template-columns:1fr 1fr}.agent-lookup input{width:90px}}
+
+/* ---------- customer portal ---------- */
+.portal-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px;margin-top:14px}
+.plot-card{padding:16px}
+.plot-card h3{font:700 14px Manrope;margin:0 0 3px}
+.plot-card p{font-size:10px;color:#8892a4;margin:0 0 12px}
+.reg-steps{display:flex;gap:4px;margin:12px 0 4px}
+.reg-steps i{flex:1;height:5px;border-radius:3px;background:#e8ebf1}
+.reg-steps i.done{background:#2fb384}
+.reg-label{font-size:9px;color:#5a667a}
+.pay-bar{height:6px;background:#e8ebf1;border-radius:4px;overflow:hidden;margin:10px 0 5px}
+.pay-bar span{display:block;height:100%;background:#5666dc}
+.pay-nums{display:flex;justify-content:space-between;font-size:10px}
+.pay-nums b{display:block;font-size:12px}
+.due-row{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid #f0f1f4;font-size:11px}
+.due-row:last-child{border-bottom:0}
+.contact-card{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:14px;padding:14px 16px}
+.view-only-tag{font-size:8px;font-weight:700;letter-spacing:.8px;color:#0d9488;background:#ccfbf1;border-radius:4px;padding:4px 7px}
+
+/* ---------- 3D map ---------- */
+.map3d-controls{display:flex;flex-wrap:wrap;align-items:center;gap:14px;padding:12px 2px 10px}
+.map3d-controls label{display:flex;align-items:center;gap:7px;font-size:9px;font-weight:600;color:#677185}
+.map3d-controls input[type=range]{width:96px}
+.map3d-legend{display:flex;gap:12px;margin-left:auto;font-size:9px;color:#677185;flex-wrap:wrap}
+.map3d-legend i{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:5px}
+.map3d-stage{position:relative;height:430px;overflow:hidden;border-radius:10px;background:linear-gradient(180deg,#eef2fb,#f9fafc);display:grid;place-items:center;perspective:1400px}
+.map3d-scene{position:relative;transform-style:preserve-3d;transition:transform .25s ease}
+.map3d-ground{position:absolute;inset:-14px;background:#dfe5f1;border-radius:6px;transform:translateZ(-1px);box-shadow:0 0 0 1px #cfd7e8}
+.blk{position:absolute;transform-style:preserve-3d;cursor:pointer}
+.blk .f{position:absolute;display:block;font-style:normal;background:var(--c)}
+.blk .top{inset:0;transform:translateZ(var(--h));display:grid;place-items:center;transition:filter .15s}
+.blk .top span{font:700 9px Manrope;color:#fff;transform:rotate(0deg);text-shadow:0 1px 1px #0003;pointer-events:none}
+.blk:hover .top,.blk.active .top{filter:brightness(1.18)}
+.blk.active .top{outline:2px solid #172033;outline-offset:-2px}
+.blk .south{left:0;top:100%;width:100%;height:var(--h);transform-origin:top;transform:rotateX(90deg);filter:brightness(.8)}
+.blk .north{left:0;top:0;width:100%;height:var(--h);transform-origin:top;transform:rotateX(90deg);filter:brightness(.7)}
+.blk .east{left:100%;top:0;width:var(--h);height:100%;transform-origin:left;transform:rotateY(-90deg);filter:brightness(.65)}
+.blk .west{left:0;top:0;width:var(--h);height:100%;transform-origin:left;transform:rotateY(-90deg);filter:brightness(.9)}
+.map3d-detail{display:flex;flex-wrap:wrap;align-items:center;gap:22px;margin-top:12px;padding:12px 14px;border:1px solid #eaedf1;border-radius:8px;font-size:11px;min-height:56px}
+.map3d-detail p{margin:0;color:#8892a4;font-size:10px}
+.map3d-detail small{display:block;font-size:8px;color:#929baa;letter-spacing:.6px}
+.map3d-detail b{display:block;font:700 12px Manrope}
+.map3d-dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:4px}
+.map3d-empty{position:absolute;color:#8892a4;font-size:11px}
+@media(max-width:520px){.map3d-stage{height:340px}.map3d-legend{margin-left:0}}
+
+/* ---------- bill / booking form (screen + print) ---------- */
+.print-modal{width:min(820px,100%);background:#fff;border-radius:12px;box-shadow:0 25px 90px #1720333d;margin:auto}
+.print-backdrop{align-items:flex-start;overflow:auto}
+.print-toolbar{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 16px;border-bottom:1px solid #eaedf1;flex-wrap:wrap}
+.print-toolbar b{font:700 12px Manrope}
+.print-toolbar-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.print-area{padding:18px;background:#f4f5f8}
+.bill-sheet,.booking-sheet{background:#fff;color:#111;max-width:760px;margin:0 auto;font-family:'DM Sans',Arial,sans-serif}
+.booking-sheet{padding:26px 30px;border:1px solid #d9dde6}
+.bill-copy{padding:16px 22px;border:1px solid #cfd4de}
+.bill-cut{text-align:center;color:#8a93a3;font-size:10px;margin:8px 0;overflow:hidden;white-space:nowrap}
+.bill-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;border-bottom:2px solid #172033;padding-bottom:9px}
+.bill-head h2{font:800 17px Manrope;margin:0}
+.bill-head p{font-size:10px;margin:3px 0 0;color:#555}
+.bill-copy-tag{font:700 10px Manrope;letter-spacing:1px;border:1.5px solid #172033;padding:4px 9px;border-radius:3px;white-space:nowrap}
+.bill-title{text-align:center;font:800 13px Manrope;letter-spacing:2px;margin:11px 0}
+.bill-meta{display:flex;justify-content:space-between;gap:10px;font-size:11px;margin-bottom:9px;flex-wrap:wrap}
+.bill-meta span{display:block;font-size:9px;color:#666}
+.bill-table{width:100%;border-collapse:collapse;font-size:11px}
+.bill-table th,.bill-table td{border:1px solid #cfd4de;padding:7px 9px;text-align:left;vertical-align:top}
+.bill-table th{background:#f4f5f8;width:24%;font-weight:600;color:#333}
+.bill-amount{font-weight:800;font-size:13px}
+.bill-words{font-size:11px;margin:9px 0}
+.bill-sign{display:flex;justify-content:space-between;gap:20px;margin-top:30px;font-size:10px}
+.bill-sign.three div{flex:1}
+.bill-sign i{display:block;border-top:1px solid #222;margin-bottom:5px;width:85%}
+.sheet-terms{font-size:10px;line-height:1.6;padding-left:17px;margin:0}
+
+@media print{
+  @page{size:A4;margin:10mm}
+  html,body{background:#fff!important}
+  .app-shell{display:block!important}
+  .app-shell>aside,.app-shell>main,.app-toast,.no-print{display:none!important}
+  .modal-backdrop{position:static!important;background:none!important;backdrop-filter:none!important;padding:0!important;display:block!important;overflow:visible!important}
+  .print-modal{box-shadow:none!important;width:100%!important;border-radius:0!important}
+  .print-area{padding:0!important;background:#fff!important}
+  .bill-sheet,.booking-sheet{max-width:none!important;border:0}
+  .bill-copy{break-inside:avoid;page-break-inside:avoid}
+  *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+}
+
+/* bill tables must not inherit the app's compact grey table styling */
+.bill-table{border:1px solid #cfd4de}
+.bill-table th,.bill-table td{font-size:11px!important;color:#111!important;text-transform:none!important;letter-spacing:0!important;border:1px solid #cfd4de!important;background:transparent;height:auto!important;line-height:1.35}
+.bill-table th{background:#f4f5f8!important;color:#333!important;font-weight:600!important}
+.bill-table td.bill-amount{font-size:13px!important;font-weight:800!important}
+
+/* layout fixes */
+.workspace-card>.sidebar-role-tag:first-child{margin:24px 0 16px}
+.panel.customer-summary{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.panel.customer-summary .view-only-tag,.panel.customer-summary>.button{margin-left:auto}
+.bill-sign i{height:0;border-radius:0;background:none;font-style:normal}

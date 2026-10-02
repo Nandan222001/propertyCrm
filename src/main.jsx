@@ -8,15 +8,27 @@ import {
   CalendarDays, Building2, House, Receipt, FileText, Clock3, CheckCircle2,
   AlertCircle, SlidersHorizontal, Send, Eye, Edit2, LockKeyhole, RefreshCw,
   FileSpreadsheet, MapPin, IndianRupee, Mail, Phone, Activity, Trash2, LogOut,
-  Sparkles, Check, CheckCircle
+  Sparkles, Check, CheckCircle, Printer, MessageCircle
 } from 'lucide-react';
 
 import './style.css';
 import './components/RoleThemeStyles.css';
+import './components/FeatureStyles.css';
 
 import {
-  projects, seedBookings, seedPlots, seedPays, agents, seedUsers, seedCrud, roleConfigs
+  projects, seedBookings, seedPlots, seedPays, agents, seedUsers, seedCrud, roleConfigs,
+  seedCustomers, seedReceipts, seedRegistry
 } from './data/seedData';
+import {
+  parseAmt, fmtINR, agentKey, todayLabel, openWhatsApp,
+  isAdmin, canCreateBooking, canApprove, canCreateCustomer, canRecordPayment, canManageBills
+} from './lib/helpers';
+import { BookingModal, PaymentModal, CustomerModal } from './components/FeatureModals';
+import { BillModal, BookingFormModal } from './components/PrintSheets';
+import { PlotMap3D } from './components/PlotMap3D';
+import { AgentLookup, AgentInfoModal } from './components/AgentLookup';
+import { CustomersPage, CustomerProfile, DocumentsPage, StatusBadge } from './components/CustomerViews';
+import { ApprovalsPage } from './components/ApprovalsPage';
 
 import { SuperAdminDashboard } from './components/dashboards/SuperAdminDashboard';
 import { AdminDashboard } from './components/dashboards/AdminDashboard';
@@ -29,6 +41,7 @@ import { LoginScreen } from './components/LoginScreen';
 
 const pathFor = {
   'Overview': '/',
+  'Approvals': '/approvals',
   'Projects & plots': '/projects-plots',
   'Bookings': '/bookings',
   'Payments': '/payments',
@@ -45,6 +58,7 @@ const pathFor = {
 
 const iconMap = {
   'Overview': LayoutDashboard,
+  'Approvals': CheckCircle2,
   'Projects & plots': Map,
   'Bookings': ClipboardList,
   'Payments': Wallet,
@@ -61,7 +75,7 @@ const iconMap = {
 export function App() {
   const location = useLocation();
   const navigate = useNavigate();
-  const page = Object.keys(pathFor).find(k => pathFor[k] === location.pathname) || 'Overview';
+  const rawPage = Object.keys(pathFor).find(k => pathFor[k] === location.pathname) || 'Overview';
 
   // Navigation & UI state
   const [mobile, setMobile] = useState(false);
@@ -75,7 +89,7 @@ export function App() {
   const [selected, setSelected] = useState(null);
 
   // Authentication & Role state
-  const [session, setSession] = useState(() => localStorage.getItem('nmt_session') || 'ADMIN');
+  const [session, setSession] = useState(() => localStorage.getItem('nmt_session') || '');
   const [role, setRole] = useState(() => localStorage.getItem('nmt_role') || 'ADMIN');
   const [users, setUsers] = useState(() => JSON.parse(localStorage.getItem('nmt_users') || 'null') || seedUsers);
   const [currentUser, setCurrentUser] = useState(() => {
@@ -84,9 +98,19 @@ export function App() {
   });
 
   // Core ERP Domain Data
-  const [bookings, setBookings] = useState(() => JSON.parse(localStorage.getItem('nmt_bookings') || 'null') || seedBookings);
-  const [plots, setPlots] = useState(() => JSON.parse(localStorage.getItem('nmt_plots') || 'null') || seedPlots);
-  const [pays, setPays] = useState(() => JSON.parse(localStorage.getItem('nmt_payments') || 'null') || seedPays);
+  const load = (key, seed) => {
+    try { return JSON.parse(localStorage.getItem(key) || 'null') || seed; } catch { return seed; }
+  };
+  const [bookings, setBookings] = useState(() => load('nmt2_bookings', seedBookings));
+  const [plots, setPlots] = useState(() => load('nmt2_plots', seedPlots));
+  const [pays, setPays] = useState(() => load('nmt2_payments', seedPays));
+  const [customers, setCustomers] = useState(() => load('nmt2_customers', seedCustomers));
+  const [receipts, setReceipts] = useState(() => load('nmt2_receipts', seedReceipts));
+  const [registry, setRegistry] = useState(() => load('nmt2_registry', seedRegistry));
+  const [billNo, setBillNo] = useState('');
+  const [bookingPrint, setBookingPrint] = useState(null);
+  const [agentInfo, setAgentInfo] = useState(null);
+  const [bookingPreset, setBookingPreset] = useState(null);
   const [fups, setFups] = useState({});
   const [crud, setCrud] = useState(() => {
     const saved = JSON.parse(localStorage.getItem('nmt_module_crud') || 'null') || seedCrud;
@@ -99,18 +123,21 @@ export function App() {
   const [userEdit, setUserEdit] = useState(null);
 
   // Sync to localStorage
-  useEffect(() => localStorage.setItem('nmt_bookings', JSON.stringify(bookings)), [bookings]);
-  useEffect(() => localStorage.setItem('nmt_plots', JSON.stringify(plots)), [plots]);
-  useEffect(() => localStorage.setItem('nmt_payments', JSON.stringify(pays)), [pays]);
+  useEffect(() => localStorage.setItem('nmt2_bookings', JSON.stringify(bookings)), [bookings]);
+  useEffect(() => localStorage.setItem('nmt2_plots', JSON.stringify(plots)), [plots]);
+  useEffect(() => localStorage.setItem('nmt2_payments', JSON.stringify(pays)), [pays]);
+  useEffect(() => localStorage.setItem('nmt2_customers', JSON.stringify(customers)), [customers]);
+  useEffect(() => localStorage.setItem('nmt2_receipts', JSON.stringify(receipts)), [receipts]);
+  useEffect(() => localStorage.setItem('nmt2_registry', JSON.stringify(registry)), [registry]);
   useEffect(() => localStorage.setItem('nmt_module_crud', JSON.stringify(crud)), [crud]);
   useEffect(() => localStorage.setItem('nmt_users', JSON.stringify(users)), [users]);
   useEffect(() => localStorage.setItem('nmt_role', role), [role]);
   useEffect(() => localStorage.setItem('nmt_current_user', JSON.stringify(currentUser)), [currentUser]);
 
   useEffect(() => {
-    if (page === 'Projects & plots') setTab('Plots');
-    if (page === 'Bookings') setTab('All bookings');
-  }, [page]);
+    if (rawPage === 'Projects & plots') setTab('Plots');
+    if (rawPage === 'Bookings') setTab('All bookings');
+  }, [rawPage]);
 
   useEffect(() => {
     if (toast) {
@@ -148,12 +175,17 @@ export function App() {
     localStorage.setItem('nmt_role', selectedRole);
     const user = userObj || users.find(u => u.role === selectedRole) || roleConfigs[selectedRole].defaultUser;
     setCurrentUser(user);
-    notify(`Welcome to NMT ERP! Logged in as ${user.name} (${selectedRole}).`);
+    notify(`Welcome to Lalita ERP! Logged in as ${user.name} (${selectedRole}).`);
     go('Overview');
   };
 
   const handleRegister = (newUser) => {
-    setUsers([newUser, ...users]);
+    if (newUser.role === 'CUSTOMER') {
+      newUser = { ...newUser, customerName: newUser.name };
+      setCustomers([{ id: `CUS-${String(Date.now()).slice(-4)}`, name: newUser.name, mobile: (newUser.phone || '').replace(/\D/g, '').slice(-10), email: newUser.email, address: '', agent: '', status: 'Pending Approval', createdAt: todayLabel() }, ...customers]);
+    } else {
+      setUsers([newUser, ...users]);
+    }
     setRole(newUser.role);
     setSession(newUser.role);
     setCurrentUser(newUser);
@@ -170,7 +202,7 @@ export function App() {
   };
 
   const exportCsv = () => {
-    const rows = page === 'Payments' ? pays.map(x => x.join(',')) : bookings.map(x => x.join(','));
+    const rows = page === 'Payments' ? vPays.map(x => x.join(',')) : vBookings.map(x => x.slice(0, 9).join(','));
     const head = page === 'Payments'
       ? 'Customer,Plot,Project,Booking value,Paid,Pending,Due date,Status,Agent'
       : 'Booking ID,Customer,Project,Plot,Date,Value,Paid,Status,Agent';
@@ -192,19 +224,6 @@ export function App() {
       });
       notify(prior ? 'Record updated' : 'Record created');
       setEditRecord(null);
-    } else if (modal === 'booking') {
-      const id = `BK-2026-${String(149 + bookings.length - seedBookings.length).padStart(4, '0')}`;
-      const b = [id, d.customer, d.project, d.plot, '28 Sep 2026', d.amount, d.paid || '0', 'Processing', d.agent || currentUser.name];
-      setBookings([b, ...bookings]);
-      setPlots(plots.map(x => x[0] === d.plot ? [...x.slice(0, 5), 'BOOKED', d.customer, d.agent || currentUser.name] : x));
-      notify(`Booking created for ${d.customer} · Plot ${d.plot} marked BOOKED`);
-    } else if (modal === 'payment') {
-      const due = Number(d.total.replaceAll(',', '')) - Number(d.paid.replaceAll(',', ''));
-      setPays([[
-        d.customer, d.plot, d.project, d.total, d.paid,
-        due.toLocaleString('en-IN'), d.due || '—', due <= 0 ? 'PAID' : 'PARTIALLY PAID', d.agent || currentUser.name
-      ], ...pays]);
-      notify(`Payment of ₹${d.paid} recorded for ${d.customer}`);
     } else if (modal === 'user') {
       if (userEdit) {
         setUsers(users.map(u => u.id === userEdit.id ? { ...u, ...d } : u));
@@ -221,15 +240,160 @@ export function App() {
     setModal('');
   };
 
+  // ---- receipts / bills ------------------------------------------------
+  const nextReceiptNo = (list) =>
+    `RCT-2026-${String(Math.max(200, ...list.map(r => Number(r.no.split('-')[2]) || 0)) + 1).padStart(4, '0')}`;
+
+  const newReceipt = (list, f) => ({
+    no: nextReceiptNo(list), date: todayLabel(), shared: false, reference: '', mode: 'Cash', ...f
+  });
+
+  const billText = (r) =>
+    `Dear ${r.customer}, we have received ₹${r.amount} for Plot ${r.plot} (${r.project}). ` +
+    `Receipt ${r.no} dated ${r.date}. Balance: ₹${r.balance}. Thank you - Lalita Realestate Infra.`;
+
+  const customerPhone = (name) => customers.find(c => c.name === name)?.mobile || '';
+
+  const shareReceipt = (r) => {
+    setReceipts(prev => prev.map(x => x.no === r.no ? { ...x, shared: true } : x));
+    openWhatsApp(customerPhone(r.customer), billText(r));
+    notify(`Bill ${r.no} shared with ${r.customer} (visible in their login)`);
+  };
+
+  const copyBill = async (r) => {
+    try { await navigator.clipboard.writeText(billText(r)); notify('Bill text copied'); }
+    catch { notify('Copy not available in this browser'); }
+  };
+
+  // ---- bookings ----------------------------------------------------------
+  // Creates the ledger row and a token receipt once a booking is confirmed.
+  const confirmLedger = (b) => {
+    const due = parseAmt(b[5]) - parseAmt(b[6]);
+    setPays(prev => prev.some(p => p[0] === b[1] && p[1] === b[3]) ? prev : [
+      [b[1], b[3], b[2], b[5], b[6], fmtINR(due), '—', due <= 0 ? 'PAID' : 'PENDING', b[8]], ...prev
+    ]);
+    if (parseAmt(b[6]) > 0) {
+      setReceipts(prev => [newReceipt(prev, {
+        customer: b[1], plot: b[3], project: b[2], finalPrice: b[5], amount: b[6],
+        balance: fmtINR(due), mode: 'Token advance', agent: b[8]
+      }), ...prev]);
+    }
+  };
+
+  const saveBooking = (d) => {
+    const next = Math.max(0, ...bookings.map(b => Number(b[0].split('-')[2]) || 0)) + 1;
+    const approved = isAdmin(role);
+    const b = [
+      `BK-2026-${String(next).padStart(4, '0')}`, d.customer, d.project, d.plot, todayLabel(),
+      d.amount, d.paid || '0', approved ? 'Confirmed' : 'Pending Approval', d.agent, d.plan
+    ];
+    setBookings([b, ...bookings]);
+    setPlots(plots.map(x => x[0] === d.plot ? [...x.slice(0, 5), approved ? 'BOOKED' : 'HOLD', d.customer, d.agent, x[8]] : x));
+    if (approved) confirmLedger(b);
+    setModal('');
+    setBookingPreset(null);
+    notify(approved
+      ? `Booking ${b[0]} confirmed · Plot ${d.plot} booked`
+      : `Booking ${b[0]} sent to admin for approval · Plot ${d.plot} on hold`);
+  };
+
+  const approveBooking = (b) => {
+    const confirmed = b.map((v, i) => i === 7 ? 'Confirmed' : v);
+    setBookings(prev => prev.map(x => x[0] === b[0] ? confirmed : x));
+    setPlots(prev => prev.map(x => x[0] === b[3] ? [...x.slice(0, 5), 'BOOKED', b[1], b[8], x[8]] : x));
+    confirmLedger(confirmed);
+    notify(`Booking ${b[0]} approved · token receipt generated`);
+  };
+
+  const rejectBooking = (b) => {
+    setBookings(prev => prev.map(x => x[0] === b[0] ? x.map((v, i) => i === 7 ? 'Rejected' : v) : x));
+    setPlots(prev => prev.map(x => x[0] === b[3] ? [...x.slice(0, 5), 'AVAILABLE', '—', x[7], x[8]] : x));
+    notify(`Booking ${b[0]} rejected · Plot ${b[3]} released`);
+  };
+
+  const whatsappBooking = (b) => {
+    const text = b[7] === 'Confirmed' || b[7] === 'Agreement'
+      ? `Dear ${b[1]}, your booking ${b[0]} for Plot ${b[3]} (${b[2]}) is confirmed. Final price ₹${b[5]}, paid ₹${b[6]}. - Lalita Realestate Infra`
+      : `Dear ${b[1]}, your booking ${b[0]} for Plot ${b[3]} (${b[2]}) is ${b[7].toLowerCase()}. We will update you shortly. - Lalita Realestate Infra`;
+    openWhatsApp(customerPhone(b[1]), text);
+  };
+
+  // ---- payments -----------------------------------------------------------
+  const savePayment = ({ booking: b, finalPrice, amount, mode, reference, due }) => {
+    const newPaid = parseAmt(b[6]) + amount;
+    const balance = finalPrice - newPaid;
+    const dueLabel = balance <= 0 || !due
+      ? '—'
+      : new Date(due).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+    setBookings(prev => prev.map(x => x[0] === b[0] ? x.map((v, i) => i === 5 ? fmtINR(finalPrice) : i === 6 ? fmtINR(newPaid) : v) : x));
+    setPays(prev => {
+      const row = [b[1], b[3], b[2], fmtINR(finalPrice), fmtINR(newPaid), fmtINR(Math.max(balance, 0)), dueLabel, balance <= 0 ? 'PAID' : 'PARTIALLY PAID', b[8]];
+      return prev.some(p => p[0] === b[1] && p[1] === b[3]) ? prev.map(p => p[0] === b[1] && p[1] === b[3] ? row : p) : [row, ...prev];
+    });
+    if (balance <= 0) setPlots(prev => prev.map(x => x[0] === b[3] ? [...x.slice(0, 5), 'SOLD', ...x.slice(6)] : x));
+    const r = newReceipt(receipts, {
+      customer: b[1], plot: b[3], project: b[2], finalPrice: fmtINR(finalPrice), amount: fmtINR(amount),
+      balance: fmtINR(Math.max(balance, 0)), mode, reference, agent: b[8]
+    });
+    setReceipts([r, ...receipts]);
+    setModal('');
+    setBillNo(r.no);
+    notify(`₹${fmtINR(amount)} recorded for ${b[1]} · bill ${r.no} generated`);
+  };
+
+  // ---- customers ----------------------------------------------------------
+  const saveCustomer = (d) => {
+    const next = Math.max(0, ...customers.map(c => Number(c.id.split('-')[1]) || 0)) + 1;
+    setCustomers([{ id: `CUS-${String(next).padStart(4, '0')}`, ...d, status: 'Pending Approval', createdAt: todayLabel() }, ...customers]);
+    setModal('');
+    notify(`Customer ${d.name} sent to admin for approval`);
+  };
+  const setCustomerStatus = (c, status) => {
+    setCustomers(prev => prev.map(x => x.id === c.id ? { ...x, status } : x));
+    notify(`Customer ${c.name} ${status.toLowerCase()}`);
+  };
+  const openCustomer = (c) => { setSelected(c); navigate(pathFor['Customer detail']); setSearch(''); setMobile(false); };
+  const whatsappCustomer = (c) => openWhatsApp(c.mobile, `Hello ${c.name}, this is Lalita Realestate Infra regarding your plot booking.`);
+  const setRegistryStatus = (id, value) => { setRegistry(prev => ({ ...prev, [id]: value })); notify(`Registry status set to "${value}"`); };
+  const bookPlot = (p) => { setBookingPreset({ project: p[8], plot: p[0] }); setModal('booking'); };
+
   // If no active session, show the interactive Auth screen with generated real estate photography
   if (!session) {
-    return <LoginScreen onLogin={handleLogin} onRegister={handleRegister} />;
+    return <LoginScreen onLogin={handleLogin} onRegister={handleRegister} customers={customers} users={users} />;
   }
 
   // Active role config & navigation definitions
   const currentRoleConfig = roleConfigs[role] || roleConfigs['ADMIN'];
   const workspaceNav = currentRoleConfig.workspaceNav || ['Overview', 'Projects & plots', 'Bookings', 'Payments'];
   const insightsNav = currentRoleConfig.insightsNav || ['Reports', 'Documents', 'Notifications'];
+
+  // Direct URLs cannot bypass the role's navigation.
+  const allowedPages = [...workspaceNav, ...insightsNav, ...(workspaceNav.includes('Customers') ? ['Customer detail'] : [])];
+  const page = allowedPages.includes(rawPage) ? rawPage : 'Overview';
+
+  // Role-scoped data: agents see their own records, customers see only theirs.
+  const isAgentRole = role === 'SALES AGENT';
+  const isCustomerRole = role === 'CUSTOMER';
+  const myKey = agentKey(currentUser.name);
+  const myName = currentUser.customerName || currentUser.name;
+  const vBookings = isAgentRole ? bookings.filter(b => b[8] === myKey) : isCustomerRole ? bookings.filter(b => b[1] === myName) : bookings;
+  const vPays = isAgentRole ? pays.filter(p => p[8] === myKey) : isCustomerRole ? pays.filter(p => p[0] === myName) : pays;
+  const vCustomers = isAgentRole ? customers.filter(c => c.agent === myKey) : isCustomerRole ? customers.filter(c => c.name === myName) : customers;
+  const vReceipts = isAgentRole ? receipts.filter(r => r.agent === myKey) : isCustomerRole ? receipts.filter(r => r.customer === myName && r.shared) : receipts;
+  const myCustomer = customers.find(c => c.name === myName) || { id: 'CUS-NEW', name: myName, mobile: '', email: currentUser.email || '', address: '', agent: '' };
+  const pendingApprovals = bookings.filter(b => b[7] === 'Pending Approval').length + customers.filter(c => c.status === 'Pending Approval').length;
+  const billReceipt = receipts.find(r => r.no === billNo);
+  const openBooking = (b) => setBookingPrint(b);
+  const plotOf = (no) => plots.find(p => p[0] === no);
+
+  const documents = [
+    ...vBookings.flatMap(b => [
+      { key: `bf-${b[0]}`, title: 'Booking Form', sub: `${b[1]} · ${b[3]}`, date: b[4], kind: 'Booking', open: () => openBooking(b) },
+      ...(b[7] === 'Confirmed' || b[7] === 'Agreement' ? [{ key: `al-${b[0]}`, title: 'Allotment Letter', sub: `${b[1]} · ${b[3]}`, date: b[4], kind: 'Allotment' }] : []),
+      ...(b[7] === 'Agreement' ? [{ key: `ag-${b[0]}`, title: 'Agreement to Sale', sub: `${b[1]} · ${b[3]}`, date: b[4], kind: 'Agreement' }] : [])
+    ]),
+    ...vReceipts.map(r => ({ key: r.no, title: `Receipt ${r.no}`, sub: `${r.customer} · ₹${r.amount}`, date: r.date, kind: 'Receipt', open: () => setBillNo(r.no) }))
+  ];
 
   const getNavBadge = (itemName) => {
     if (role === 'SALES AGENT') {
@@ -244,9 +408,11 @@ export function App() {
       if (itemName === 'Commissions') return { text: '3 pending', alert: false };
       if (itemName === 'Notifications') return { text: '4', alert: false };
     } else if (role === 'SUPER ADMIN') {
+      if (itemName === 'Approvals' && pendingApprovals) return { text: `${pendingApprovals}`, alert: true };
       if (itemName === 'Notifications') return { text: '5', alert: false };
       if (itemName === 'User & role management') return { text: `${users.length}`, alert: false };
     } else if (role === 'ADMIN') {
+      if (itemName === 'Approvals' && pendingApprovals) return { text: `${pendingApprovals}`, alert: true };
       if (itemName === 'Bookings') return { text: '6', alert: false };
       if (itemName === 'Payments') return { text: '24', alert: true };
       if (itemName === 'Notifications') return { text: '3', alert: false };
@@ -258,6 +424,7 @@ export function App() {
 
   const meta = {
     'Overview': [currentRoleConfig.title, currentRoleConfig.subtitle],
+    'Approvals': ['Admin Approvals', 'Bookings and customers entered by agents are confirmed here.'],
     'Projects & plots': ['Project & Plot Inventory', 'Master portfolio, layout availability, plot dimensions and customer allocations.'],
     'Bookings': ['Sales Booking Operations', 'Auditable transaction lifecycle from token advance to registered conveyance.'],
     'Payments': ['Collections, Dues & Treasury', 'Every rupee booked, collected and pending — daily banking reconciliations.'],
@@ -286,9 +453,9 @@ export function App() {
       {/* Dynamic Role-Based Sidebar */}
       <aside className={`sidebar ${mobile ? 'open' : ''}`}>
         <div className="brand">
-          <div className="brand-mark">N</div>
+          <div className="brand-mark">L</div>
           <div>
-            <b>NMT <span>ERP</span></b>
+            <b>Lalita <span>Realestate Infra</span></b>
             <small>ENTERPRISE REAL ESTATE</small>
           </div>
           <button className="sidebar-close" onClick={() => setMobile(false)}>
@@ -298,18 +465,20 @@ export function App() {
 
         {/* Project & Role Chip */}
         <div className="workspace-card">
-          <button
-            className="workspace"
-            onClick={() => setProject(project === 'All projects' ? 'Green Meadows' : 'All projects')}
-            title="Switch project filter"
-          >
-            <span className="workspace-icon">GM</span>
-            <span>
-              <b>{project === 'All projects' ? 'Green Meadows' : project}</b>
-              <small>Phase II · Mumbai</small>
-            </span>
-            <ChevronDown size={14} />
-          </button>
+          {!isCustomerRole && (
+            <button
+              className="workspace"
+              onClick={() => setProject(project === 'All projects' ? 'Green Meadows' : 'All projects')}
+              title="Switch project filter"
+            >
+              <span className="workspace-icon">GM</span>
+              <span>
+                <b>{project === 'All projects' ? 'Green Meadows' : project}</b>
+                <small>Phase II · Mumbai</small>
+              </span>
+              <ChevronDown size={14} />
+            </button>
+          )}
 
           <div className="sidebar-role-tag" style={{ borderLeftColor: currentRoleConfig.color }}>
             <span className="role-dot" style={{ background: currentRoleConfig.color }} />
@@ -383,16 +552,18 @@ export function App() {
               <small>{role}</small>
             </div>
 
-            {/* Quick Role Switcher */}
-            <select
-              value={role}
-              onChange={(e) => handleRoleChange(e.target.value)}
-              title="Change user perspective"
-            >
-              {['SUPER ADMIN', 'ADMIN', 'SALES MANAGER', 'SALES AGENT', 'ACCOUNTS', 'MANAGEMENT'].map((r) => (
-                <option key={r} value={r}>{r}</option>
-              ))}
-            </select>
+            {/* Perspective switcher: only a Super Admin session can preview other roles */}
+            {session === 'SUPER ADMIN' && (
+              <select
+                value={role}
+                onChange={(e) => handleRoleChange(e.target.value)}
+                title="Preview another role"
+              >
+                {['SUPER ADMIN', 'ADMIN', 'SALES MANAGER', 'SALES AGENT', 'ACCOUNTS', 'MANAGEMENT', 'CUSTOMER'].map((r) => (
+                  <option key={r} value={r}>{r}</option>
+                ))}
+              </select>
+            )}
 
             <button
               className="logout-button"
@@ -435,18 +606,20 @@ export function App() {
               <kbd>⌘K</kbd>
             </div>
 
-            {/* Quick Perspective Switcher */}
-            <div className="role-switch-quick">
-              <select
-                value={role}
-                onChange={(e) => handleRoleChange(e.target.value)}
-                className="select-mini role-topbar-select"
-              >
-                {['SUPER ADMIN', 'ADMIN', 'SALES MANAGER', 'SALES AGENT', 'ACCOUNTS', 'MANAGEMENT'].map((r) => (
-                  <option key={r} value={r}>Role: {r}</option>
-                ))}
-              </select>
-            </div>
+            {/* Quick Perspective Switcher (Super Admin session only) */}
+            {session === 'SUPER ADMIN' && (
+              <div className="role-switch-quick">
+                <select
+                  value={role}
+                  onChange={(e) => handleRoleChange(e.target.value)}
+                  className="select-mini role-topbar-select"
+                >
+                  {['SUPER ADMIN', 'ADMIN', 'SALES MANAGER', 'SALES AGENT', 'ACCOUNTS', 'MANAGEMENT', 'CUSTOMER'].map((r) => (
+                    <option key={r} value={r}>Role: {r}</option>
+                  ))}
+                </select>
+              </div>
+            )}
 
             {/* Notifications Shortcut */}
             <button className="top-icon" onClick={() => go('Notifications')} title="View alerts">
@@ -482,38 +655,46 @@ export function App() {
             </div>
 
             <div className="heading-actions">
-              <button className="button button-white" onClick={exportCsv}>
-                <Download size={14} /> Export CSV
-              </button>
-
-              {/* Role-tailored primary CTA */}
-              {role === 'SALES AGENT' && (
-                <button className="button button-primary" onClick={() => setModal('booking')}>
-                  <Plus size={15} /> Quick Book Plot
+              {!isCustomerRole && (
+                <button className="button button-white" onClick={exportCsv}>
+                  <Download size={14} /> Export CSV
                 </button>
               )}
-              {role === 'ACCOUNTS' && (
+
+              {/* Admin: look up any agent's numbers, beside New Booking */}
+              {page === 'Overview' && isAdmin(role) && (
+                <AgentLookup onPick={setAgentInfo} />
+              )}
+
+              {/* Role-tailored primary actions */}
+              {canCreateBooking(role) && ['Overview', 'Bookings', 'Projects & plots'].includes(page) && (
+                <button className="button button-primary" onClick={() => { setBookingPreset(null); setModal('booking'); }}>
+                  <Plus size={15} /> {role === 'SALES AGENT' ? 'Quick Book Plot' : 'New Booking'}
+                </button>
+              )}
+              {canRecordPayment(role) && ['Overview', 'Payments'].includes(page) && (
                 <button className="button button-primary" onClick={() => setModal('payment')}>
                   <Plus size={15} /> Record Payment
                 </button>
               )}
-              {(role === 'ADMIN' || role === 'SUPER ADMIN' || role === 'SALES MANAGER') && (
+              {canCreateCustomer(role) && page === 'Customers' && (
+                <button className="button button-primary" onClick={() => setModal('customer')}>
+                  <Plus size={15} /> Add Customer
+                </button>
+              )}
+              {isAdmin(role) && (page === 'Projects & plots' || page === 'Agents') && (
                 <button
-                  className="button button-primary"
-                  onClick={() => {
-                    setCrudPage(page);
-                    setEditRecord(null);
-                    setModal(page === 'Payments' ? 'payment' : page === 'Bookings' ? 'booking' : 'record');
-                  }}
+                  className="button button-white"
+                  onClick={() => { setCrudPage(page); setEditRecord(null); setModal('record'); }}
                 >
-                  <Plus size={15} />
-                  {page === 'Payments' ? 'Record Payment' : page === 'Projects & plots' ? 'Add Project' : page === 'Agents' ? 'Add Agent' : page === 'Customers' ? 'Add Customer' : 'New Booking'}
+                  <Plus size={15} /> {page === 'Agents' ? 'Add Agent' : 'Add Project'}
                 </button>
               )}
             </div>
           </div>
 
           {/* Filters Bar */}
+          {!isCustomerRole && (
           <div className="filters">
             <label>
               <span>PROJECT</span>
@@ -548,6 +729,15 @@ export function App() {
               Role: <b>{role}</b>
             </div>
           </div>
+          )}
+
+          {/* Admin: agent/customer entries waiting for approval */}
+          {page === 'Overview' && canApprove(role) && pendingApprovals > 0 && (
+            <div className="pending-banner">
+              <span><b>{pendingApprovals}</b> item{pendingApprovals > 1 ? 's' : ''} entered by agents {pendingApprovals > 1 ? 'are' : 'is'} waiting for your approval.</span>
+              <button className="button button-primary small-btn" onClick={() => go('Approvals')}>Review now</button>
+            </div>
+          )}
 
           {/* OVERVIEW: Distinct Dashboard per Role */}
           {page === 'Overview' && (
@@ -562,7 +752,21 @@ export function App() {
                 <SalesManagerDashboard go={go} D={setModal} notify={notify} agents={agents} />
               )}
               {role === 'SALES AGENT' && (
-                <SalesAgentDashboard go={go} D={setModal} notify={notify} bookings={bookings} plots={plots} />
+                <SalesAgentDashboard go={go} D={setModal} notify={notify} bookings={vBookings} plots={plots} />
+              )}
+              {role === 'CUSTOMER' && (
+                <CustomerProfile
+                  portal
+                  customer={myCustomer}
+                  bookings={bookings}
+                  pays={pays}
+                  receipts={vReceipts}
+                  registry={registry}
+                  role={role}
+                  onOpenBill={(r) => setBillNo(r.no)}
+                  onPrintBooking={openBooking}
+                  notify={notify}
+                />
               )}
               {role === 'ACCOUNTS' && (
                 <AccountsDashboard go={go} D={setModal} notify={notify} pays={pays} />
@@ -574,6 +778,19 @@ export function App() {
           )}
 
           {/* OTHER PAGES: Customized & Role-Adapted */}
+          {page === 'Approvals' && (
+            <ApprovalsPage
+              bookings={bookings}
+              customers={customers}
+              onApproveBooking={approveBooking}
+              onRejectBooking={rejectBooking}
+              onApproveCustomer={(c) => setCustomerStatus(c, 'Approved')}
+              onRejectCustomer={(c) => setCustomerStatus(c, 'Rejected')}
+              onWhatsApp={whatsappBooking}
+              onPrintBooking={openBooking}
+            />
+          )}
+
           {page === 'Projects & plots' && (
             <Projects
               plots={plots}
@@ -586,28 +803,31 @@ export function App() {
               notify={notify}
               projects={projects}
               role={role}
-              D={setModal}
+              onBook={bookPlot}
             />
           )}
 
           {page === 'Bookings' && (
             <Bookings
-              bookings={bookings}
+              bookings={vBookings}
               project={project}
               search={search}
               tab={tab}
               TB={setTab}
-              setSelected={setSelected}
-              go={go}
               role={role}
-              D={setModal}
-              notify={notify}
+              onNew={() => { setBookingPreset(null); setModal('booking'); }}
+              onOpenCustomer={(name) => openCustomer(customers.find(c => c.name === name) || { name, mobile: '', email: '', address: '', agent: '' })}
+              onApprove={approveBooking}
+              onReject={rejectBooking}
+              onPrint={openBooking}
+              onWhatsApp={whatsappBooking}
             />
           )}
 
           {page === 'Payments' && (
             <Payments
-              pays={pays}
+              pays={vPays}
+              receipts={vReceipts}
               project={project}
               search={search}
               filter={filter}
@@ -615,18 +835,24 @@ export function App() {
               D={setModal}
               notify={notify}
               role={role}
+              onOpenBill={(r) => setBillNo(r.no)}
+              onShare={shareReceipt}
+              onRemind={(p) => openWhatsApp(customerPhone(p[0]), `Dear ${p[0]}, a payment of ₹${p[5]} for Plot ${p[1]} (${p[2]}) is due ${p[6] !== '—' ? `on ${p[6]}` : 'now'}. Please pay at the earliest. - Lalita Realestate Infra`)}
             />
           )}
 
           {page === 'Customers' && (
-            <Customers
-              bookings={bookings}
-              project={project}
-              search={search}
-              go={go}
-              setSelected={setSelected}
-              selected={selected}
+            <CustomersPage
+              customers={vCustomers}
+              bookings={vBookings}
               role={role}
+              search={search}
+              project={project}
+              onOpen={openCustomer}
+              onAdd={() => setModal('customer')}
+              onApprove={(c) => setCustomerStatus(c, 'Approved')}
+              onReject={(c) => setCustomerStatus(c, 'Rejected')}
+              onWhatsApp={whatsappCustomer}
             />
           )}
 
@@ -654,10 +880,7 @@ export function App() {
           )}
 
           {page === 'Documents' && (
-            <Documents
-              notify={notify}
-              role={role}
-            />
+            <DocumentsPage docs={documents} notify={notify} />
           )}
 
           {page === 'Notifications' && (
@@ -688,15 +911,22 @@ export function App() {
           )}
 
           {page === 'Customer detail' && (
-            <CustomerDetail
-              selected={selected || bookings[0]}
-              notify={notify}
+            <CustomerProfile
+              customer={selected && selected.name ? selected : vCustomers[0] || myCustomer}
+              bookings={vBookings}
+              pays={vPays}
+              receipts={vReceipts}
+              registry={registry}
               role={role}
+              onRegistry={setRegistryStatus}
+              onOpenBill={(r) => setBillNo(r.no)}
+              onPrintBooking={openBooking}
+              notify={notify}
             />
           )}
 
           {/* Module CRUD Records View */}
-          {page !== 'Overview' && page !== 'Customer detail' && page !== 'User & role management' && (
+          {isAdmin(role) && !['Overview', 'Approvals', 'Customer detail', 'Customers', 'Bookings', 'Payments', 'User & role management', 'Documents'].includes(page) && (
             <CrudWorkspace
               page={page}
               records={crud[page] || []}
@@ -715,8 +945,25 @@ export function App() {
         </div>
       </main>
 
-      {/* Modal Dialog */}
-      {modal && (
+      {/* Modal dialogs */}
+      {modal === 'booking' && (
+        <BookingModal
+          role={role}
+          agentName={myKey}
+          customers={customers}
+          plots={plots}
+          preset={bookingPreset}
+          close={() => { setModal(''); setBookingPreset(null); }}
+          save={saveBooking}
+        />
+      )}
+      {modal === 'payment' && (
+        <PaymentModal bookings={bookings} pays={pays} close={() => setModal('')} save={savePayment} />
+      )}
+      {modal === 'customer' && (
+        <CustomerModal agentName={myKey} customers={customers} close={() => setModal('')} save={saveCustomer} />
+      )}
+      {modal && !['booking', 'payment', 'customer'].includes(modal) && (
         <Modal
           kind={modal}
           close={() => { setModal(''); setEditRecord(null); setUserEdit(null); }}
@@ -725,6 +972,28 @@ export function App() {
           initial={editRecord || userEdit}
           role={role}
         />
+      )}
+
+      {billReceipt && (
+        <BillModal
+          receipt={billReceipt}
+          close={() => setBillNo('')}
+          shared={billReceipt.shared}
+          onShare={canManageBills(role) ? () => shareReceipt(billReceipt) : undefined}
+          onCopy={() => copyBill(billReceipt)}
+        />
+      )}
+      {bookingPrint && (
+        <BookingFormModal
+          booking={bookingPrint}
+          customer={customers.find(c => c.name === bookingPrint[1])}
+          plot={plotOf(bookingPrint[3])}
+          close={() => setBookingPrint(null)}
+          onWhatsApp={isCustomerRole ? undefined : () => whatsappBooking(bookingPrint)}
+        />
+      )}
+      {agentInfo && (
+        <AgentInfoModal agent={agentInfo} bookings={bookings} customers={customers} receipts={receipts} close={() => setAgentInfo(null)} />
       )}
     </div>
   );
@@ -781,41 +1050,38 @@ function Table({ headers, rows }) {
 // ROLE-ADAPTED MODULE PAGES
 // --------------------------------------------------------------------------
 
-function Projects({ plots, search, project, filter, F, tab, TB, notify, projects, role, D }) {
-  const isAgent = role === 'SALES AGENT';
-  const isAccounts = role === 'ACCOUNTS';
-  const isManager = role === 'SALES MANAGER';
+function Projects({ plots, search, project, filter, F, tab, TB, notify, projects, role, onBook }) {
+  const customerView = role === 'CUSTOMER';
+  const canBook = canCreateBooking(role);
 
   const list = plots.filter(p => {
     const textMatch = p.join(' ').toLowerCase().includes(search.toLowerCase());
-    const projectMatch = project === 'All projects' || ((p[0].startsWith('A-') ? 'Green Meadows' : p[0].startsWith('B-') ? 'Silver Oaks' : 'Park View') === project);
+    const projectMatch = project === 'All projects' || p[8] === project;
     const statusMatch = filter === 'All status' || p[5] === filter.toUpperCase();
     return textMatch && projectMatch && statusMatch;
   });
 
-  const plotRows = list.map(p => {
-    const isAvail = p[5] === 'AVAILABLE';
-    return [
-      <b>{p[0]}</b>,
-      p[1],
-      p[2],
-      p[3],
-      `₹${p[4]}`,
-      <Badge>{p[5]}</Badge>,
-      p[6],
-      p[7],
-      <div className="table-actions-cell" key={p[0]}>
-        <button className="icon-action" onClick={() => notify(`Plot ${p[0]} specifications opened`)} title="View Specs">
-          <Eye size={14} />
+  const plotRows = list.map(p => [
+    <b>{p[0]}</b>,
+    p[8],
+    p[1],
+    p[2],
+    p[3],
+    `₹${p[4]}`,
+    <Badge>{p[5]}</Badge>,
+    p[6],
+    p[7],
+    <div className="table-actions-cell" key={p[0]}>
+      <button className="icon-action" onClick={() => notify(`Plot ${p[0]} · ${p[2]} sq.ft · ${p[3]} facing · ₹${p[4]}`)} title="View Specs">
+        <Eye size={14} />
+      </button>
+      {canBook && p[5] === 'AVAILABLE' && (
+        <button className="button button-primary small-btn" onClick={() => onBook(p)} title="Book this plot">
+          {role === 'SALES AGENT' ? 'Reserve' : 'Book'}
         </button>
-        {isAgent && isAvail && (
-          <button className="button button-primary small-btn" onClick={() => D('booking')} title="Quick reserve plot">
-            Reserve
-          </button>
-        )}
-      </div>
-    ];
-  });
+      )}
+    </div>
+  ]);
 
   return (
     <>
@@ -831,6 +1097,7 @@ function Projects({ plots, search, project, filter, F, tab, TB, notify, projects
       <div className="panel section-panel">
         <div className="tabs">
           <button className={tab === 'Plots' ? 'active' : ''} onClick={() => TB('Plots')}>Plot layout ({list.length})</button>
+          <button className={tab === '3D' ? 'active' : ''} onClick={() => TB('3D')}>3D map</button>
           <button className={tab === 'Projects' ? 'active' : ''} onClick={() => TB('Projects')}>Master projects (4)</button>
           <div className="table-tools">
             <span className="filter-label">FILTER STATUS:</span>
@@ -847,9 +1114,11 @@ function Projects({ plots, search, project, filter, F, tab, TB, notify, projects
             headers={['PROJECT NAME', 'LOCATION & PHASE', 'TOTAL PLOTS', 'BOOKED', 'HOLD', 'EST. REVENUE', 'STATUS']}
             rows={projects.map(p => [<b>{p[0]}</b>, p[1], p[2], p[3], p[4], `₹${p[5]}`, <Badge>Active</Badge>])}
           />
+        ) : tab === '3D' ? (
+          <PlotMap3D plots={list} role={role} notify={notify} onBook={canBook ? onBook : undefined} />
         ) : (
           <Table
-            headers={['PLOT NO.', 'LAYOUT', 'AREA (SQ.FT)', 'FACING', 'PRICE', 'STATUS', 'CUSTOMER', 'AGENT', 'ACTIONS']}
+            headers={['PLOT NO.', 'PROJECT', 'LAYOUT', 'AREA (SQ.FT)', 'FACING', 'PRICE', 'STATUS', 'CUSTOMER', 'AGENT', 'ACTIONS']}
             rows={plotRows}
           />
         )}
@@ -858,28 +1127,26 @@ function Projects({ plots, search, project, filter, F, tab, TB, notify, projects
   );
 }
 
-function Bookings({ bookings, project, search, tab, TB, setSelected, go, role, D, notify }) {
-  const isAgent = role === 'SALES AGENT';
-  const isManager = role === 'SALES MANAGER';
-  const isAccounts = role === 'ACCOUNTS';
-
-  const statuses = ['All bookings', 'Confirmed', 'Processing', 'Agreement'];
+function Bookings({ bookings, project, search, tab, TB, role, onNew, onOpenCustomer, onApprove, onReject, onPrint, onWhatsApp }) {
+  const statuses = ['All bookings', 'Confirmed', 'Pending Approval', 'Processing', 'Agreement', 'Rejected'];
   const rows = bookings.filter(b => {
     const textMatch = b.join(' ').toLowerCase().includes(search.toLowerCase());
     const projMatch = project === 'All projects' || b[2] === project;
     const tabMatch = tab === 'All bookings' || b[7].toLowerCase() === tab.toLowerCase();
     return textMatch && projMatch && tabMatch;
   });
+  const count = (s) => bookings.filter(b => b[7] === s).length;
+  const customerView = role === 'CUSTOMER';
 
   return (
     <>
       <RoleContextBanner role={role} page="Bookings" />
 
       <div className="mini-stats four">
-        <Mini title="TOTAL BOOKINGS" value="176" />
-        <Mini title="CONFIRMED" value="142" color="green-text" />
-        <Mini title="UNDER PROCESSING" value="23" color="indigo-text" />
-        <Mini title="AGREEMENT STAGE" value="11" color="amber-text" />
+        <Mini title="TOTAL BOOKINGS" value={bookings.length} />
+        <Mini title="CONFIRMED" value={count('Confirmed')} color="green-text" />
+        <Mini title="AWAITING ADMIN APPROVAL" value={count('Pending Approval')} color="amber-text" />
+        <Mini title="AGREEMENT STAGE" value={count('Agreement')} color="indigo-text" />
       </div>
 
       <div className="panel section-panel">
@@ -889,9 +1156,9 @@ function Bookings({ bookings, project, search, tab, TB, setSelected, go, role, D
               {s}
             </button>
           ))}
-          {isAgent && (
-            <button className="button button-primary small-btn" onClick={() => D('booking')} style={{ marginLeft: 'auto' }}>
-              <Plus size={12} /> New Deal
+          {canCreateBooking(role) && (
+            <button className="button button-primary small-btn" onClick={onNew} style={{ marginLeft: 'auto' }}>
+              <Plus size={12} /> New Booking
             </button>
           )}
         </div>
@@ -907,34 +1174,37 @@ function Bookings({ bookings, project, search, tab, TB, setSelected, go, role, D
             `₹${b[6]}`,
             <Badge>{b[7]}</Badge>,
             b[8],
-            <div className="table-actions-cell" key={b[0]}>
-              <button className="icon-action" onClick={() => { setSelected(b); go('Customer detail'); }} title="View details">
+            <div className="row-actions" key={b[0]}>
+              <button className="icon-action" onClick={() => onOpenCustomer(b[1])} title="Customer profile">
                 <Eye size={14} />
               </button>
-              {isManager && b[7] === 'Processing' && (
-                <button className="button button-white small-btn" onClick={() => notify(`Booking ${b[0]} approved and confirmed.`)}>
-                  Approve
-                </button>
-              )}
-              {isAccounts && (
-                <button className="button button-white small-btn" onClick={() => notify(`Tax invoice generated for ${b[0]}.`)}>
-                  Invoice
-                </button>
+              <button className="icon-action" onClick={() => onPrint(b)} title="Print booking form">
+                <Printer size={14} />
+              </button>
+              <button className="icon-action wa-icon" onClick={() => onWhatsApp(b)} title="WhatsApp customer">
+                <MessageCircle size={14} />
+              </button>
+              {canApprove(role) && b[7] === 'Pending Approval' && (
+                <>
+                  <button className="button button-primary small-btn" onClick={() => onApprove(b)}>Approve</button>
+                  <button className="button button-white small-btn" onClick={() => onReject(b)}>Reject</button>
+                </>
               )}
             </div>
           ])}
         />
         <div className="table-pagination">
-          Showing {rows.length} bookings <span>Role-filtered view</span>
+          Showing {rows.length} bookings <span>{role === 'SALES AGENT' ? 'Your bookings only' : 'Role-filtered view'}</span>
         </div>
       </div>
     </>
   );
 }
 
-function Payments({ pays, project, search, filter, F, D, notify, role }) {
-  const isAccounts = role === 'ACCOUNTS';
-  const isAgent = role === 'SALES AGENT';
+function Payments({ pays, receipts, project, search, filter, F, D, notify, role, onOpenBill, onShare, onRemind }) {
+  const [view, setView] = useState('ledger');
+  const canBill = canManageBills(role);
+  const customerView = role === 'CUSTOMER';
 
   const list = pays.filter(p => {
     const textMatch = p.join(' ').toLowerCase().includes(search.toLowerCase());
@@ -942,160 +1212,101 @@ function Payments({ pays, project, search, filter, F, D, notify, role }) {
     const filterMatch = filter === 'All status' || p[7] === filter.toUpperCase();
     return textMatch && projMatch && filterMatch;
   });
+  const bills = receipts.filter(r => r.customer.toLowerCase().includes(search.toLowerCase()) || r.no.toLowerCase().includes(search.toLowerCase()) || r.plot.toLowerCase().includes(search.toLowerCase()));
+
+  const total = pays.reduce((s, p) => s + parseAmt(p[3]), 0);
+  const paid = pays.reduce((s, p) => s + parseAmt(p[4]), 0);
+  const overdue = pays.filter(p => p[7] === 'OVERDUE').reduce((s, p) => s + parseAmt(p[5]), 0);
 
   return (
     <>
       <RoleContextBanner role={role} page="Payments" />
 
-      <div className="mini-stats five">
-        <Mini title="TOTAL BOOKING VALUE" value="₹12.6 Cr" />
-        <Mini title="COLLECTED TO DATE" value="₹7.9 Cr" color="green-text" />
-        <Mini title="PENDING INSTALMENTS" value="₹4.7 Cr" color="indigo-text" />
-        <Mini title="OVERDUE RECOVERY" value="₹86.4 L" color="amber-text" />
-        <Mini title="TODAY'S COLLECTION" value="₹4.2 L" color="green-text" />
+      <div className="mini-stats four">
+        <Mini title="TOTAL BOOKING VALUE" value={`₹${fmtINR(total)}`} />
+        <Mini title="COLLECTED TO DATE" value={`₹${fmtINR(paid)}`} color="green-text" />
+        <Mini title="PENDING" value={`₹${fmtINR(total - paid)}`} color="indigo-text" />
+        <Mini title="OVERDUE" value={`₹${fmtINR(overdue)}`} color="amber-text" />
       </div>
 
       <div className="panel section-panel">
         <div className="tabs">
-          <span className="filter-label">RECONCILIATION STATUS:</span>
-          {['All status', 'PAID', 'PARTIALLY PAID', 'PENDING', 'OVERDUE'].map(s => (
-            <button key={s} className={`filter-btn ${filter === s ? 'active' : ''}`} onClick={() => F(s)}>
-              {s}
-            </button>
-          ))}
-          {isAccounts && (
+          <button className={view === 'ledger' ? 'active' : ''} onClick={() => setView('ledger')}>{customerView ? 'My payments' : 'Ledger'} ({list.length})</button>
+          <button className={view === 'bills' ? 'active' : ''} onClick={() => setView('bills')}>Bills &amp; receipts ({receipts.length})</button>
+          {canRecordPayment(role) && (
             <button className="button button-primary small-btn" onClick={() => D('payment')} style={{ marginLeft: 'auto' }}>
-              <Plus size={12} /> Record Receipt
+              <Plus size={12} /> Record Payment
             </button>
           )}
         </div>
 
-        <Table
-          headers={['CUSTOMER', 'PROJECT & PLOT', 'TOTAL VALUE', 'PAID TO DATE', 'PENDING BALANCE', 'NEXT DUE DATE', 'STATUS', 'AGENT', 'ACTIONS']}
-          rows={list.map(p => [
-            <b>{p[0]}</b>,
-            `${p[2]} · ${p[1]}`,
-            `₹${p[3]}`,
-            <span className="green-text">₹{p[4]}</span>,
-            `₹${p[5]}`,
-            p[6],
-            <Badge>{p[7]}</Badge>,
-            p[8],
-            <div className="table-actions-cell" key={p[0]}>
-              <button className="icon-action" onClick={() => notify(`Customer ledger opened for ${p[0]}`)} title="Inspect Ledger">
-                <Eye size={14} />
-              </button>
-              {isAccounts && p[7] === 'OVERDUE' && (
-                <button className="button button-white small-btn" onClick={() => notify(`Formal demand notice emailed to ${p[0]}.`)}>
-                  Notice
+        {view === 'ledger' && (
+          <>
+            <div className="tabs">
+              <span className="filter-label">STATUS:</span>
+              {['All status', 'PAID', 'PARTIALLY PAID', 'PENDING', 'OVERDUE'].map(s => (
+                <button key={s} className={`filter-btn ${filter === s ? 'active' : ''}`} onClick={() => F(s)}>
+                  {s}
                 </button>
-              )}
+              ))}
             </div>
-          ])}
-        />
-        <div className="table-pagination">
-          Showing {list.length} customer ledgers <span>Audited financial records</span>
-        </div>
+            <Table
+              headers={['CUSTOMER', 'PROJECT & PLOT', 'FINAL PRICE', 'PAID TO DATE', 'PENDING BALANCE', 'NEXT DUE DATE', 'STATUS', customerView ? 'AGENT' : 'ACTIONS']}
+              rows={list.map(p => [
+                <b>{p[0]}</b>,
+                `${p[2]} · ${p[1]}`,
+                `₹${p[3]}`,
+                <span className="green-text">₹{p[4]}</span>,
+                `₹${p[5]}`,
+                p[6],
+                <Badge>{p[7]}</Badge>,
+                customerView ? p[8] : (
+                  <div className="row-actions" key={`${p[0]}-${p[1]}`}>
+                    {p[5] !== '0' && (
+                      <button className="icon-action wa-icon" onClick={() => onRemind(p)} title="WhatsApp payment reminder">
+                        <MessageCircle size={14} />
+                      </button>
+                    )}
+                  </div>
+                )
+              ])}
+            />
+            <div className="table-pagination">Showing {list.length} ledgers <span>Balance updates automatically when a payment is recorded</span></div>
+          </>
+        )}
+
+        {view === 'bills' && (
+          <>
+            <Table
+              headers={['RECEIPT NO.', 'DATE', 'CUSTOMER', 'PLOT', 'AMOUNT', 'MODE', 'SHARED', 'ACTIONS']}
+              rows={bills.map(r => [
+                <b>{r.no}</b>,
+                r.date,
+                r.customer,
+                `${r.project} · ${r.plot}`,
+                <b>₹{r.amount}</b>,
+                r.mode,
+                <Badge>{r.shared ? 'Shared' : 'Not shared'}</Badge>,
+                <div className="row-actions" key={r.no}>
+                  <button className="icon-action" onClick={() => onOpenBill(r)} title="View / print bill (office + customer copy)">
+                    <Printer size={14} />
+                  </button>
+                  {canBill && (
+                    <button className="button whatsapp-btn small-btn" onClick={() => onShare(r)} title="Share bill with customer">
+                      <MessageCircle size={12} /> Share
+                    </button>
+                  )}
+                </div>
+              ])}
+            />
+            {bills.length === 0 && <p className="empty-note">No bills yet.</p>}
+            <div className="table-pagination">
+              {customerView ? 'Bills shared with you by the office' : 'Each bill prints with an office copy and a customer copy'}
+            </div>
+          </>
+        )}
       </div>
     </>
-  );
-}
-
-function Customers({ bookings, project, search, go, setSelected, selected, role }) {
-  if (selected && selected.length) {
-    return <CustomerDetail selected={selected} notify={() => {}} role={role} />;
-  }
-
-  const rows = bookings.filter(b => {
-    return b.join(' ').toLowerCase().includes(search.toLowerCase()) && (project === 'All projects' || b[2] === project);
-  });
-
-  return (
-    <>
-      <RoleContextBanner role={role} page="Customers" />
-
-      <div className="mini-stats four">
-        <Mini title="TOTAL CUSTOMERS" value="176" />
-        <Mini title="ACTIVE BOOKINGS" value="152" color="green-text" />
-        <Mini title="AVG DEAL SIZE" value="₹18.4 L" />
-        <Mini title="REPEAT BUYERS" value="28" color="indigo-text" />
-      </div>
-
-      <div className="panel section-panel">
-        <Table
-          headers={['CUSTOMER NAME', 'PROJECT · PLOT', 'BOOKING ID', 'ALLOTMENT DATE', 'TOTAL DEAL', 'OUTSTANDING', 'PROFILE']}
-          rows={rows.map(b => [
-            <div className="customer-cell"><Avatar name={b[1]} /><b>{b[1]}</b></div>,
-            `${b[2]} · ${b[3]}`,
-            b[0],
-            b[4],
-            `₹${b[5]}`,
-            `₹${(Number(b[5].replaceAll(',', '')) - Number(b[6].replaceAll(',', ''))).toLocaleString('en-IN')}`,
-            <button className="icon-action" onClick={() => { setSelected(b); go('Customer detail'); }} title="Open customer dossier">
-              <Eye size={14} />
-            </button>
-          ])}
-        />
-      </div>
-    </>
-  );
-}
-
-function CustomerDetail({ selected, notify, role }) {
-  const b = selected;
-  return (
-    <div className="customer-detail">
-      <RoleContextBanner role={role} page="Customers" />
-
-      <div className="panel customer-summary">
-        <Avatar name={b[1]} />
-        <div>
-          <span className="eyebrow">CUSTOMER PROFILE & DOSSIER</span>
-          <h2>{b[1]}</h2>
-          <p>+91 98•••• •••42 · Assigned Property Consultant: {b[8]}</p>
-        </div>
-        <button className="button button-white" onClick={() => notify(`Customer file for ${b[1]} downloaded.`)}>
-          <Download size={14} /> Dossier PDF
-        </button>
-      </div>
-
-      <div className="overview-grid">
-        <div className="panel">
-          <div className="panel-head">
-            <div>
-              <h2>Property Allocation</h2>
-              <p>Registered unit and project details</p>
-            </div>
-            <Badge>{b[7]}</Badge>
-          </div>
-          <div className="detail-rows">
-            <div><span>Project</span><b>{b[2]}</b></div>
-            <div><span>Unit / Plot</span><b>{b[3]}</b></div>
-            <div><span>Booking Date</span><b>{b[4]}</b></div>
-            <div><span>Booking Value</span><b>₹{b[5]}</b></div>
-            <div><span>Paid to Date</span><b className="green-text">₹{b[6]}</b></div>
-          </div>
-        </div>
-
-        <div className="panel">
-          <div className="panel-head">
-            <div>
-              <h2>Legal & Contract Documents</h2>
-              <p>Executed documents</p>
-            </div>
-          </div>
-          {['Booking Form', 'Allotment Letter', 'Agreement to Sale', 'Payment Receipt'].map(x => (
-            <div className="document-row" key={x}>
-              <FileText size={17} />
-              <b>{x}</b>
-              <button className="icon-action" onClick={() => notify(`Opened ${x} for ${b[1]}`)}>
-                <Eye size={14} />
-              </button>
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
   );
 }
 
@@ -1236,52 +1447,6 @@ function Reports({ notify, role }) {
             </button>
           </div>
         ))}
-      </div>
-    </>
-  );
-}
-
-function Documents({ notify, role }) {
-  const docs = [
-    ['Booking Form', 'Rajesh Sharma · A-012', '12 Jun 2026', 'Booking'],
-    ['Allotment Letter', 'Rajesh Sharma · A-012', '14 Jun 2026', 'Allocation'],
-    ['Agreement to Sale', 'Rajesh Sharma · A-012', '18 Jun 2026', 'Agreement'],
-    ['Tax Receipt #0211', 'Rajesh Sharma · ₹4,80,000', '20 Sep 2026', 'Receipt'],
-    ['Booking Form', 'Anita Verma · B-104', '27 Sep 2026', 'Booking'],
-    ['Token Receipt #0212', 'Anita Verma · ₹6,30,000', '27 Sep 2026', 'Receipt']
-  ];
-
-  return (
-    <>
-      <RoleContextBanner role={role} page="Documents" />
-
-      <div className="panel section-panel">
-        <div className="panel-head">
-          <div>
-            <h2>Document Vault & Customer Files</h2>
-            <p>Audited records, signed conveyance deeds, and official receipts</p>
-          </div>
-        </div>
-
-        <div className="documents-list">
-          {docs.map((d, idx) => (
-            <div className="document-row" key={idx}>
-              <FileText size={18} className="indigo-text" />
-              <div>
-                <b>{d[0]}</b>
-                <small>{d[1]}</small>
-              </div>
-              <span className="doc-date">{d[2]}</span>
-              <Badge>{d[3]}</Badge>
-              <button className="icon-action" onClick={() => notify(`${d[0]} preview opened`)}>
-                <Eye size={14} />
-              </button>
-              <button className="icon-action" onClick={() => notify(`${d[0]} download started`)}>
-                <Download size={14} />
-              </button>
-            </div>
-          ))}
-        </div>
       </div>
     </>
   );
@@ -1492,16 +1657,11 @@ function CrudWorkspace({ page, records, project, search, create, edit, view, rem
 }
 
 function Modal({ kind, close, save, context, initial, role }) {
-  const pay = kind === 'payment';
   const record = kind === 'record';
   const title = kind === 'user'
     ? `${initial ? 'Edit' : 'Add'} Team Member`
     : record
-    ? `${initial ? 'Edit' : 'Create'} ${context === 'Projects & plots' ? 'Project' : context === 'Bookings' ? 'Booking' : context === 'Payments' ? 'Payment' : 'Record'}`
-    : kind === 'booking'
-    ? 'Create Sales Booking'
-    : pay
-    ? 'Record Customer Payment'
+    ? `${initial ? 'Edit' : 'Create'} ${context === 'Projects & plots' ? 'Project' : context === 'Agents' ? 'Agent' : 'Record'}`
     : 'Save Record';
 
   const fields = kind === 'user' ? [
@@ -1517,23 +1677,6 @@ function Modal({ kind, close, save, context, initial, role }) {
     ['amount', 'Amount / Plots', 'text', 'e.g. 18,40,000'],
     ['status', 'Status', 'select', ['Active', 'Pending', 'Processing', 'Confirmed', 'Overdue', 'Paid', 'Approved']],
     ['notes', 'Details / Notes', 'text', 'Add relevant notes']
-  ] : pay ? [
-    ['customer', 'Customer Name', 'text', 'Rajesh Sharma'],
-    ['plot', 'Plot Number', 'text', 'A-012'],
-    ['project', 'Project', 'select', ['Green Meadows', 'Silver Oaks', 'Park View', 'River Enclave']],
-    ['total', 'Booking Value (₹)', 'text', '18,40,000'],
-    ['paid', 'Amount Received (₹)', 'text', '2,00,000'],
-    ['due', 'Next Due Date', 'date', ''],
-    ['agent', 'Received By', 'select', ['M. Kumar', 'S. Patel', 'R. Gupta', 'N. Bose']]
-  ] : kind === 'booking' ? [
-    ['customer', 'Customer Name', 'text', 'Neha Kapoor'],
-    ['mobile', 'Mobile Number', 'tel', '+91 98765 43210'],
-    ['project', 'Project', 'select', ['Green Meadows', 'Silver Oaks', 'Park View', 'River Enclave']],
-    ['plot', 'Plot Number', 'text', 'A-024'],
-    ['amount', 'Booking Value (₹)', 'text', '18,40,000'],
-    ['paid', 'Token Advance (₹)', 'text', '2,00,000'],
-    ['agent', 'Assigned Agent', 'select', ['M. Kumar', 'S. Patel', 'R. Gupta', 'N. Bose']],
-    ['plan', 'Installment Plan', 'select', ['12 monthly installments', '6 monthly installments', 'Paid in full']]
   ] : [
     ['name', 'Record Name', 'text', 'Enter name'],
     ['details', 'Details', 'text', 'Enter details']
@@ -1550,7 +1693,7 @@ function Modal({ kind, close, save, context, initial, role }) {
       <div className="modal">
         <div className="modal-head">
           <div>
-            <span className="modal-kicker">NMT ERP · {context || 'WORKSPACE'}</span>
+            <span className="modal-kicker">Lalita ERP · {context || 'WORKSPACE'}</span>
             <h2>{title}</h2>
             <p>Enter the details below to update live workspace records.</p>
           </div>
@@ -1580,7 +1723,7 @@ function Modal({ kind, close, save, context, initial, role }) {
           <div className="modal-actions">
             <button type="button" className="button button-white" onClick={close}>Cancel</button>
             <button type="submit" className="button button-primary">
-              {initial ? 'Save Changes' : pay ? 'Record Payment' : kind === 'booking' ? 'Confirm Booking' : 'Save'}
+              {initial ? 'Save Changes' : 'Save'}
               <ChevronRight size={14} />
             </button>
           </div>
