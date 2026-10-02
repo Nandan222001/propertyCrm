@@ -1,6 +1,6 @@
-# NMT Real Estate ERP — Demo MVP
+# Lalita Realestate Infra ERP — Demo MVP
 
-A React + Vite client-demo MVP based on the NMT Solution Real Estate Plot Management & Sales ERP proposal.
+A React + Vite client-demo MVP based on the Lalita Realestate Infra Plot Management & Sales ERP proposal.
 
 ## Run locally
 

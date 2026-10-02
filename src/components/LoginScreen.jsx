@@ -139,9 +139,9 @@ export function LoginScreen({ onLogin, onRegister, customers = [], users = [] })
       {/* Visual Showcase Left Panel */}
       <section className="login-art auth-hero-panel" style={{ backgroundImage: `linear-gradient(rgba(18, 26, 49, 0.72), rgba(18, 26, 49, 0.88)), url(${heroImages[selectedImage].url})` }}>
         <div className="login-brand">
-          <div className="brand-mark">N</div>
+          <div className="brand-mark">L</div>
           <div>
-            <b>NMT <span>ERP</span></b>
+            <b>Lalita <span>Realestate Infra</span></b>
             <small>ENTERPRISE REAL ESTATE OPERATIONS</small>
           </div>
         </div>

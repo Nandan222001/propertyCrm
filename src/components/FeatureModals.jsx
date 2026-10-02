@@ -55,7 +55,7 @@ export function BookingModal({ role, agentName, customers, plots, close, save, p
 
   return (
     <Shell
-      kicker="NMT ERP · BOOKINGS"
+      kicker="Lalita ERP · BOOKINGS"
       title="Create Sales Booking"
       sub={agentMode ? 'Your booking is sent to the admin for approval. The plot is held until then.' : 'Admin bookings are confirmed immediately.'}
       close={close}
@@ -138,7 +138,7 @@ export function PaymentModal({ bookings, pays, close, save }) {
   }
 
   return (
-    <Shell kicker="NMT ERP · ACCOUNTS" title="Record Customer Payment" sub="Select the plot. A bill (office + customer copy) is generated after saving." close={close}>
+    <Shell kicker="Lalita ERP · ACCOUNTS" title="Record Customer Payment" sub="Select the plot. A bill (office + customer copy) is generated after saving." close={close}>
       <form onSubmit={submit}>
         <div className="form-grid">
           <Field label="Plot" wide>
@@ -185,7 +185,7 @@ export function CustomerModal({ agentName, customers, close, save }) {
     save({ name: d.name.trim(), mobile, email: d.email.trim(), address: d.address.trim(), agent: agentName });
   }
   return (
-    <Shell kicker="NMT ERP · CUSTOMERS" title="Add New Customer" sub="Only sales agents add customers. The admin approves every new customer." close={close}>
+    <Shell kicker="Lalita ERP · CUSTOMERS" title="Add New Customer" sub="Only sales agents add customers. The admin approves every new customer." close={close}>
       <form onSubmit={submit}>
         <div className="form-grid">
           <Field label="Full name"><input name="name" required placeholder="Neha Kapoor" /></Field>

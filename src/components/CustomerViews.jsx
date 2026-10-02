@@ -104,7 +104,7 @@ export function CustomerProfile({
         </div>
         {portal && <span className="view-only-tag">VIEW ONLY</span>}
         {!portal && (
-          <button className="button whatsapp-btn" onClick={() => openWhatsApp(customer.mobile, `Hello ${customer.name}, this is NMT Solution regarding your plot booking.`)}>
+          <button className="button whatsapp-btn" onClick={() => openWhatsApp(customer.mobile, `Hello ${customer.name}, this is Lalita Realestate Infra regarding your plot booking.`)}>
             <MessageCircle size={14} /> WhatsApp
           </button>
         )}

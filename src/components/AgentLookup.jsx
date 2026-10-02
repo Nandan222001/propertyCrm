@@ -81,7 +81,7 @@ export function AgentInfoModal({ agent, bookings, customers, receipts, close }) 
           </table>
         </div>
         <div className="modal-actions">
-          <button className="button whatsapp-btn" onClick={() => openWhatsApp(agent[7], `Hi ${agent[0]}, this is the NMT ERP admin desk.`)}>
+          <button className="button whatsapp-btn" onClick={() => openWhatsApp(agent[7], `Hi ${agent[0]}, this is the Lalita ERP admin desk.`)}>
             <MessageCircle size={14} /> WhatsApp agent
           </button>
           <button className="button button-white" onClick={close}>Close</button>

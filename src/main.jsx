@@ -175,7 +175,7 @@ export function App() {
     localStorage.setItem('nmt_role', selectedRole);
     const user = userObj || users.find(u => u.role === selectedRole) || roleConfigs[selectedRole].defaultUser;
     setCurrentUser(user);
-    notify(`Welcome to NMT ERP! Logged in as ${user.name} (${selectedRole}).`);
+    notify(`Welcome to Lalita ERP! Logged in as ${user.name} (${selectedRole}).`);
     go('Overview');
   };
 
@@ -250,7 +250,7 @@ export function App() {
 
   const billText = (r) =>
     `Dear ${r.customer}, we have received ₹${r.amount} for Plot ${r.plot} (${r.project}). ` +
-    `Receipt ${r.no} dated ${r.date}. Balance: ₹${r.balance}. Thank you - NMT Solution.`;
+    `Receipt ${r.no} dated ${r.date}. Balance: ₹${r.balance}. Thank you - Lalita Realestate Infra.`;
 
   const customerPhone = (name) => customers.find(c => c.name === name)?.mobile || '';
 
@@ -313,8 +313,8 @@ export function App() {
 
   const whatsappBooking = (b) => {
     const text = b[7] === 'Confirmed' || b[7] === 'Agreement'
-      ? `Dear ${b[1]}, your booking ${b[0]} for Plot ${b[3]} (${b[2]}) is confirmed. Final price ₹${b[5]}, paid ₹${b[6]}. - NMT Solution`
-      : `Dear ${b[1]}, your booking ${b[0]} for Plot ${b[3]} (${b[2]}) is ${b[7].toLowerCase()}. We will update you shortly. - NMT Solution`;
+      ? `Dear ${b[1]}, your booking ${b[0]} for Plot ${b[3]} (${b[2]}) is confirmed. Final price ₹${b[5]}, paid ₹${b[6]}. - Lalita Realestate Infra`
+      : `Dear ${b[1]}, your booking ${b[0]} for Plot ${b[3]} (${b[2]}) is ${b[7].toLowerCase()}. We will update you shortly. - Lalita Realestate Infra`;
     openWhatsApp(customerPhone(b[1]), text);
   };
 
@@ -353,7 +353,7 @@ export function App() {
     notify(`Customer ${c.name} ${status.toLowerCase()}`);
   };
   const openCustomer = (c) => { setSelected(c); navigate(pathFor['Customer detail']); setSearch(''); setMobile(false); };
-  const whatsappCustomer = (c) => openWhatsApp(c.mobile, `Hello ${c.name}, this is NMT Solution regarding your plot booking.`);
+  const whatsappCustomer = (c) => openWhatsApp(c.mobile, `Hello ${c.name}, this is Lalita Realestate Infra regarding your plot booking.`);
   const setRegistryStatus = (id, value) => { setRegistry(prev => ({ ...prev, [id]: value })); notify(`Registry status set to "${value}"`); };
   const bookPlot = (p) => { setBookingPreset({ project: p[8], plot: p[0] }); setModal('booking'); };
 
@@ -453,9 +453,9 @@ export function App() {
       {/* Dynamic Role-Based Sidebar */}
       <aside className={`sidebar ${mobile ? 'open' : ''}`}>
         <div className="brand">
-          <div className="brand-mark">N</div>
+          <div className="brand-mark">L</div>
           <div>
-            <b>NMT <span>ERP</span></b>
+            <b>Lalita <span>Realestate Infra</span></b>
             <small>ENTERPRISE REAL ESTATE</small>
           </div>
           <button className="sidebar-close" onClick={() => setMobile(false)}>
@@ -837,7 +837,7 @@ export function App() {
               role={role}
               onOpenBill={(r) => setBillNo(r.no)}
               onShare={shareReceipt}
-              onRemind={(p) => openWhatsApp(customerPhone(p[0]), `Dear ${p[0]}, a payment of ₹${p[5]} for Plot ${p[1]} (${p[2]}) is due ${p[6] !== '—' ? `on ${p[6]}` : 'now'}. Please pay at the earliest. - NMT Solution`)}
+              onRemind={(p) => openWhatsApp(customerPhone(p[0]), `Dear ${p[0]}, a payment of ₹${p[5]} for Plot ${p[1]} (${p[2]}) is due ${p[6] !== '—' ? `on ${p[6]}` : 'now'}. Please pay at the earliest. - Lalita Realestate Infra`)}
             />
           )}
 
@@ -1693,7 +1693,7 @@ function Modal({ kind, close, save, context, initial, role }) {
       <div className="modal">
         <div className="modal-head">
           <div>
-            <span className="modal-kicker">NMT ERP · {context || 'WORKSPACE'}</span>
+            <span className="modal-kicker">Lalita ERP · {context || 'WORKSPACE'}</span>
             <h2>{title}</h2>
             <p>Enter the details below to update live workspace records.</p>
           </div>

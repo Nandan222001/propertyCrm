@@ -100,7 +100,7 @@ export const seedCrud = {
 
 
 export const COMPANY = {
-  name: 'NMT Solution Real Estate',
+  name: 'Lalita Realestate Infra',
   address: 'Head Office, Mumbai, Maharashtra',
   phone: '+91 98765 00001',
   email: 'accounts@nmtsolution.demo'
