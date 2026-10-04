@@ -25,10 +25,11 @@ logger = get_logger(__name__)
 
 
 # Starlette renamed these constants (422 -> UNPROCESSABLE_CONTENT,
-# 413 -> CONTENT_TOO_LARGE). Resolve at import time so the app runs on both the
-# 0.4x and 1.x lines without deprecation warnings.
-_HTTP_422 = getattr(status, "HTTP_422_UNPROCESSABLE_CONTENT", status.HTTP_422_UNPROCESSABLE_ENTITY)
-_HTTP_413 = getattr(status, "HTTP_413_CONTENT_TOO_LARGE", status.HTTP_413_REQUEST_ENTITY_TOO_LARGE)
+# 413 -> CONTENT_TOO_LARGE). Resolve them lazily-with-`or` so the *deprecated*
+# name is only touched when the new name is absent — a plain getattr(default=…)
+# would evaluate the deprecated attribute eagerly and still warn.
+_HTTP_422 = getattr(status, "HTTP_422_UNPROCESSABLE_CONTENT", None) or status.HTTP_422_UNPROCESSABLE_ENTITY
+_HTTP_413 = getattr(status, "HTTP_413_CONTENT_TOO_LARGE", None) or status.HTTP_413_REQUEST_ENTITY_TOO_LARGE
 
 
 class AppError(Exception):
