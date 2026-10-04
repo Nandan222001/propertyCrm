@@ -1,6 +1,6 @@
 import React from 'react';
 import { Shield, Info, CheckCircle2, Lock, Eye } from 'lucide-react';
-import { roleConfigs } from '../data/seedData';
+import { roleConfigs } from '../../data/seedData';
 
 export function RoleContextBanner({ role, page }) {
   const cfg = roleConfigs[role] || roleConfigs['ADMIN'];

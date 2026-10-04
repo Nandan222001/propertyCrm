@@ -4,7 +4,7 @@ import {
   CheckCircle2, Sparkles, Layers, ArrowRight, Eye, EyeOff, Award, 
   Briefcase, Wallet, Users, Target, Check, RefreshCw
 } from 'lucide-react';
-import { roleConfigs } from '../data/seedData';
+import { roleConfigs } from '../../data/seedData';
 
 export function LoginScreen({ onLogin, onRegister, customers = [], users = [] }) {
   const [tab, setTab] = useState('login'); // 'login' | 'register'

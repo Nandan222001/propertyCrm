@@ -1,6 +1,6 @@
 import React from 'react';
 import { Check, X, MessageCircle, Eye } from 'lucide-react';
-import { StatusBadge } from './CustomerViews';
+import { StatusBadge } from '../customers/CustomerViews';
 
 export function ApprovalsPage({ bookings, customers, onApproveBooking, onRejectBooking, onApproveCustomer, onRejectCustomer, onWhatsApp, onPrintBooking }) {
   const pendingBookings = bookings.filter(b => b[7] === 'Pending Approval');

@@ -1,7 +1,7 @@
 import React from 'react';
 import { Printer, X, MessageCircle, Send, Copy, CheckCircle2 } from 'lucide-react';
-import { COMPANY } from '../data/seedData';
-import { amountInWords, parseAmt, fmtINR } from '../lib/helpers';
+import { COMPANY } from '../../data/seedData';
+import { amountInWords, parseAmt, fmtINR } from '../../utils';
 
 // Modal shell. Everything inside `.print-area` is what window.print() outputs.
 export function PrintModal({ title, close, actions, children }) {

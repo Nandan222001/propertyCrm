@@ -1,7 +1,7 @@
 import React from 'react';
 import { Eye, Printer, MessageCircle, Download, FileText, Check, X as XIcon, Plus } from 'lucide-react';
-import { REGISTRY_STEPS } from '../data/seedData';
-import { parseAmt, fmtINR, openWhatsApp, isAdmin, canCreateCustomer, canApprove } from '../lib/helpers';
+import { REGISTRY_STEPS } from '../../data/seedData';
+import { parseAmt, fmtINR, openWhatsApp, isAdmin, canCreateCustomer, canApprove } from '../../utils';
 
 const statusClass = (s) => {
   const t = String(s).toLowerCase();
@@ -192,7 +192,7 @@ export function CustomerProfile({
 }
 
 // ------------------------------------------------------------ documents page
-export function DocumentsPage({ docs, notify }) {
+export function DocumentsPage({ docs, notify, onOpenDocument }) {
   return (
     <div className="panel section-panel">
       <div className="panel-head">
@@ -206,10 +206,20 @@ export function DocumentsPage({ docs, notify }) {
             <div><b>{d.title}</b><small>{d.sub}</small></div>
             <span className="doc-date">{d.date}</span>
             <StatusBadge>{d.kind}</StatusBadge>
-            <button className="icon-action" title="Open" onClick={d.open || (() => notify(`${d.title} will be issued at the ${d.kind.toLowerCase()} stage.`))}>
+            <button
+              className="icon-action"
+              title="Open"
+              onClick={() => (onOpenDocument
+                ? onOpenDocument(d)
+                : (d.open ? d.open() : notify(`${d.title} will be issued at the ${d.kind.toLowerCase()} stage.`)))}
+            >
               <Eye size={14} />
             </button>
-            {d.open && <button className="icon-action" title="Print" onClick={d.open}><Download size={14} /></button>}
+            {(onOpenDocument || d.open) && (
+              <button className="icon-action" title="Print" onClick={onOpenDocument ? () => onOpenDocument(d) : d.open}>
+                <Download size={14} />
+              </button>
+            )}
           </div>
         ))}
       </div>

@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { Search, X, MessageCircle } from 'lucide-react';
-import { agents } from '../data/seedData';
-import { parseAmt, fmtINR, openWhatsApp } from '../lib/helpers';
+import { agents } from '../../data/seedData';
+import { parseAmt, fmtINR, openWhatsApp } from '../../utils';
 
 export function agentStats(name, bookings, customers, receipts) {
   const mine = bookings.filter(b => b[8] === name);

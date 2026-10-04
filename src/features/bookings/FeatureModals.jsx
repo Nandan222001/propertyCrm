@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { X, ChevronRight } from 'lucide-react';
-import { projects, agents } from '../data/seedData';
-import { parseAmt, fmtINR, isAdmin } from '../lib/helpers';
+import { projects, agents } from '../../data/seedData';
+import { parseAmt, fmtINR, isAdmin } from '../../utils';
 
 function Shell({ kicker, title, sub, close, children }) {
   return (
