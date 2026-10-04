@@ -96,8 +96,9 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         headers = {
             "X-Content-Type-Options": "nosniff",
             "X-Frame-Options": "DENY",
-            "Referrer-Policy": "no-referrer",
-            "Permissions-Policy": "geolocation=(), microphone=(), camera=()",
+            # Same value as the SPA/nignx/vercel policy so browsers see one story.
+            "Referrer-Policy": "strict-origin-when-cross-origin",
+            "Permissions-Policy": "camera=(), microphone=(), geolocation=(), payment=()",
             "Cross-Origin-Opener-Policy": "same-origin",
             "Cross-Origin-Resource-Policy": "same-site",
             "Content-Security-Policy": settings.CSP_POLICY,
