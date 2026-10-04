@@ -1,0 +1,85 @@
+# =============================================================================
+# Local / staging stack: MySQL 8 + Redis + API + web (nginx).
+# Production uses the same images plus Terraform-provisioned infrastructure
+# (see infra/terraform) — this file is for development and integration testing.
+#
+#   cp backend/.env.example backend/.env   # then set the secrets
+#   docker compose up --build
+#   open http://localhost:8080
+# =============================================================================
+name: lalita-erp
+
+services:
+  db:
+    image: mysql:8.4
+    restart: unless-stopped
+    command:
+      - --default-authentication-plugin=caching_sha2_password
+      - --require-secure-transport=ON
+      - --local-infile=0
+      - --sql-mode=STRICT_ALL_TABLES,NO_ENGINE_SUBSTITUTION
+    environment:
+      MYSQL_DATABASE: ${DB_NAME:-lalita_erp}
+      MYSQL_USER: ${DB_USER:-lalita_app}
+      MYSQL_PASSWORD: ${DB_PASSWORD:?set DB_PASSWORD in .env}
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:?set DB_ROOT_PASSWORD in .env}
+    volumes:
+      - db-data:/var/lib/mysql
+      - ./backend/scripts/create_db.sql:/docker-entrypoint-initdb.d/10-create_db.sql:ro
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-p${DB_ROOT_PASSWORD}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks: [backend]
+
+  redis:
+    image: redis:7.4-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--save", "", "--appendonly", "no", "--maxmemory", "256mb", "--maxmemory-policy", "allkeys-lru"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    networks: [backend]
+
+  api:
+    build: ./backend
+    restart: unless-stopped
+    depends_on:
+      db: { condition: service_healthy }
+      redis: { condition: service_healthy }
+    env_file: [./backend/.env]
+    environment:
+      DB_HOST: db
+      REDIS_URL: redis://redis:6379/0
+      DB_SSL_MODE: disabled          # private compose network; TLS terminates at nginx
+      FORCE_HTTPS: "false"
+      ALLOWED_HOSTS: localhost,127.0.0.1,api
+    read_only: true
+    tmpfs: [/tmp]
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: [ALL]
+    ports: ["8000:8000"]
+    networks: [backend]
+
+  web:
+    build:
+      context: .
+      dockerfile: deploy/web.Dockerfile
+    restart: unless-stopped
+    depends_on: [api]
+    ports: ["8080:8080"]
+    read_only: true
+    tmpfs: [/var/cache/nginx, /var/run]
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: [ALL]
+    networks: [backend]
+
+volumes:
+  db-data:
+
+networks:
+  backend:
+    driver: bridge
