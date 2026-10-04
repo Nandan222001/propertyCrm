@@ -1,0 +1,36 @@
+[project]
+name = "lalita-erp-api"
+version = "1.0.0"
+description = "Lalita Realestate Infra ERP — FastAPI backend (MySQL, RBAC, audited)"
+requires-python = ">=3.11"
+
+[tool.ruff]
+line-length = 110
+target-version = "py311"
+exclude = ["migrations/versions", "__pycache__", ".venv"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "S", "C4", "SIM", "RUF"]
+ignore = [
+    "S101",   # assert is fine in tests
+    "B008",   # FastAPI Depends() in defaults is the framework idiom
+    "E501",   # long lines are handled by the formatter width
+    "S105",   # "token"/"password" strings appear in field names by design
+    "RUF012", # repository/service class attributes (sortable maps, permission maps)
+              # are read-only in practice and intentionally class-level.
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["S105", "S106", "S107", "RUF012", "S311"]  # S311: test data only
+"app/core/config.py" = ["S105"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["app", "tests"]
+
+[tool.bandit]
+exclude_dirs = ["tests", "migrations"]
+skips = ["B101"]
+
+[tool.coverage.run]
+source = ["app"]
+omit = ["app/db/seed.py"]
