@@ -10,7 +10,9 @@ def test_security_headers_present_on_every_response(client):
     response = client.get("/api/v1/health")
     assert response.headers["X-Content-Type-Options"] == "nosniff"
     assert response.headers["X-Frame-Options"] == "DENY"
-    assert response.headers["Referrer-Policy"] == "no-referrer"
+    # One policy across the API, nginx and vercel.json (see docs/SECURITY.md).
+    assert response.headers["Referrer-Policy"] == "strict-origin-when-cross-origin"
+    assert response.headers["Permissions-Policy"] == "camera=(), microphone=(), geolocation=(), payment=()"
     assert "Content-Security-Policy" in response.headers
     assert response.headers["Cache-Control"] == "no-store"
     assert "Server" not in response.headers
