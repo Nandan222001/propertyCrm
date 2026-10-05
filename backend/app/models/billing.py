@@ -117,7 +117,7 @@ class InvoiceItem(Base, PkMixin, TimestampMixin):
 
     @property
     def base_amount(self) -> Decimal:
-        """Quantity × rate before the line discount."""
+        """Quantity times rate before the line discount."""
         return (self.quantity * self.unit_price).quantize(Decimal("0.01"))
 
 

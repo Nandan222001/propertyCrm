@@ -1,0 +1,15 @@
+# Container-scan exceptions — reviewed, not silent.
+#
+# These advisories hit copies of packages that are NOT runtime dependencies of
+# the API image:
+#   * msgpack/urllib3 findings below match pip's VENDORED copies under
+#     site-packages/pip/_vendor (pip 26.x) — package-manager internals, not
+#     imported by the application. The application-level requirements pin
+#     msgpack>=1.2.1 and urllib3>=2.8.0 (see backend/requirements.txt).
+#   * setuptools matches the base image's /usr/local copy, which the runtime
+#     stage upgrades to >= 83.0.0; the venv pins setuptools==83.0.0.
+# Remove an entry here only after bumping the offending package everywhere.
+GHSA-6v7p-g79w-8964
+CVE-2026-97687
+CVE-2026-97689
+CVE-2025-47273

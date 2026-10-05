@@ -109,7 +109,7 @@ The 16 required control areas are implemented, tested and documented in the
   `security_events` for 401/403/423/429, lockouts and token reuse, retained
   10 years and surfaced through admin reports and CloudWatch alarms.
 * **Supply chain** — pinned dependencies, pip-audit/npm audit/Dependabot,
-  gitleaks, CodeQL, trivy image scans, SBOM per release.
+  gitleaks, Semgrep SAST, trivy image scans, SBOM per release.
 * **Content unavailable to customers until approved** — agents' records are
   `PENDING_APPROVAL` and plots are held, not sold, until an approver confirms.
 

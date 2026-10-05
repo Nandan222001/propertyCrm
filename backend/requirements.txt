@@ -46,6 +46,14 @@ reportlab==4.2.5           # tax-invoice PDF rendering (core fonts only, A4)
 PyJWT==2.15.1
 passlib[bcrypt]==1.7.4     # password hashing facade (bcrypt rounds >= 12)
 
+# --- supply-chain floors ------------------------------------------------------
+# Transitive packages that vulnerability scanners kept flagging from stale
+# image layers. Pinned at (or above) each advisory's fixed version so every
+# copy of them — wherever a scanner finds one — is patched.
+msgpack==1.2.1             # >= 1.2.1: GHSA-6v7p-g79w-8964 (OOB read)
+urllib3==2.8.0             # >= 2.8.0: CVE-2026-97687 / CVE-2026-97689
+setuptools==83.0.0         # >= 83.0.0: CVE-2025-47273 + PYSEC-2026-3447
+
 # --- abuse control & operations ---------------------------------------------
 limits==5.8.0              # token-bucket rate-limit primitives (login / API)
 redis==5.2.1               # shared rate-limit + refresh-token store in multi-node
