@@ -56,7 +56,7 @@ setuptools==83.0.0         # >= 83.0.0: CVE-2025-47273 + PYSEC-2026-3447
 
 # --- abuse control & operations ---------------------------------------------
 limits==5.8.0              # token-bucket rate-limit primitives (login / API)
-redis==5.2.1               # shared rate-limit + refresh-token store in multi-node
+redis==8.1.0               # shared rate-limit + refresh-token store in multi-node
 
 # -----------------------------------------------------------------------------
 # DELIBERATE PIN — do not "upgrade" blindly:
