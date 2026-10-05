@@ -62,7 +62,7 @@ jobs:
       - name: Build API image
         run: docker build -t lalita-erp-api:scan ./backend
       - name: Trivy image scan
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: lalita-erp-api:scan
           format: sarif
