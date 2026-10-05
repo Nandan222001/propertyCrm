@@ -89,6 +89,9 @@ jobs:
           exit-code: '1'
           ignore-unfixed: true
           scanners: vuln
+          # the gate runs trivy inside a container that cannot see the
+          # workspace, so the ignore file must be mounted explicitly
+          trivyignores: .trivyignore
           # Secret scanning of the baked image is deliberately off: the hits
           # are by-design placeholders (create_db.sql's CHANGE_ME MySQL
           # password, config.py's local-only SECRET_KEY fallback), and real

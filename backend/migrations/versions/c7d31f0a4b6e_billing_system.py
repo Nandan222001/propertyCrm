@@ -194,10 +194,12 @@ def downgrade() -> None:
     op.drop_index("ix_payments_invoice_id", table_name="payments")
     op.drop_column("payments", "invoice_id")
 
-    op.drop_constraint("ck_invoice_items_invoice_qty_positive", "invoice_items", type_="check")
-    op.drop_constraint("ck_invoice_items_invoice_price_non_negative", "invoice_items", type_="check")
-    op.drop_constraint("ck_invoices_invoice_paid_non_negative", "invoices", type_="check")
-    op.drop_constraint("ck_invoices_invoice_total_non_negative", "invoices", type_="check")
+    # op.f() marks the names as already convention-expanded; without it
+    # alembic re-applies ck_<table>_<name> and MySQL fails with errno 3821.
+    op.drop_constraint(op.f("ck_invoice_items_invoice_qty_positive"), "invoice_items", type_="check")
+    op.drop_constraint(op.f("ck_invoice_items_invoice_price_non_negative"), "invoice_items", type_="check")
+    op.drop_constraint(op.f("ck_invoices_invoice_paid_non_negative"), "invoices", type_="check")
+    op.drop_constraint(op.f("ck_invoices_invoice_total_non_negative"), "invoices", type_="check")
 
     op.drop_table("invoice_status_history")
     op.drop_table("invoice_items")
