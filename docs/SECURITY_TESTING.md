@@ -7,7 +7,7 @@
 | Unit + integration (API) | `backend/tests/*.py` | 110 tests | every security control and business rule |
 | Migration verification | `tests/test_audit_and_ops.py` | upgrade + downgrade + offline MySQL DDL render | schema is reversible and MySQL-correct |
 | Client render smoke | `scripts/render-smoke.mjs` | login screen + 7 roles + 5 deep links | the SPA cannot silently break for a role |
-| Static analysis | ruff, bandit, CodeQL, tfsec | CI | bug patterns, insecure APIs, IaC misconfiguration |
+| Static analysis | ruff, bandit, Semgrep, tfsec | CI | bug patterns, insecure APIs, IaC misconfiguration |
 | Dependency audit | pip-audit, npm audit, Dependabot, trivy | CI + weekly | known CVEs in our supply chain |
 | Secret scanning | gitleaks (full history) | CI | no credential ever enters git |
 | Dynamic (manual) | OWASP ZAP baseline against staging | per release | headers, auth flows, injection surface |

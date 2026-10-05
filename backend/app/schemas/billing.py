@@ -35,7 +35,7 @@ class InvoiceItemIn(RequestModel):
     def _discount_within_line(self) -> InvoiceItemIn:
         base = (self.quantity * self.unit_price).quantize(Decimal("0.01"))
         if self.discount_amount > base:
-            raise ValueError("line discount cannot exceed quantity × rate")
+            raise ValueError("line discount cannot exceed quantity * rate")
         return self
 
 

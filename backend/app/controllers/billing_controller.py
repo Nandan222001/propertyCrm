@@ -6,8 +6,8 @@ from typing import Annotated
 
 from fastapi import Depends, Response
 
-from app.core.constants import AuditAction, Permission
-from app.core.dependencies import ActorDep, DbDep, PaginationDep, require
+from app.core.constants import AuditAction
+from app.core.dependencies import ActorDep, DbDep, PaginationDep
 from app.core.responses import success
 from app.schemas.billing import (
     InvoiceCancel,

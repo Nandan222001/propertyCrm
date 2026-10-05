@@ -9,13 +9,14 @@
 
 from __future__ import annotations
 
+import contextlib
 from logging.config import fileConfig
 
 from alembic import context
 from sqlalchemy import engine_from_config, pool
 
 from app.core.config import settings
-from app.models import Base  # noqa: F401 - registers all metadata
+from app.models import Base
 
 config = context.config
 # Precedence: explicit URL (CLI ``-x db_url=...`` or programmatic
@@ -27,10 +28,9 @@ _explicit_url = context.get_x_argument(as_dictionary=True).get("db_url") or conf
 )
 config.set_main_option("sqlalchemy.url", (_explicit_url or settings.database_url).replace("%", "%%"))
 if config.config_file_name is not None:
-    try:
+    # logging config is optional (fileConfig needs a logging section)
+    with contextlib.suppress(Exception):
         fileConfig(config.config_file_name)
-    except Exception:  # pragma: no cover - logging config is optional
-        pass
 
 target_metadata = Base.metadata
 

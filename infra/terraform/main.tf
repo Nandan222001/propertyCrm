@@ -197,44 +197,65 @@ resource "aws_db_parameter_group" "main" {
   name   = "lalita-erp-mysql-${var.environment}"
   family = "mysql8.4"
 
-  parameter { name = "require_secure_transport"  value = "ON" }
-  parameter { name = "local_infile"              value = "OFF" }
-  parameter { name = "sql_mode"                  value = "STRICT_ALL_TABLES,NO_ENGINE_SUBSTITUTION" }
-  parameter { name = "audit_log_enabled"         value = "ON" }
-  parameter { name = "log_connections"           value = "ON" }
-  parameter { name = "slow_query_log"            value = "1" }
-  parameter { name = "long_query_time"           value = "2" }
+  parameter {
+    name  = "require_secure_transport"
+    value = "ON"
+  }
+  parameter {
+    name  = "local_infile"
+    value = "OFF"
+  }
+  parameter {
+    name  = "sql_mode"
+    value = "STRICT_ALL_TABLES,NO_ENGINE_SUBSTITUTION"
+  }
+  parameter {
+    name  = "audit_log_enabled"
+    value = "ON"
+  }
+  parameter {
+    name  = "log_connections"
+    value = "ON"
+  }
+  parameter {
+    name  = "slow_query_log"
+    value = "1"
+  }
+  parameter {
+    name  = "long_query_time"
+    value = "2"
+  }
 }
 
 resource "aws_db_instance" "main" {
-  identifier                   = "lalita-erp-${var.environment}"
-  engine                       = "mysql"
-  engine_version               = "8.4"
-  instance_class               = var.db_instance_class
-  allocated_storage            = 100
-  max_allocated_storage        = 500
-  storage_type                 = "gp3"
-  storage_encrypted            = true
-  kms_key_id                   = aws_kms_key.data.arn
-  db_name                      = "lalita_erp"
-  username                     = "lalita_admin"
-  password                     = random_password.db.result
-  multi_az                     = true                 # survives an AZ failure
-  backup_retention_period      = var.db_backup_retention_days
-  backup_window                = "19:30-20:30"        # 01:00-02:00 IST
-  maintenance_window           = "sun:20:45-sun:21:45"
-  copy_tags_to_snapshot        = true
-  deletion_protection          = true
-  skip_final_snapshot          = false
-  final_snapshot_identifier    = "lalita-erp-final-${var.environment}"
-  performance_insights_enabled = true
-  monitoring_interval          = 60                   # Enhanced monitoring
+  identifier                      = "lalita-erp-${var.environment}"
+  engine                          = "mysql"
+  engine_version                  = "8.4"
+  instance_class                  = var.db_instance_class
+  allocated_storage               = 100
+  max_allocated_storage           = 500
+  storage_type                    = "gp3"
+  storage_encrypted               = true
+  kms_key_id                      = aws_kms_key.data.arn
+  db_name                         = "lalita_erp"
+  username                        = "lalita_admin"
+  password                        = random_password.db.result
+  multi_az                        = true # survives an AZ failure
+  backup_retention_period         = var.db_backup_retention_days
+  backup_window                   = "19:30-20:30" # 01:00-02:00 IST
+  maintenance_window              = "sun:20:45-sun:21:45"
+  copy_tags_to_snapshot           = true
+  deletion_protection             = true
+  skip_final_snapshot             = false
+  final_snapshot_identifier       = "lalita-erp-final-${var.environment}"
+  performance_insights_enabled    = true
+  monitoring_interval             = 60 # Enhanced monitoring
   enabled_cloudwatch_logs_exports = ["audit", "error", "general", "slowquery"]
-  auto_minor_version_upgrade   = true
-  apply_immediately            = false
-  db_subnet_group_name         = aws_db_subnet_group.main.name
-  parameter_group_name         = aws_db_parameter_group.main.name
-  vpc_security_group_ids       = [aws_security_group.db.id]
+  auto_minor_version_upgrade      = true
+  apply_immediately               = false
+  db_subnet_group_name            = aws_db_subnet_group.main.name
+  parameter_group_name            = aws_db_parameter_group.main.name
+  vpc_security_group_ids          = [aws_security_group.db.id]
   # Point-in-time recovery is implicit with automated backups (RPO <= 5 min).
 }
 
@@ -400,7 +421,9 @@ resource "aws_wafv2_web_acl" "main" {
   name  = "lalita-erp-${var.environment}"
   scope = "REGIONAL"
 
-  default_action { allow {} }
+  default_action {
+    allow {}
+  }
 
   visibility_config {
     cloudwatch_metrics_enabled = true
@@ -412,7 +435,9 @@ resource "aws_wafv2_web_acl" "main" {
   rule {
     name     = "AWSManagedRulesCommonRuleSet"
     priority = 1
-    override_action { none {} }
+    override_action {
+      none {}
+    }
     statement {
       managed_rule_group_statement {
         name        = "AWSManagedRulesCommonRuleSet"
@@ -429,7 +454,9 @@ resource "aws_wafv2_web_acl" "main" {
   rule {
     name     = "AWSManagedRulesSQLiRuleSet"
     priority = 2
-    override_action { none {} }
+    override_action {
+      none {}
+    }
     statement {
       managed_rule_group_statement {
         name        = "AWSManagedRulesSQLiRuleSet"
@@ -446,7 +473,9 @@ resource "aws_wafv2_web_acl" "main" {
   rule {
     name     = "AWSManagedRulesKnownBadInputsRuleSet"
     priority = 3
-    override_action { none {} }
+    override_action {
+      none {}
+    }
     statement {
       managed_rule_group_statement {
         name        = "AWSManagedRulesKnownBadInputsRuleSet"
@@ -464,7 +493,9 @@ resource "aws_wafv2_web_acl" "main" {
   rule {
     name     = "RateLimitPerIp"
     priority = 10
-    action { block {} }
+    action {
+      block {}
+    }
     statement {
       rate_based_statement {
         limit              = 2000

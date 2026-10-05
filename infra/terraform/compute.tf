@@ -50,12 +50,16 @@ resource "aws_security_group" "app" {
     protocol        = "tcp"
     security_groups = [aws_security_group.alb.id]
   }
+  # Scoped by the database subnet CIDRs instead of the DB security group:
+  # referencing the DB SG here while the DB SG references this SG would be a
+  # dependency cycle (terraform validate: "Cycle: aws_security_group.app,
+  # aws_security_group.db"). Rules may only reference across one direction.
   egress {
     description = "MySQL to the database tier"
     from_port   = 3306
     to_port     = 3306
     protocol    = "tcp"
-    security_groups = [aws_security_group.db.id]
+    cidr_blocks = aws_subnet.private[*].cidr_block
   }
   egress {
     description = "TLS to AWS APIs (Secrets Manager, ECR, CloudWatch, S3)"
@@ -91,8 +95,8 @@ resource "aws_security_group" "db" {
 # ----------------------------------------------------------------------- IAM
 data "aws_iam_policy_document" "ecs_assume" {
   statement {
-    effect    = "Allow"
-    actions   = ["sts:AssumeRole"]
+    effect  = "Allow"
+    actions = ["sts:AssumeRole"]
     principals {
       type        = "Service"
       identifiers = ["ecs-tasks.amazonaws.com"]
@@ -190,10 +194,10 @@ resource "aws_ecs_task_definition" "api" {
 
   container_definitions = jsonencode([
     {
-      name      = "api"
-      image     = var.app_image
-      essential = true
-      user      = "1001:1001"
+      name                   = "api"
+      image                  = var.app_image
+      essential              = true
+      user                   = "1001:1001"
       readonlyRootFilesystem = true
       environment = [
         { name = "ENVIRONMENT", value = var.environment },

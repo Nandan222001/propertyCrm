@@ -37,6 +37,8 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 # curl for the healthcheck; tini reaps zombies and forwards signals to uvicorn.
 RUN apt-get update \
  && apt-get install -y --no-install-recommends curl tini ca-certificates \
+ && apt-get install -y --only-upgrade libpcre2-8-0 \
+ && /usr/local/bin/pip install --no-cache-dir --upgrade "setuptools>=83.0.0" \
  && rm -rf /var/lib/apt/lists/* \
  && groupadd --system --gid 1001 app \
  && useradd --system --uid 1001 --gid app --home /app --shell /usr/sbin/nologin app

@@ -14,7 +14,7 @@ Design constraints:
 from __future__ import annotations
 
 import io
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal
 
 from reportlab.lib.pagesizes import A4
@@ -260,7 +260,7 @@ class _InvoicePDF:
                 _rupees(item.get("discount_amount", 0)) if item.get("discount_amount") else "—",
                 _rupees(item["line_total"]),
             )
-            for value, (title, width, align) in zip(values, columns):
+            for value, (title, width, align) in zip(values, columns, strict=True):
                 if value is None:  # description column (may wrap)
                     yy = baseline
                     for line in desc_lines:
@@ -396,7 +396,7 @@ class _InvoicePDF:
     def _footer(self) -> None:
         y = MARGIN / 2 + 4
         self._hr(y=y + 12, color=LINE, weight=0.5)
-        generated = datetime.now(timezone.utc).strftime("%d %b %Y, %H:%M UTC")
+        generated = datetime.now(UTC).strftime("%d %b %Y, %H:%M UTC")
         self._text(MARGIN, y, f"Computer-generated tax invoice · generated {generated} · "
                               f"{self.invoice['invoice_number']}", size=7, color=MUTED)
         self._text(PAGE_W - MARGIN, y, f"Page {self.page}", size=7, color=MUTED, align="right")

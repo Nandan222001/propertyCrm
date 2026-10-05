@@ -109,7 +109,7 @@ def test_invoice_creation_computes_totals_server_side(client, accounts_headers, 
     invoice = _create_invoice(client, accounts_headers, billing_booking["id"])
     assert invoice["status"] == "DRAFT"
     assert invoice["invoice_number"].startswith("INV-")
-    # line 1: 1 × 1,00,000; line 2: 1200 × 25 − 2,000 = 28,000 → subtotal 1,28,000
+    # line 1: 1 x 1,00,000; line 2: 1200 x 25 - 2,000 = 28,000 -> subtotal 1,28,000
     assert float(invoice["subtotal"]) == 128000.0
     assert float(invoice["taxable_value"]) == 128000.0
     assert float(invoice["gst_amount"]) == 23040.0
@@ -130,7 +130,7 @@ def test_invoice_totals_apply_discount_and_rounding(client, accounts_headers, bi
              "unit_price": "99999.99"},
         ],
     )
-    # taxable = 99999.99 − 8333 = 91666.99; GST 12% = 11000.04 (rounded)
+    # taxable = 99999.99 - 8333 = 91666.99; GST 12% = 11000.04 (rounded)
     assert float(invoice["taxable_value"]) == 91666.99
     assert float(invoice["gst_amount"]) == 11000.04
     # exact 102667.03 → rounded to the whole rupee with round_off booked
