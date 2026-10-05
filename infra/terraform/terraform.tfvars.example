@@ -1,0 +1,14 @@
+# Copy to terraform.tfvars (never commit the filled-in file) or pass values via
+# TF_VAR_* environment variables from your pipeline's secret store.
+region                 = "ap-south-1"
+environment            = "production"
+owner                  = "platform@lalitarealestate.example"
+vpc_cidr               = "10.42.0.0/16"
+app_image              = "123456789012.dkr.ecr.ap-south-1.amazonaws.com/lalita-erp-api:1.0.0"
+web_image              = "123456789012.dkr.ecr.ap-south-1.amazonaws.com/lalita-erp-web:1.0.0"
+acm_certificate_arn    = "arn:aws:acm:ap-south-1:123456789012:certificate/00000000-0000-0000-0000-000000000000"
+db_instance_class      = "db.t4g.medium"
+db_backup_retention_days = 35
+backup_replica_region  = "ap-southeast-1"
+alert_emails           = ["security@lalitarealestate.example", "ops@lalitarealestate.example"]
+log_retention_days     = 400

@@ -1,0 +1,17 @@
+## Bandit configuration ---------------------------------------------------------
+## Python SAST for the ERP backend.  Run with:
+##   bandit -c bandit.yaml -r app
+##
+## B105 (hardcoded password *string*) and B107 (hardcoded password *default*) are
+## skipped: this codebase contains no credentials, but it does contain string
+## *discriminants* that trip the heuristic — JWT token types ("access"/"refresh")
+## and audit event identifiers ("auth.token_refresh").  Any real secret is loaded
+## from the environment through `app.core.config.Settings` (see `.env.example`).
+skips:
+  - B105
+  - B107
+  - B101   # asserts are confined to tests/ and to invariant checks
+exclude_dirs:
+  - tests
+  - migrations/versions
+  - .venv

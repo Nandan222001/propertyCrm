@@ -1,4 +1,53 @@
+# --- dependencies / build output ---------------------------------------------
 node_modules/
 dist/
+dist-ssr/
+.vite/
+*.local
+
+# --- python ------------------------------------------------------------------
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+*.egg-info/
+
+# --- secrets & environment ---------------------------------------------------
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+!docs/**/*.example
+
+# --- local databases & backups ----------------------------------------------
+# SQLite databases (plus their -wal/-shm sidecars) and dumped backups never
+# belong in git: they contain seeded PII-shaped demo data.
+backend/var/*
+!backend/var/.gitkeep
+*.sqlite3
+*.sqlite3-wal
+*.sqlite3-shm
+*.db
+*.sql.gz
+*.sql.gz.gpg
+backups/
+
+# --- terraform ---------------------------------------------------------------
+**/.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+crash.log
+.terraform.lock.hcl
+
+# --- editors / OS ------------------------------------------------------------
 .DS_Store
-.env*
+.idea/
+.vscode/
+*.swp

@@ -1,0 +1,33 @@
+# Automated patch management: grouped, weekly, reviewer-required.
+version: 2
+updates:
+  - package-ecosystem: pip
+    directory: /backend
+    schedule: { interval: weekly, day: monday, time: '03:00' }
+    open-pull-requests-limit: 5
+    versioning-strategy: increase
+    groups:
+      security-patches:
+        applies-to: security-updates
+        patterns: ['*']
+    labels: [dependencies, backend]
+
+  - package-ecosystem: npm
+    directory: /
+    schedule: { interval: weekly, day: monday, time: '03:00' }
+    open-pull-requests-limit: 5
+    groups:
+      security-patches:
+        applies-to: security-updates
+        patterns: ['*']
+    labels: [dependencies, frontend]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule: { interval: monthly }
+    labels: [dependencies, ci]
+
+  - package-ecosystem: docker
+    directory: /backend
+    schedule: { interval: monthly }
+    labels: [dependencies, containers]

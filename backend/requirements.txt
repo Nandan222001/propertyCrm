@@ -1,0 +1,57 @@
+# =============================================================================
+# Runtime dependencies — Lalita Realestate Infra ERP API
+# -----------------------------------------------------------------------------
+# Everything is pinned to an exact version so builds are reproducible and
+# `pip-audit` / Dependabot diffs are meaningful.  Upgrade deliberately:
+#
+#   python -m pip install --upgrade <pkg> && pip-audit -r requirements.txt \
+#     && python -m pytest tests -q
+#
+# Security-relevant notes are inline.  See docs/DEPENDENCY_MANAGEMENT.md.
+# =============================================================================
+
+# --- web framework -----------------------------------------------------------
+# Starlette is pinned explicitly because it is the layer that parses HTTP: we
+# must never resolve to a version with an open advisory (pip-audit gates this).
+fastapi==0.142.2
+starlette==1.7.0
+uvicorn[standard]==0.54.0  # ASGI server (standard extra = uvloop + httptools)
+python-multipart==0.0.32   # multipart/form-data parsing (kept >= 0.0.31: CVE fixes)
+
+# --- data layer --------------------------------------------------------------
+SQLAlchemy==2.0.36         # ORM; all queries are parameterised by construction
+alembic==1.14.0            # schema migrations (backend/migrations)
+PyMySQL==1.1.1             # pure-python MySQL driver (no libmysqlclient CVE surface)
+cryptography==50.0.2       # TLS + Fernet field-level encryption for PII at rest
+greenlet==3.5.6            # SQLAlchemy async/bridge dependency
+
+# --- runtime support (pinned for reproducible CVE scans) ---------------------
+anyio==4.15.1              # async primitives used by starlette
+h11==0.16.0                # HTTP/1.1 protocol state machine
+idna==3.20                 # IDNA codec for hostname validation
+typing-extensions==4.16.0  # backports used by pydantic/sqlalchemy
+
+# --- configuration & validation ---------------------------------------------
+pydantic==2.10.4           # request/response schemas + strict input validation
+pydantic-settings==2.7.0   # 12-factor settings loaded from env / .env
+python-dotenv==1.2.4       # .env support for local development
+
+# --- authentication & secrets ------------------------------------------------
+# PyJWT replaces python-jose: it is actively maintained, backed by `cryptography`
+# instead of the abandoned `ecdsa`/`rsa`/`pyasn1` chain (PYSEC-2024-232/233 and
+# PYSEC-2026-1325), and it supports the same HS256 + claim validation we rely on.
+PyJWT==2.15.1
+passlib[bcrypt]==1.7.4     # password hashing facade (bcrypt rounds >= 12)
+
+# --- abuse control & operations ---------------------------------------------
+limits==5.8.0              # token-bucket rate-limit primitives (login / API)
+redis==5.2.1               # shared rate-limit + refresh-token store in multi-node
+
+# -----------------------------------------------------------------------------
+# DELIBERATE PIN — do not "upgrade" blindly:
+#   passlib 1.7.4 reads `bcrypt.__about__.__version__`, which bcrypt >= 4.1
+#   removed.  On bcrypt 4.1+ hashing still works but emits
+#   "(trapped) error reading bcrypt version" and passlib can mis-detect the
+#   backend.  Keep bcrypt at 4.0.1 until passlib >= 1.7.5 ships.
+# -----------------------------------------------------------------------------
+bcrypt==4.0.1
