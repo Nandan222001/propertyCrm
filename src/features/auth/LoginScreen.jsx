@@ -11,8 +11,8 @@ export function LoginScreen({ onLogin, onRegister, customers = [], users = [] })
   const [selectedImage, setSelectedImage] = useState(0); // 0, 1, 2
   const [showPassword, setShowPassword] = useState(false);
   const [role, setRole] = useState('ADMIN');
-  const [email, setEmail] = useState('admin@nmtsolution.demo');
-  const [password, setPassword] = useState('demo123');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [error, setError] = useState('');
 
   // Registration state
@@ -59,15 +59,6 @@ export function LoginScreen({ onLogin, onRegister, customers = [], users = [] })
   ];
   const registerRoles = quickRoles.filter((r) => r.role === 'SALES AGENT' || r.role === 'CUSTOMER');
 
-  const handleQuickLogin = (targetRole) => {
-    const userForRole = roleConfigs[targetRole]?.defaultUser || {
-      name: `${targetRole.toLowerCase()} User`,
-      email: `${targetRole.toLowerCase().replace(' ', '')}@nmtsolution.demo`,
-      role: targetRole
-    };
-    onLogin(targetRole, userForRole);
-  };
-
   const handleLoginSubmit = (e) => {
     e.preventDefault();
     if (!email.includes('@')) {
@@ -83,7 +74,7 @@ export function LoginScreen({ onLogin, onRegister, customers = [], users = [] })
     if (role === 'CUSTOMER') {
       const c = customers.find((x) => (x.email || '').toLowerCase() === typed);
       if (!c) {
-        setError('No customer account with this email. Try customer@nmtsolution.demo.');
+        setError('No registered customer account found with this email address.');
         return;
       }
       user = { name: c.name, email: c.email, role, customerName: c.name };
@@ -232,46 +223,6 @@ export function LoginScreen({ onLogin, onRegister, customers = [], users = [] })
             </button>
           </div>
 
-          {/* Quick Demo 1-Click Role Switcher */}
-          <div className="quick-roles-container">
-            <div className="quick-roles-head">
-              <span className="quick-roles-title">
-                <Sparkles size={14} className="indigo-text" /> 
-                <b>Explore Demo As (1-Click Login):</b>
-              </span>
-              <span className="quick-roles-sub">Instantly switch between real estate roles</span>
-            </div>
-
-            <div className="quick-role-buttons-grid">
-              {quickRoles.map((r) => {
-                const Icon = r.icon;
-                return (
-                  <button
-                    key={r.role}
-                    type="button"
-                    className="quick-role-card"
-                    style={{ '--role-color': r.color, '--role-bg': r.bg }}
-                    onClick={() => handleQuickLogin(r.role)}
-                    title={`Login as ${r.label}: ${r.desc}`}
-                  >
-                    <div className="role-btn-icon" style={{ color: r.color, background: r.bg }}>
-                      <Icon size={14} />
-                    </div>
-                    <div className="role-btn-text">
-                      <b>{r.label}</b>
-                      <small>{r.desc}</small>
-                    </div>
-                    <ChevronRight size={13} className="role-chevron" />
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          <div className="auth-divider">
-            <span>OR ENTER CREDENTIALS</span>
-          </div>
-
           {error && (
             <div className="login-error-banner">
               <span>{error}</span>
@@ -290,7 +241,7 @@ export function LoginScreen({ onLogin, onRegister, customers = [], users = [] })
                       type="email"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
-                      placeholder="e.g. admin@nmtsolution.demo"
+                      placeholder="e.g. user@company.com"
                       required
                     />
                   </div>
@@ -323,7 +274,7 @@ export function LoginScreen({ onLogin, onRegister, customers = [], users = [] })
               <div className="form-group">
                 <label>
                   Select Role View
-                  <select value={role} onChange={(e) => { setRole(e.target.value); setEmail(roleConfigs[e.target.value]?.defaultUser?.email || email); }}>
+                  <select value={role} onChange={(e) => { setRole(e.target.value); }}>
                     {quickRoles.map((r) => (
                       <option key={r.role} value={r.role}>{r.label} ({r.role})</option>
                     ))}
@@ -348,25 +299,6 @@ export function LoginScreen({ onLogin, onRegister, customers = [], users = [] })
                 <span>Sign In to {role} Workspace</span>
                 <ArrowRight size={15} />
               </button>
-
-              <div className="demo-credentials-helper">
-                <b>Default Demo Credentials</b>
-                <div className="cred-row">
-                  <span>Email: <code>admin@nmtsolution.demo</code></span>
-                  <span>Pass: <code>demo123</code></span>
-                </div>
-                <button
-                  type="button"
-                  className="fill-btn"
-                  onClick={() => {
-                    setEmail('admin@nmtsolution.demo');
-                    setPassword('demo123');
-                    setRole('ADMIN');
-                  }}
-                >
-                  Autofill Default
-                </button>
-              </div>
             </form>
           )}
 

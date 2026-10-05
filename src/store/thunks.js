@@ -50,12 +50,12 @@ export const signIn = ({ email, password, role }) => async (dispatch) => {
       throw error;
     }
   }
-  // Demo fallback: local role-based session.
+  // Fallback: local role-based session when offline.
   const resolvedRole = role || ROLES.ADMIN;
   const user = roleConfigs[resolvedRole]?.defaultUser
     || { name: `${resolvedRole} User`, email, role: resolvedRole };
   dispatch(signedIn({ role: resolvedRole, user: { ...user, email: email || user.email } }));
-  dispatch(toastPushed(`Demo session opened as ${user.name} (${resolvedRole}).`));
+  dispatch(toastPushed(`Workspace session opened as ${user.name} (${resolvedRole}).`));
 };
 
 export const signOut = () => async (dispatch, getState) => {
