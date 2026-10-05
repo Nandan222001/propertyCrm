@@ -6,5 +6,5 @@ pytest-cov==7.1.0          # coverage gate (see pytest.ini --cov-fail-under)
 httpx==0.28.1              # in-process ASGI transport for the TestClient suite
 ruff==0.16.10              # linter + formatter (config in pyproject.toml)
 bandit==1.9.4              # Python SAST (config in bandit.yaml)
-pip-audit==2.7.3           # CVE scan of this very file (CI + pre-commit)
+pip-audit==2.10.1           # CVE scan of this very file (CI + pre-commit)
 mysql-mimic==3.0.4         # in-process MySQL protocol server for live SQL tests
