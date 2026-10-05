@@ -67,4 +67,7 @@ def downgrade() -> None:
         op.drop_index(name, table_name=table)
     if op.get_bind().dialect.name != "sqlite":
         for table, short_name, _condition in reversed(CHECK_CONSTRAINTS):
-            op.drop_constraint(f"ck_{table}_{short_name}", table, type_="check")
+            # op.f() marks the name as already convention-expanded; without it
+            # alembic re-applies ck_<table>_<constraint_name> and MySQL fails
+            # with errno 3821 ("check constraint ... is not found").
+            op.drop_constraint(op.f(f"ck_{table}_{short_name}"), table, type_="check")

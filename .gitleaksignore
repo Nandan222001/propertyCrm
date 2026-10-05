@@ -1,0 +1,4 @@
+# CI placeholder values (example-* since 1e46715) flagged by the generic-api-key
+# rule in the two commits that first added the workflow; not real credentials.
+66e0fa761a4a2d916c49431956889d380a73d3c6:.github/workflows/ci.yml:generic-api-key:36
+66e0fa761a4a2d916c49431956889d380a73d3c6:.github/workflows/ci.yml:generic-api-key:131

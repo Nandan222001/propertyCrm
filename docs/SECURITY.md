@@ -119,7 +119,7 @@ See `docs/SECURITY_TESTING.md` for the full matrix. Summary:
 | SAST | bandit | PR blocker (high severity) |
 | Dependency CVEs | pip-audit, npm audit, Dependabot | PR + weekly |
 | Secrets | gitleaks | PR blocker |
-| SAST (data-flow) | CodeQL security-extended | PR blocker |
+| SAST | Semgrep (`p/ci`, `p/secrets`) + bandit | PR blocker |
 | Container | trivy | PR blocker (HIGH/CRITICAL) |
 | IaC | terraform validate, tfsec | PR blocker |
 | Client render smoke | esbuild + jsdom (all 7 roles) | PR blocker |
@@ -174,7 +174,7 @@ See `docs/DEPENDENCY_MANAGEMENT.md`: exact pinning, weekly grouped updates, CVE 
 * Encrypted-by-default: KMS CMK with rotation for RDS, S3, logs, SNS and secrets; public access blocked on every bucket.
 * Network isolation: private subnets for data and compute, security groups scoped by reference (not CIDR), no public IP on tasks, flow logs on.
 * Least-privilege IAM: separate execution and task roles; no `*` actions on data resources; secrets read at runtime from Secrets Manager.
-* Guardrails in CI: `terraform fmt/validate`, tfsec, CodeQL IaC queries, and manual review for destructive changes.
+* Guardrails in CI: `terraform fmt/validate`, tfsec, and manual review for destructive changes.
 
 ---
 

@@ -33,7 +33,7 @@ jobs:
       DB_USER: lalita_app
       DB_PASSWORD: ci-db-password
       DB_SSL_MODE: disabled
-      SECRET_KEY: ci-secret-key-0123456789-0123456789-0123456789
+      SECRET_KEY: example-ci-only-not-a-real-secret
       INDEX_PEPPER: ci-index-pepper
       FIELD_ENCRYPTION_KEY: ci-field-encryption-key
       LOG_JSON: 'false'
@@ -128,7 +128,7 @@ jobs:
           ENVIRONMENT: test
           DB_DIALECT: mysql
           DB_PASSWORD: render-only
-          SECRET_KEY: ci-secret-key-0123456789
+          SECRET_KEY: example-ci-only-not-a-real-secret
           INDEX_PEPPER: ci-pepper
           FIELD_ENCRYPTION_KEY: ci-field-key
         run: alembic upgrade head --sql > /tmp/schema.sql && ! grep -qi 'sqlite' /tmp/schema.sql
