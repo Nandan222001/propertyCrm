@@ -5,7 +5,7 @@
 # compilers, no pip cache and no test tooling. Runs as an unprivileged user with
 # a read-only-friendly filesystem, and ships a healthcheck that matches /health.
 # =============================================================================
-FROM python:3.12-slim-bookworm AS builder
+FROM python:3.14-slim-bookworm AS builder
 
 ENV PIP_DISABLE_PIP_VERSION_CHECK=1 \
     PIP_NO_CACHE_DIR=1 \
@@ -22,7 +22,7 @@ RUN python -m venv /opt/venv \
  && /opt/venv/bin/pip install -r requirements.txt
 
 
-FROM python:3.12-slim-bookworm AS runtime
+FROM python:3.14-slim-bookworm AS runtime
 
 LABEL org.opencontainers.image.title="lalita-erp-api" \
       org.opencontainers.image.description="Lalita Realestate Infra ERP — FastAPI backend" \
