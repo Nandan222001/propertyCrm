@@ -70,14 +70,14 @@ export const agents = [
 ];
 
 export const seedUsers = [
-  { id: 'USR-001', name: 'Arjun Shah', email: 'admin@nmtsolution.demo', phone: '+91 98765 00001', role: 'ADMIN', status: 'Active', title: 'Operations Director' },
-  { id: 'USR-002', name: 'Devendra Singhania', email: 'superadmin@nmtsolution.demo', phone: '+91 98765 00000', role: 'SUPER ADMIN', status: 'Active', title: 'Chief Technology Officer' },
-  { id: 'USR-003', name: 'Meera Kumar', email: 'manager@nmtsolution.demo', phone: '+91 98765 00002', role: 'SALES MANAGER', status: 'Active', title: 'VP of Sales & Strategy' },
-  { id: 'USR-004', name: 'Sanjay Patel', email: 'agent@nmtsolution.demo', phone: '+91 98765 00003', role: 'SALES AGENT', status: 'Active', title: 'Senior Property Consultant' },
-  { id: 'USR-007', name: 'Manoj Kumar', email: 'manoj@nmtsolution.demo', phone: '+91 98765 10001', role: 'SALES AGENT', status: 'Active', title: 'Property Consultant' },
-  { id: 'USR-008', name: 'Rohit Gupta', email: 'rohit@nmtsolution.demo', phone: '+91 98765 10003', role: 'SALES AGENT', status: 'Active', title: 'Property Consultant' },
-  { id: 'USR-005', name: 'Neha Desai', email: 'accounts@nmtsolution.demo', phone: '+91 98765 00004', role: 'ACCOUNTS', status: 'Active', title: 'Head of Treasury & Billing' },
-  { id: 'USR-006', name: 'Vikramaditya Birla', email: 'management@nmtsolution.demo', phone: '+91 98765 00005', role: 'MANAGEMENT', status: 'Active', title: 'Managing Director & Board Member' }
+  { id: 'USR-001', name: 'Arjun Shah', email: 'admin@lalitainfra.com', phone: '+91 98765 00001', role: 'ADMIN', status: 'Active', title: 'Operations Director' },
+  { id: 'USR-002', name: 'Devendra Singhania', email: 'superadmin@lalitainfra.com', phone: '+91 98765 00000', role: 'SUPER ADMIN', status: 'Active', title: 'Chief Technology Officer' },
+  { id: 'USR-003', name: 'Meera Kumar', email: 'manager@lalitainfra.com', phone: '+91 98765 00002', role: 'SALES MANAGER', status: 'Active', title: 'VP of Sales & Strategy' },
+  { id: 'USR-004', name: 'Sanjay Patel', email: 'agent@lalitainfra.com', phone: '+91 98765 00003', role: 'SALES AGENT', status: 'Active', title: 'Senior Property Consultant' },
+  { id: 'USR-007', name: 'Manoj Kumar', email: 'manoj@lalitainfra.com', phone: '+91 98765 10001', role: 'SALES AGENT', status: 'Active', title: 'Property Consultant' },
+  { id: 'USR-008', name: 'Rohit Gupta', email: 'rohit@lalitainfra.com', phone: '+91 98765 10003', role: 'SALES AGENT', status: 'Active', title: 'Property Consultant' },
+  { id: 'USR-005', name: 'Neha Desai', email: 'accounts@lalitainfra.com', phone: '+91 98765 00004', role: 'ACCOUNTS', status: 'Active', title: 'Head of Treasury & Billing' },
+  { id: 'USR-006', name: 'Vikramaditya Birla', email: 'management@lalitainfra.com', phone: '+91 98765 00005', role: 'MANAGEMENT', status: 'Active', title: 'Managing Director & Board Member' }
 ];
 
 export const seedCrud = {
@@ -104,18 +104,18 @@ export const COMPANY = {
   address: 'Head Office, Mumbai, Maharashtra',
   gstin: '27AAACL1234K1ZV',
   phone: '+91 98765 00001',
-  email: 'accounts@nmtsolution.demo'
+  email: 'accounts@lalitainfra.com'
 };
 
 export const seedCustomers = [
-  ['Rajesh Sharma', '9876500101', 'customer@nmtsolution.demo', 'Andheri East, Mumbai', 'M. Kumar'],
-  ['Anita Verma', '9876500102', 'anita@example.demo', 'Kothrud, Pune', 'S. Patel'],
-  ['Deepak Iyer', '9876500103', 'deepak@example.demo', 'Thane West', 'M. Kumar'],
-  ['Priya Nair', '9876500104', 'priya@example.demo', 'Powai, Mumbai', 'R. Gupta'],
-  ['Sneha Mehta', '9876500105', 'sneha@example.demo', 'Borivali, Mumbai', 'M. Kumar'],
-  ['Vikram Joshi', '9876500106', 'vikram@example.demo', 'Baner, Pune', 'S. Patel'],
-  ['Karan Rao', '9876500107', 'karan@example.demo', 'Hinjewadi, Pune', 'R. Gupta'],
-  ['Meena Kapoor', '9876500108', 'meena@example.demo', 'Vashi, Navi Mumbai', 'S. Patel']
+  ['Rajesh Sharma', '9876500101', 'rajesh.sharma@gmail.com', 'Andheri East, Mumbai', 'M. Kumar'],
+  ['Anita Verma', '9876500102', 'anita.verma@gmail.com', 'Kothrud, Pune', 'S. Patel'],
+  ['Deepak Iyer', '9876500103', 'deepak.iyer@gmail.com', 'Thane West', 'M. Kumar'],
+  ['Priya Nair', '9876500104', 'priya.nair@gmail.com', 'Powai, Mumbai', 'R. Gupta'],
+  ['Sneha Mehta', '9876500105', 'sneha.mehta@gmail.com', 'Borivali, Mumbai', 'M. Kumar'],
+  ['Vikram Joshi', '9876500106', 'vikram.joshi@gmail.com', 'Baner, Pune', 'S. Patel'],
+  ['Karan Rao', '9876500107', 'karan.rao@gmail.com', 'Hinjewadi, Pune', 'R. Gupta'],
+  ['Meena Kapoor', '9876500108', 'meena.kapoor@gmail.com', 'Vashi, Navi Mumbai', 'S. Patel']
 ].map(([name, mobile, email, address, agent], i) => ({
   id: `CUS-${String(i + 1).padStart(4, '0')}`,
   name, mobile, email, address, agent,
@@ -278,7 +278,7 @@ export const roleConfigs = {
     bg: '#f3e8ff',
     title: 'Platform Governance & System Health',
     subtitle: 'System infrastructure, tenant security, global audit logs & root configuration.',
-    defaultUser: { name: 'Devendra Singhania', email: 'superadmin@nmtsolution.demo', role: 'SUPER ADMIN' },
+    defaultUser: { name: 'Devendra Singhania', email: 'superadmin@lalitainfra.com', role: 'SUPER ADMIN' },
     permissions: ['ALL', 'SYSTEM_AUDIT', 'INFRASTRUCTURE', 'DATABASE_BACKUPS', 'IAM_PROVISIONING', 'MASTER_RECORDS'],
     workspaceNav: ['Overview', 'Approvals', 'Projects & plots', 'Bookings', 'Payments', 'Billing', 'Customers', 'Agents', 'Commissions'],
     insightsNav: ['Reports', 'Documents', 'Notifications', 'User & role management', 'Administration']
@@ -289,7 +289,7 @@ export const roleConfigs = {
     bg: '#eef0ff',
     title: 'Operations Command Center',
     subtitle: 'Overall project portfolio, customer bookings, collection reconciliations and operations.',
-    defaultUser: { name: 'Arjun Shah', email: 'admin@nmtsolution.demo', role: 'ADMIN' },
+    defaultUser: { name: 'Arjun Shah', email: 'admin@lalitainfra.com', role: 'ADMIN' },
     permissions: ['PROJECTS_CRUD', 'BOOKINGS_CRUD', 'PAYMENTS_CRUD', 'AGENTS_CRUD', 'REPORTS_VIEW', 'USER_MANAGEMENT'],
     workspaceNav: ['Overview', 'Approvals', 'Projects & plots', 'Bookings', 'Payments', 'Billing', 'Customers', 'Agents', 'Commissions'],
     insightsNav: ['Reports', 'Documents', 'Notifications', 'User & role management', 'Administration']
@@ -300,7 +300,7 @@ export const roleConfigs = {
     bg: '#e0f2fe',
     title: 'Sales Team Pipeline & Quotas',
     subtitle: 'Real-time sales velocity, agent league tables, discount approvals and team conversions.',
-    defaultUser: { name: 'Meera Kumar', email: 'manager@nmtsolution.demo', role: 'SALES MANAGER' },
+    defaultUser: { name: 'Meera Kumar', email: 'manager@lalitainfra.com', role: 'SALES MANAGER' },
     permissions: ['VIEW_ALL_LEADS', 'APPROVE_HOLDS', 'APPROVE_COMMISSIONS', 'ASSIGN_AGENTS', 'SALES_ANALYTICS'],
     workspaceNav: ['Overview', 'Projects & plots', 'Bookings', 'Customers', 'Agents', 'Commissions'],
     insightsNav: ['Reports', 'Documents', 'Notifications', 'Billing']
@@ -311,7 +311,7 @@ export const roleConfigs = {
     bg: '#dcfce7',
     title: 'My Sales Desk & Deal Pipeline',
     subtitle: 'Track your assigned plots, customer visits, deal closures, and commission statements.',
-    defaultUser: { name: 'Sanjay Patel', email: 'agent@nmtsolution.demo', role: 'SALES AGENT' },
+    defaultUser: { name: 'Sanjay Patel', email: 'agent@lalitainfra.com', role: 'SALES AGENT' },
     permissions: ['VIEW_INVENTORY', 'CREATE_BOOKING', 'MY_CUSTOMERS_ONLY', 'MY_COMMISSIONS_ONLY', 'VIEW_BROCHURES'],
     workspaceNav: ['Overview', 'Projects & plots', 'Bookings', 'Customers', 'Commissions'],
     insightsNav: ['Documents', 'Notifications']
@@ -322,7 +322,7 @@ export const roleConfigs = {
     bg: '#ffedd5',
     title: 'Financial Ledger, Collections & Dues',
     subtitle: 'Payment receipts, installment reconciliation, aging debtor analysis, and commission payouts.',
-    defaultUser: { name: 'Neha Desai', email: 'accounts@nmtsolution.demo', role: 'ACCOUNTS' },
+    defaultUser: { name: 'Neha Desai', email: 'accounts@lalitainfra.com', role: 'ACCOUNTS' },
     permissions: ['RECORD_PAYMENTS', 'MANAGE_LEDGER', 'RECONCILE_ACCOUNTS', 'DISBURSE_COMMISSIONS', 'FINANCIAL_REPORTS'],
     workspaceNav: ['Overview', 'Payments', 'Billing', 'Bookings', 'Customers', 'Commissions'],
     insightsNav: ['Reports', 'Documents', 'Notifications']
@@ -333,7 +333,7 @@ export const roleConfigs = {
     bg: '#ffe4e6',
     title: 'Executive Boardroom & Portfolio BI',
     subtitle: 'High-level Gross Development Value (GDV), cash flow forecasts, absorption velocity and project ROI.',
-    defaultUser: { name: 'Vikramaditya Birla', email: 'management@nmtsolution.demo', role: 'MANAGEMENT' },
+    defaultUser: { name: 'Vikramaditya Birla', email: 'management@lalitainfra.com', role: 'MANAGEMENT' },
     permissions: ['EXECUTIVE_BI', 'CASHFLOW_VIEW', 'PORTFOLIO_ANALYTICS', 'BOARD_REPORTS', 'EXPORT_DATA'],
     workspaceNav: ['Overview', 'Projects & plots', 'Bookings', 'Payments', 'Billing'],
     insightsNav: ['Reports', 'Documents', 'Notifications']
@@ -344,7 +344,7 @@ export const roleConfigs = {
     bg: '#ccfbf1',
     title: 'My Plots, Payments & Documents',
     subtitle: 'View your plots, registry status, payments, pending dues, bills and documents. View-only access.',
-    defaultUser: { name: 'Rajesh Sharma', email: 'customer@nmtsolution.demo', role: 'CUSTOMER', customerName: 'Rajesh Sharma' },
+    defaultUser: { name: 'Rajesh Sharma', email: 'rajesh.sharma@gmail.com', role: 'CUSTOMER', customerName: 'Rajesh Sharma' },
     permissions: ['VIEW_MY_PLOTS', 'VIEW_MY_PAYMENTS', 'VIEW_MY_BILLS', 'VIEW_MY_DOCUMENTS'],
     workspaceNav: ['Overview', 'Payments', 'Billing', 'Documents'],
     insightsNav: []

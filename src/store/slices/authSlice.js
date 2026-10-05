@@ -13,7 +13,7 @@ import { readJson, readText } from '../../utils/storage';
 import { clientAudit, redact } from '../../utils/security';
 
 const defaultUserFor = (role = ROLES.ADMIN) =>
-  roleConfigs[role]?.defaultUser || { name: 'Workspace User', email: `${role.toLowerCase().replace(/\s+/g, '')}@nmtsolution.demo`, role };
+  roleConfigs[role]?.defaultUser || { name: 'Workspace User', email: `${role.toLowerCase().replace(/\s+/g, '')}@lalitainfra.com`, role };
 
 const initialState = {
   /** Role string of the active session ('' = signed out). */
