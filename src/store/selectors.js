@@ -77,11 +77,14 @@ export const selectScopedData = createSelector(
       : isCustomerRole
         ? domain.receipts.filter((r) => r.customer === name && r.shared)
         : domain.receipts;
+    const invoices = isCustomerRole
+      ? domain.invoices.filter((inv) => inv.customer_name === name)
+      : domain.invoices;
 
     const myCustomer = domain.customers.find((c) => c.name === name)
       || { id: 'CUS-NEW', name, mobile: '', email: currentUser?.email || '', address: '', agent: '' };
 
-    return { bookings, payments, customers, receipts, myCustomer, isAgentRole, isCustomerRole, agentName: key };
+    return { bookings, payments, customers, receipts, invoices, myCustomer, isAgentRole, isCustomerRole, agentName: key };
   },
 );
 
@@ -103,12 +106,16 @@ export const selectDocuments = createSelector([selectScopedData], ({ bookings, r
 
 /** Nav badge rules live here (one place) rather than inside the sidebar JSX. */
 export const selectNavBadge = createSelector(
-  [selectRole, selectPendingApprovals, selectUsers],
-  (role, pending, users) => (item) => {
+  [selectRole, selectPendingApprovals, selectUsers, selectDomain],
+  (role, pending, users, domain) => (item) => {
     const table = NAV_BADGES[role] || {};
     const badge = table[item];
     if (!badge) return null;
-    const text = String(badge.text).replace('{pending}', String(pending)).replace('{users}', String(users.length));
+    const overdueInvoices = domain.invoices.filter((inv) => inv.status === 'OVERDUE').length;
+    const text = String(badge.text)
+      .replace('{pending}', String(pending))
+      .replace('{users}', String(users.length))
+      .replace('{overdueInvoices}', String(overdueInvoices));
     if (!text || text === '0') return null;
     return { text, alert: Boolean(badge.alert) };
   },
@@ -122,3 +129,21 @@ export const selectBookingForPrint = createSelector([selectDomain, selectUi], (d
 
 export const selectPlotForPrint = createSelector([selectDomain, selectBookingForPrint], (domain, booking) =>
   booking ? domain.plots.find((p) => p[0] === booking[3]) : null);
+
+/** Billing KPI block, derived from the scoped invoice book (never stored twice). */
+export const selectBillingSummary = createSelector([selectScopedData], ({ invoices }) => {
+  const live = invoices.filter((inv) => !['DRAFT', 'CANCELLED'].includes(inv.status));
+  const num = (row, field) => Number(row[field]) || 0;
+  return {
+    billed: live.reduce((sum, inv) => sum + num(inv, 'total_amount'), 0),
+    collected: live.reduce((sum, inv) => sum + num(inv, 'amount_paid'), 0),
+    outstanding: live.reduce((sum, inv) => sum + num(inv, 'balance_amount'), 0),
+    overdue: live.filter((inv) => inv.status === 'OVERDUE').reduce((sum, inv) => sum + num(inv, 'balance_amount'), 0),
+    gstCharged: live.reduce((sum, inv) => sum + num(inv, 'gst_amount'), 0),
+    draftValue: invoices.filter((inv) => inv.status === 'DRAFT').reduce((sum, inv) => sum + num(inv, 'total_amount'), 0),
+    invoiceCount: invoices.length,
+    statusCounts: invoices.reduce((counts, inv) => ({
+      ...counts, [inv.status]: (counts[inv.status] || 0) + 1,
+    }), {}),
+  };
+});

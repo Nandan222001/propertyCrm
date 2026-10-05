@@ -6,8 +6,8 @@
  */
 import { ApiUnavailableError, actions, api, setTokens, clearTokens } from '../api';
 import { ROLES } from '../constants/roles';
-import { roleConfigs } from '../data/seedData';
-import { fmtINR, parseAmt } from '../utils/money';
+import { COMPANY, roleConfigs } from '../data/seedData';
+import { amountInWords, fmtINR, parseAmt } from '../utils/money';
 import { todayLabel } from '../utils/date';
 import { BOOKING_STATUS, PAYMENT_STATUS, PLOT_STATUS } from '../utils/status';
 import { nextReference, newId } from '../utils/id';
@@ -19,6 +19,10 @@ import {
   crudRowRemoved, crudRowUpserted, followUpSet, registryStatusSet, rowPatched, rowRemoved, rowUpserted,
   workspaceDemo, workspaceHydrated, workspaceLoading,
 } from './slices/domainSlice';
+import {
+  computeTotals, itemsPayload, nextInvoiceNumber,
+} from '../utils/billing';
+import { buildInvoicePdf, downloadPdfBytes } from '../utils/pdf';
 import { modalClosed, toastPushed } from './slices/uiSlice';
 
 /** Toast helper — every page calls `notify(...)` through this one action. */
@@ -71,17 +75,19 @@ export const previewRole = (role) => (dispatch) => {
 export const hydrateWorkspace = () => async (dispatch) => {
   dispatch(workspaceLoading());
   try {
-    const [projects, plots, bookings, customers, payments, receipts] = await Promise.all([
+    const [projects, plots, bookings, customers, payments, receipts, invoices] = await Promise.all([
       api.projects.list({ page_size: 200 }),
       api.plots.list({ page_size: 500 }),
       api.bookings.list({ page_size: 500 }),
       api.customers.list({ page_size: 500 }),
       api.payments.list({ page_size: 500 }),
       api.receipts.list({ page_size: 500 }),
+      api.invoices.list({ page_size: 500 }),
     ]);
     dispatch(workspaceHydrated({
       projects: projects.data, plots: plots.data, bookings: bookings.data,
       customers: customers.data, payments: payments.data, receipts: receipts.data,
+      invoices: invoices.data,
     }));
   } catch (error) {
     dispatch(workspaceDemo(error instanceof ApiUnavailableError ? '' : error.message));
@@ -258,6 +264,255 @@ export const recordPayment = ({ booking, finalPrice, amount, mode, reference, du
 export const markReceiptShared = (receipt) => (dispatch) => {
   dispatch(rowPatched({ key: 'receipts', id: receipt.no, changes: { shared: true } }));
   dispatch(toastPushed(`Bill ${receipt.no} shared with ${receipt.customer} (visible in their login)`));
+};
+
+// ----------------------------------------------------------------- billing
+/** Dispatch a history entry onto an invoice row (demo mode bookkeeping). */
+const invoiceHistoryEntry = (invoice, toStatus, reason, actor) => [
+  { id: Date.now(), to_status: toStatus, from_status: invoice.status, changed_by_label: actor, reason },
+  ...(invoice.history || []),
+];
+
+/**
+ * Create (or update a draft) invoice. Demo mode computes the totals locally
+ * with the same arithmetic as the API; live mode trusts the server response.
+ */
+export const saveInvoice = (form) => async (dispatch, getState) => {
+  const { auth, domain } = getState();
+  const actor = auth.currentUser?.name || 'Billing desk';
+  const items = itemsPayload(form.items);
+  if (!items.length) {
+    dispatch(toastPushed('Add at least one line item first'));
+    return null;
+  }
+  const totals = computeTotals(form.items, { discount: form.discount, gstRate: form.gstRate });
+
+  if (auth.mode === 'live' && form.booking?.id) {
+    try {
+      const body = {
+        booking_id: form.booking.id,
+        gst_rate: form.gstRate,
+        discount_amount: Number(form.discount) || 0,
+        items,
+        notes: form.notes || null,
+        terms: form.terms || null,
+      };
+      const response = form.editing
+        ? await api.invoices.update(form.editing.id, body)
+        : await api.invoices.create(body);
+      dispatch(rowUpserted({ key: 'invoices', row: response.data }));
+      dispatch(modalClosed());
+      dispatch(toastPushed(response.message || `Invoice ${response.data.invoice_number} saved`));
+      return response.data;
+    } catch (error) {
+      dispatch(toastPushed(`The server rejected the invoice: ${error.message}`));
+      return null;
+    }
+  }
+
+  const existing = form.editing;
+  const number = existing?.invoice_number || nextInvoiceNumber(domain.invoices);
+  const bookingTuple = domain.bookings.find((b) => Array.isArray(b) && b[0] === form.bookingNumber);
+  const row = {
+    id: existing?.id || number,
+    public_id: existing?.public_id || number,
+    invoice_number: number,
+    booking_number: form.bookingNumber,
+    customer_name: form.booking?.customer || bookingTuple?.[1] || '—',
+    agent_name: form.booking?.agent || bookingTuple?.[8] || '',
+    project_name: form.booking?.project || bookingTuple?.[2] || '',
+    plot_number: form.booking?.plot || bookingTuple?.[3] || '',
+    issue_date: existing?.issue_date || todayLabel(),
+    due_date: form.dueDate || null,
+    status: 'DRAFT',
+    subtotal: totals.subtotal,
+    discount_amount: totals.discountAmount,
+    taxable_value: totals.taxableValue,
+    gst_rate: totals.gstRate,
+    gst_amount: totals.gstAmount,
+    cgst_amount: totals.cgstAmount,
+    sgst_amount: totals.sgstAmount,
+    round_off: totals.roundOff,
+    total_amount: totals.totalAmount,
+    amount_paid: 0,
+    balance_amount: totals.totalAmount,
+    items: items.map((item, index) => ({
+      ...item, id: index + 1,
+      line_total: Math.max(0, item.quantity * item.unit_price - item.discount_amount),
+    })),
+    history: invoiceHistoryEntry(
+      existing || { status: null, history: [] }, 'DRAFT',
+      existing ? 'Draft edited' : 'Invoice created', actor,
+    ),
+    notes: form.notes || null,
+    terms: form.terms || null,
+    is_shared_with_customer: existing?.is_shared_with_customer || false,
+    cancellation_reason: null,
+  };
+  dispatch(rowUpserted({ key: 'invoices', row }));
+  dispatch(modalClosed());
+  dispatch(toastPushed(`Draft ${number} saved · ₹${fmtINR(totals.totalAmount)} · ready to issue`));
+  clientAudit(existing ? 'invoice.updated' : 'invoice.created', { number, total: totals.totalAmount });
+  return row;
+};
+
+/** Issue a draft — it becomes a numbered, collectible bill (due in 15 days). */
+export const issueInvoice = (invoice) => async (dispatch, getState) => {
+  const { auth } = getState();
+  if (auth.mode === 'live' && typeof invoice.id === 'number') {
+    try {
+      const response = await actions.issueInvoice(invoice.id, {});
+      dispatch(rowUpserted({ key: 'invoices', row: response.data }));
+      dispatch(toastPushed(response.message || `Invoice ${invoice.invoice_number} issued`));
+      return;
+    } catch (error) {
+      dispatch(toastPushed(`Could not issue: ${error.message}`));
+      return;
+    }
+  }
+  const due = new Date(Date.now() + 15 * 86400000)
+    .toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+  dispatch(rowPatched({
+    key: 'invoices',
+    id: invoice.id,
+    changes: {
+      status: 'ISSUED',
+      due_date: invoice.due_date || due,
+      history: invoiceHistoryEntry(invoice, 'ISSUED', `Issued · payment due ${invoice.due_date || due}`,
+        auth.currentUser?.name || 'Billing desk'),
+    },
+  }));
+  dispatch(toastPushed(`Invoice ${invoice.invoice_number} issued · due ${invoice.due_date || due}`));
+  clientAudit('invoice.issued', { number: invoice.invoice_number });
+};
+
+/** Cancel an unpaid invoice with a reason (audited). */
+export const cancelInvoice = (invoice, reason) => async (dispatch, getState) => {
+  const { auth } = getState();
+  if (auth.mode === 'live' && typeof invoice.id === 'number') {
+    try {
+      const response = await actions.cancelInvoice(invoice.id, { reason });
+      dispatch(rowUpserted({ key: 'invoices', row: response.data }));
+      dispatch(toastPushed(response.message || `Invoice ${invoice.invoice_number} cancelled`));
+      return;
+    } catch (error) {
+      dispatch(toastPushed(`Could not cancel: ${error.message}`));
+      return;
+    }
+  }
+  dispatch(rowPatched({
+    key: 'invoices',
+    id: invoice.id,
+    changes: {
+      status: 'CANCELLED',
+      cancellation_reason: reason,
+      balance_amount: 0,
+      history: invoiceHistoryEntry(invoice, 'CANCELLED', reason, auth.currentUser?.name || 'Billing desk'),
+    },
+  }));
+  dispatch(toastPushed(`Invoice ${invoice.invoice_number} cancelled`));
+  clientAudit('invoice.cancelled', { number: invoice.invoice_number, reason });
+};
+
+/**
+ * Collect against an invoice. The ledger side (booking paid amount, payments
+ * row, numbered receipt) is delegated to `recordPayment`; the invoice then
+ * records the same amount as `amount_paid`.
+ */
+export const payInvoice = (invoice, { amount, mode, reference }) => async (dispatch, getState) => {
+  const { auth, domain } = getState();
+  if (auth.mode === 'live' && typeof invoice.id === 'number') {
+    try {
+      const response = await actions.payInvoice(invoice.id, { amount, mode, reference });
+      dispatch(rowUpserted({ key: 'invoices', row: response.data }));
+      dispatch(modalClosed());
+      dispatch(toastPushed(response.message || `₹${fmtINR(amount)} collected`));
+      return;
+    } catch (error) {
+      dispatch(toastPushed(`Could not record the collection: ${error.message}`));
+      return;
+    }
+  }
+  const booking = domain.bookings.find((b) => Array.isArray(b) && b[0] === invoice.booking_number);
+  if (booking) {
+    dispatch(recordPayment({
+      booking, finalPrice: parseAmt(booking[5]), amount, mode, reference, due: null,
+    }));
+  }
+  const paid = (Number(invoice.amount_paid) || 0) + Number(amount);
+  const balance = Math.max((Number(invoice.total_amount) || 0) - paid, 0);
+  dispatch(rowPatched({
+    key: 'invoices',
+    id: invoice.id,
+    changes: {
+      amount_paid: paid,
+      balance_amount: balance,
+      status: balance <= 0 ? 'PAID' : 'PARTIALLY_PAID',
+      history: invoiceHistoryEntry(
+        invoice, balance <= 0 ? 'PAID' : 'PARTIALLY_PAID',
+        `₹${fmtINR(amount)} collected via ${mode}`, auth.currentUser?.name || 'Billing desk',
+      ),
+    },
+  }));
+  dispatch(modalClosed());
+  dispatch(toastPushed(
+    `₹${fmtINR(amount)} collected on ${invoice.invoice_number} · ${balance <= 0 ? 'fully settled' : `₹${fmtINR(balance)} still due`}`,
+  ));
+  clientAudit('invoice.payment', { number: invoice.invoice_number, amount });
+};
+
+/** Flag the bill as shared with the customer portal/WhatsApp (audited). */
+export const shareInvoice = (invoice) => async (dispatch, getState) => {
+  const { auth } = getState();
+  if (auth.mode === 'live' && typeof invoice.id === 'number') {
+    try {
+      await actions.shareInvoice(invoice.id);
+    } catch (error) {
+      dispatch(toastPushed(`Could not share: ${error.message}`));
+      return;
+    }
+  }
+  dispatch(rowPatched({ key: 'invoices', id: invoice.id, changes: { is_shared_with_customer: true } }));
+  dispatch(toastPushed(`Bill ${invoice.invoice_number} shared with ${invoice.customer_name}`));
+  clientAudit('invoice.shared', { number: invoice.invoice_number });
+};
+
+/**
+ * Download the tax-invoice PDF. Live mode streams the reportlab-rendered file
+ * from the API; demo mode renders the same A4 invoice locally (offline-safe).
+ */
+export const downloadInvoicePdf = (invoice) => async (dispatch, getState) => {
+  const { auth, domain } = getState();
+  try {
+    let bytes = null;
+    if (auth.mode === 'live' && typeof invoice.id === 'number') {
+      const blob = await actions.invoicePdf(invoice.id);
+      bytes = new Uint8Array(await blob.arrayBuffer());
+    } else {
+      const customer = domain.customers.find((c) => c.name === invoice.customer_name);
+      bytes = buildInvoicePdf({
+        invoice,
+        company: COMPANY,
+        customer: {
+          name: invoice.customer_name,
+          phone: customer?.mobile || '',
+          email: customer?.email || '',
+          address: customer?.address || '',
+        },
+        booking: {
+          booking_number: invoice.booking_number,
+          project: invoice.project_name,
+          plot: invoice.plot_number,
+        },
+        amountInWords: amountInWords(invoice.total_amount),
+      });
+    }
+    downloadPdfBytes(bytes, `${invoice.invoice_number}.pdf`);
+    dispatch(toastPushed(`PDF bill ${invoice.invoice_number}.pdf downloaded`));
+    clientAudit('invoice.pdf_downloaded', { number: invoice.invoice_number, bytes: bytes.length });
+  } catch (error) {
+    dispatch(toastPushed(`PDF download failed: ${error.message}`));
+  }
 };
 
 // --------------------------------------------------------------- masters

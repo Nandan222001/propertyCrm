@@ -30,6 +30,14 @@ export function RoleContextBanner({ role, page }) {
       'ACCOUNTS': 'Treasury & Ledger Desk — Full authority to record customer payments (NEFT, Cheque, UPI), issue tax invoices, and escalate overdue defaulters.',
       'MANAGEMENT': 'Executive View — Net cash flow realization, liquidity analysis, and monthly recurring collections trajectory.'
     },
+    'Billing': {
+      'SUPER ADMIN': 'Root Access — Full billing desk control: raise GST invoices, issue, collect, cancel and audit every tax invoice with PDF bills.',
+      'ADMIN': 'Operations Command — Raise instalment and service-charge bills against bookings, issue them for collection, and download print-ready PDFs.',
+      'SALES MANAGER': 'Sales Leadership — Review the invoice book for your team\'s bookings: billed, collected, outstanding and overdue positions.',
+      'ACCOUNTS': 'Billing Desk — Full authority to draft line-item GST invoices, issue bills, record collections (auto receipt + ledger), and share PDF bills.',
+      'MANAGEMENT': 'Boardroom View — Billed vs collected position, GST charged, outstanding receivables and ageing of the invoice book.',
+      'CUSTOMER': 'My Bills — View and download the tax invoices raised for your bookings, with payment status and balance due.'
+    },
     'Commissions': {
       'SUPER ADMIN': 'Root Access — Master commission slab configurations, payout authorization policies, and fiscal compliance audit.',
       'ADMIN': 'Operations Command — Manage agent eligibility, tier qualifications, and verify deal attribution.',

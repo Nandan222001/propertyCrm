@@ -15,15 +15,16 @@ import { FilterBar, PageHeader, Toast } from '../components/common';
 import { Sidebar, Topbar } from '../components/layout';
 import { useAppDispatch, useAppSelector, useAuth, useNotify } from '../hooks';
 import {
-  selectAllowedPages, selectBillReceipt, selectBookingForPrint, selectDomain, selectDocuments,
-  selectHeading, selectNavBadge, selectNavigation, selectPage, selectPendingApprovals,
-  selectPlotForPrint, selectRoleConfig, selectScopedData, selectUi,
+  selectAllowedPages, selectBillReceipt, selectBillingSummary, selectBookingForPrint, selectDomain,
+  selectDocuments, selectHeading, selectNavBadge, selectNavigation, selectPage,
+  selectPendingApprovals, selectPlotForPrint, selectRoleConfig, selectScopedData, selectUi,
 } from '../store/selectors';
 import { hasSession } from '../api';
 import {
   createBooking, createCustomer, decideBooking, decideCustomer, deleteRecord, hydrateWorkspace,
   markReceiptShared, previewRole, recordPayment, registerCustomerAccount, saveRecord, setFollowUp,
-  setRegistryStatus, signIn, signOut,
+  setRegistryStatus, signIn, signOut, saveInvoice, issueInvoice, cancelInvoice, payInvoice,
+  shareInvoice, downloadInvoicePdf,
 } from '../store/thunks';
 import {
   billOpened, bookingPrintSet, agentInfoSet, customerSelected, filterChanged, modalClosed, modalOpened,
@@ -41,6 +42,7 @@ import { SuperAdminDashboard } from '../features/dashboard/SuperAdminDashboard';
 import { Projects } from '../features/projects/Projects';
 import { Bookings } from '../features/bookings/Bookings';
 import { Payments } from '../features/payments/Payments';
+import { Billing } from '../features/billing/Billing';
 import { Agents } from '../features/agents/Agents';
 import { Commissions } from '../features/commissions/Commissions';
 import { Reports } from '../features/reports/Reports';
@@ -61,7 +63,7 @@ import { clientAudit } from '../utils/security';
 
 const CRUD_EXCLUDED = [
   PAGES.OVERVIEW, PAGES.APPROVALS, PAGES.CUSTOMER_DETAIL, PAGES.CUSTOMERS,
-  PAGES.BOOKINGS, PAGES.PAYMENTS, PAGES.USERS, PAGES.DOCUMENTS,
+  PAGES.BOOKINGS, PAGES.PAYMENTS, PAGES.BILLING, PAGES.USERS, PAGES.DOCUMENTS,
 ];
 
 export function App() {
@@ -82,6 +84,7 @@ export function App() {
   const documents = useAppSelector(selectDocuments);
   const badgeFor = useAppSelector(selectNavBadge);
   const billReceipt = useAppSelector(selectBillReceipt);
+  const billingSummary = useAppSelector(selectBillingSummary);
   const bookingPrint = useAppSelector(selectBookingForPrint);
   const plotForPrint = useAppSelector(selectPlotForPrint);
   const role = auth.role;
@@ -122,12 +125,22 @@ export function App() {
 
   const notifyExport = () => {
     const isPayments = page === PAGES.PAYMENTS;
+    const isBilling = page === PAGES.BILLING;
     const rows = isPayments
       ? scoped.payments.map((p) => [p[0], p[1], p[2], p[3], p[4], p[5], p[6], p[7], p[8]])
-      : scoped.bookings.map((b) => b.slice(0, 9));
+      : isBilling
+        ? scoped.invoices.map((inv) => [
+          inv.invoice_number, inv.customer_name, inv.project_name, inv.plot_number,
+          inv.booking_number, inv.issue_date, inv.due_date || '', inv.status,
+          inv.total_amount, inv.amount_paid, inv.balance_amount, inv.gst_amount,
+        ])
+        : scoped.bookings.map((b) => b.slice(0, 9));
     const headers = isPayments
       ? ['Customer', 'Plot', 'Project', 'Booking value', 'Paid', 'Pending', 'Due date', 'Status', 'Agent']
-      : ['Booking ID', 'Customer', 'Project', 'Plot', 'Date', 'Value', 'Paid', 'Status', 'Agent'];
+      : isBilling
+        ? ['Invoice no.', 'Customer', 'Project', 'Plot', 'Booking', 'Issue date', 'Due date', 'Status',
+          'Total', 'Paid', 'Balance', 'GST']
+        : ['Booking ID', 'Customer', 'Project', 'Plot', 'Date', 'Value', 'Paid', 'Status', 'Agent'];
     downloadCsv(`lalita-${page.toLowerCase().replaceAll(' ', '-')}`, rows, headers);
     clientAudit('report.exported', { page, rows: rows.length });
     notify('CSV report exported successfully');
@@ -141,6 +154,17 @@ export function App() {
   const shareReceipt = (receipt) => {
     dispatch(markReceiptShared(receipt));
     openWhatsApp(customerPhone(receipt.customer), billText(receipt));
+  };
+
+  const shareInvoiceBill = (invoice) => {
+    dispatch(shareInvoice(invoice));
+    const balance = Number(invoice.balance_amount) || 0;
+    const text = `Dear ${invoice.customer_name}, invoice ${invoice.invoice_number} for `
+      + `₹${invoice.total_amount} (${invoice.project_name || 'your booking'}${invoice.plot_number ? ` · Plot ${invoice.plot_number}` : ''}) `
+      + `is ${String(invoice.status).toLowerCase().replace(/_/g, ' ')}`
+      + (balance > 0 ? `. Balance due: ₹${balance}${invoice.due_date ? ` by ${invoice.due_date}` : ''}. ` : '. Thank you. ')
+      + 'The PDF bill is attached with this message. - Lalita Realestate Infra';
+    openWhatsApp(customerPhone(invoice.customer_name), text);
   };
 
   const copyBill = async (receipt) => {
@@ -373,6 +397,27 @@ export function App() {
                 `Dear ${row[0]}, a payment of ₹${row[5]} for Plot ${row[1]} (${row[2]}) is due `
                 + `${row[6] !== '—' ? `on ${row[6]}` : 'now'}. Please pay at the earliest. - Lalita Realestate Infra`,
               )}
+            />
+          )}
+
+          {page === PAGES.BILLING && (
+            <Billing
+              invoices={scoped.invoices}
+              bookings={scoped.bookings}
+              customers={domain.customers}
+              summary={billingSummary}
+              project={ui.project}
+              search={ui.search}
+              filter={ui.filter}
+              F={(value) => dispatch(filterChanged(value))}
+              notify={notify}
+              role={role}
+              onCreate={(form) => dispatch(saveInvoice(form))}
+              onIssue={(invoice) => dispatch(issueInvoice(invoice))}
+              onCancel={(invoice, reason) => dispatch(cancelInvoice(invoice, reason))}
+              onPay={(invoice, payment) => dispatch(payInvoice(invoice, payment))}
+              onPdf={(invoice) => dispatch(downloadInvoicePdf(invoice))}
+              onShare={shareInvoiceBill}
             />
           )}
 

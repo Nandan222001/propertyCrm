@@ -6,6 +6,7 @@ without pulling in SQLAlchemy.
 
 from __future__ import annotations
 
+from decimal import Decimal
 from enum import StrEnum as _StrEnum
 
 
@@ -57,6 +58,13 @@ class Permission(StrEnum):
     COMMISSION_VIEW = "commission:view"
     COMMISSION_APPROVE = "commission:approve"
     COMMISSION_PAYOUT = "commission:payout"
+    # billing
+    INVOICE_VIEW_ALL = "invoice:view_all"
+    INVOICE_VIEW_OWN = "invoice:view_own"
+    INVOICE_CREATE = "invoice:create"
+    INVOICE_UPDATE = "invoice:update"
+    INVOICE_ISSUE = "invoice:issue"
+    INVOICE_CANCEL = "invoice:cancel"
     # analytics
     REPORT_VIEW = "report:view"
     REPORT_EXPORT = "report:export"
@@ -91,6 +99,8 @@ ROLE_PERMISSIONS: dict[Role, frozenset[Permission]] = {
             Permission.CUSTOMER_UPDATE, Permission.CUSTOMER_APPROVE, Permission.CUSTOMER_DELETE,
             Permission.PAYMENT_VIEW_ALL, Permission.PAYMENT_CREATE, Permission.PAYMENT_APPROVE,
             Permission.RECEIPT_MANAGE, Permission.COMMISSION_VIEW, Permission.COMMISSION_APPROVE,
+            Permission.INVOICE_VIEW_ALL, Permission.INVOICE_CREATE, Permission.INVOICE_UPDATE,
+            Permission.INVOICE_ISSUE, Permission.INVOICE_CANCEL,
             Permission.REPORT_VIEW, Permission.REPORT_EXPORT, Permission.DASHBOARD_VIEW,
             Permission.DOCUMENT_VIEW, Permission.DOCUMENT_UPLOAD,
             Permission.NOTIFICATION_VIEW, Permission.NOTIFICATION_MANAGE,
@@ -103,6 +113,7 @@ ROLE_PERMISSIONS: dict[Role, frozenset[Permission]] = {
             Permission.BOOKING_VIEW_ALL, Permission.BOOKING_CREATE, Permission.BOOKING_UPDATE,
             Permission.CUSTOMER_VIEW_ALL, Permission.CUSTOMER_UPDATE,
             Permission.PAYMENT_VIEW_ALL, Permission.COMMISSION_VIEW, Permission.COMMISSION_APPROVE,
+            Permission.INVOICE_VIEW_ALL,
             Permission.REPORT_VIEW, Permission.REPORT_EXPORT, Permission.DASHBOARD_VIEW,
             Permission.DOCUMENT_VIEW, Permission.NOTIFICATION_VIEW, Permission.USER_VIEW,
             Permission.PII_REVEAL,
@@ -123,6 +134,8 @@ ROLE_PERMISSIONS: dict[Role, frozenset[Permission]] = {
             Permission.BOOKING_VIEW_ALL, Permission.CUSTOMER_VIEW_ALL,
             Permission.PAYMENT_VIEW_ALL, Permission.PAYMENT_CREATE, Permission.PAYMENT_APPROVE,
             Permission.RECEIPT_MANAGE, Permission.COMMISSION_VIEW, Permission.COMMISSION_PAYOUT,
+            Permission.INVOICE_VIEW_ALL, Permission.INVOICE_CREATE, Permission.INVOICE_UPDATE,
+            Permission.INVOICE_ISSUE, Permission.INVOICE_CANCEL,
             Permission.REPORT_VIEW, Permission.REPORT_EXPORT, Permission.DASHBOARD_VIEW,
             Permission.DOCUMENT_VIEW, Permission.DOCUMENT_UPLOAD, Permission.NOTIFICATION_VIEW,
             Permission.PII_REVEAL,
@@ -132,6 +145,7 @@ ROLE_PERMISSIONS: dict[Role, frozenset[Permission]] = {
         {
             Permission.PROJECT_VIEW, Permission.PLOT_VIEW,
             Permission.BOOKING_VIEW_ALL, Permission.CUSTOMER_VIEW_ALL, Permission.PAYMENT_VIEW_ALL,
+            Permission.INVOICE_VIEW_ALL,
             Permission.COMMISSION_VIEW, Permission.REPORT_VIEW, Permission.REPORT_EXPORT,
             Permission.DASHBOARD_VIEW, Permission.DOCUMENT_VIEW, Permission.NOTIFICATION_VIEW,
         }
@@ -139,7 +153,8 @@ ROLE_PERMISSIONS: dict[Role, frozenset[Permission]] = {
     Role.CUSTOMER: frozenset(
         {
             Permission.PROJECT_VIEW, Permission.PLOT_VIEW, Permission.BOOKING_VIEW_OWN,
-            Permission.PAYMENT_VIEW_OWN, Permission.DOCUMENT_VIEW, Permission.NOTIFICATION_VIEW,
+            Permission.PAYMENT_VIEW_OWN, Permission.INVOICE_VIEW_OWN,
+            Permission.DOCUMENT_VIEW, Permission.NOTIFICATION_VIEW,
         }
     ),
 }
@@ -180,6 +195,26 @@ class PaymentStatus(StrEnum):
     OVERDUE = "OVERDUE"
 
 
+class InvoiceStatus(StrEnum):
+    """Billing lifecycle: draft → issued → (partially) paid / overdue → cancelled."""
+
+    DRAFT = "DRAFT"
+    ISSUED = "ISSUED"
+    PARTIALLY_PAID = "PARTIALLY_PAID"
+    PAID = "PAID"
+    OVERDUE = "OVERDUE"
+    CANCELLED = "CANCELLED"
+
+    @classmethod
+    def payable(cls) -> tuple[str, ...]:
+        """Statuses against which a collection may be recorded."""
+        return (cls.ISSUED.value, cls.PARTIALLY_PAID.value, cls.OVERDUE.value)
+
+    @classmethod
+    def settled(cls) -> tuple[str, ...]:
+        return (cls.PAID.value, cls.CANCELLED.value)
+
+
 class ApprovalStatus(StrEnum):
     PENDING_APPROVAL = "PENDING_APPROVAL"
     APPROVED = "APPROVED"
@@ -206,6 +241,10 @@ class AuditAction(StrEnum):
     ERASURE = "privacy.erasure"
     BACKUP = "ops.backup"
     CONFIG_CHANGE = "ops.config_change"
+    INVOICE_ISSUED = "billing.invoice_issued"
+    INVOICE_CANCELLED = "billing.invoice_cancelled"
+    INVOICE_SHARED = "billing.invoice_shared"
+    INVOICE_PDF = "billing.invoice_pdf"
 
 
 class DocumentKind(StrEnum):
@@ -229,3 +268,9 @@ COMPANY = {
     "phone": "+91 98765 00001",
     "email": "accounts@nmtsolution.demo",
 }
+
+#: Billing defaults: numbering starts after the seeded range, invoices are due
+#: 15 days after issue, and GST splits into CGST + SGST halves (intra-state).
+INVOICE_SEQUENCE_START = 100
+INVOICE_PAYMENT_TERM_DAYS = 15
+INVOICE_GST_RATES = (Decimal("0"), Decimal("0.05"), Decimal("0.12"), Decimal("0.18"))

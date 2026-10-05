@@ -1,7 +1,7 @@
 /** Route table, headings and icon map — one definition for sidebar + routes. */
 import {
   LayoutDashboard, Map, ClipboardList, Wallet, Users, Handshake, Percent,
-  ChartNoAxesCombined, FolderOpen, Bell, Settings, Shield, FileText,
+  ChartNoAxesCombined, FolderOpen, Bell, Settings, Shield, FileText, ReceiptIndianRupee,
 } from 'lucide-react';
 
 const PAGE = {
@@ -10,6 +10,7 @@ const PAGE = {
   PROJECTS: 'Projects & plots',
   BOOKINGS: 'Bookings',
   PAYMENTS: 'Payments',
+  BILLING: 'Billing',
   CUSTOMERS: 'Customers',
   CUSTOMER_DETAIL: 'Customer detail',
   AGENTS: 'Agents',
@@ -30,6 +31,7 @@ export const PATH_FOR = {
   [PAGE.PROJECTS]: '/projects-plots',
   [PAGE.BOOKINGS]: '/bookings',
   [PAGE.PAYMENTS]: '/payments',
+  [PAGE.BILLING]: '/billing',
   [PAGE.CUSTOMERS]: '/customers',
   [PAGE.CUSTOMER_DETAIL]: '/customers/detail',
   [PAGE.AGENTS]: '/agents',
@@ -51,6 +53,7 @@ export const PAGE_ICON = {
   [PAGE.PROJECTS]: Map,
   [PAGE.BOOKINGS]: ClipboardList,
   [PAGE.PAYMENTS]: Wallet,
+  [PAGE.BILLING]: ReceiptIndianRupee,
   [PAGE.CUSTOMERS]: Users,
   [PAGE.AGENTS]: Handshake,
   [PAGE.COMMISSIONS]: Percent,
@@ -67,6 +70,7 @@ export const PAGE_META = {
   [PAGE.PROJECTS]: ['Project & Plot Inventory', 'Master portfolio, layout availability, plot dimensions and customer allocations.'],
   [PAGE.BOOKINGS]: ['Sales Booking Operations', 'Auditable transaction lifecycle from token advance to registered conveyance.'],
   [PAGE.PAYMENTS]: ['Collections, Dues & Treasury', 'Every rupee booked, collected and pending — daily banking reconciliations.'],
+  [PAGE.BILLING]: ['Tax Invoices & Billing Desk', 'Raise GST bills with line items, issue, collect, and share print-ready PDF invoices.'],
   [PAGE.CUSTOMERS]: ['Customer Master Directory', 'Comprehensive client files, plot allocations, milestone payments, and documents.'],
   [PAGE.AGENTS]: ['Sales Force & Agency Roster', 'Agent productivity, active bookings, commission tiering, and performance metrics.'],
   [PAGE.COMMISSIONS]: ['Agent Commissions & Payouts', 'Eligibility rules, manager approvals, TDS tax compliance, and bank disbursements.'],
@@ -85,6 +89,7 @@ export const NAV_BADGES = {
   'SALES AGENT': { Bookings: { text: '3' }, Notifications: { text: '2' } },
   ACCOUNTS: {
     Payments: { text: '14', alert: true },
+    Billing: { text: '{overdueInvoices}', alert: true },
     Commissions: { text: '3' },
     Notifications: { text: '6' },
   },

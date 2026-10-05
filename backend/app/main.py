@@ -45,6 +45,7 @@ def _openapi_tags() -> list[dict]:
         {"name": "Customers", "description": "Customer master data, approvals and privacy operations."},
         {"name": "Bookings", "description": "Booking workflow with maker/checker approval."},
         {"name": "Collections", "description": "Payments, ledger, receipts and overdue management."},
+        {"name": "Billing", "description": "Tax invoices, line items, GST, PDF bills, settlement."},
         {"name": "Agents", "description": "Agent roster and performance."},
         {"name": "Commissions", "description": "Commission accrual, approval and payout."},
         {"name": "Reports", "description": "Business intelligence reports."},

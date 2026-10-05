@@ -7,7 +7,7 @@
  */
 import { createSlice } from '@reduxjs/toolkit';
 import {
-  projects as seedProjects, seedPlots, seedBookings, seedPays, seedReceipts,
+  projects as seedProjects, seedPlots, seedBookings, seedPays, seedReceipts, seedInvoices,
   seedCustomers, seedRegistry, seedCrud,
 } from '../../data/seedData';
 import { readJson } from '../../utils/storage';
@@ -32,6 +32,7 @@ const initialState = {
   bookings: saved.bookings || seedBookings,
   payments: saved.payments || seedPays,
   receipts: saved.receipts || seedReceipts,
+  invoices: saved.invoices || seedInvoices,
   customers: saved.customers || seedCustomers,
   registry: saved.registry || seedRegistry,
   crud: withCrudIds(readJson('crud', null) || seedCrud),
