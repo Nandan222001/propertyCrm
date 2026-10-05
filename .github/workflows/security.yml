@@ -72,33 +72,15 @@ jobs:
       - name: Build API image
         # --no-cache: a scan must never see layers cached from an older build
         run: docker build --no-cache -t lalita-erp-api:scan ./backend
-      - name: Trivy table summary (visibility, never fails the job)
-        run: |
-          docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
-            aquasec/trivy:latest image --severity HIGH,CRITICAL --ignore-unfixed \
-            --scanners vuln \
-            --skip-dirs "/opt/venv/lib/python3.12/site-packages/pip/_vendor,/usr/local/lib/python3.12/site-packages/pip/_vendor" \
-            lalita-erp-api:scan || true
       - name: Trivy image scan (gate)
-        uses: aquasecurity/trivy-action@v0.36.0
-        with:
-          image-ref: lalita-erp-api:scan
-          format: sarif
-          output: trivy-results.sarif
-          severity: HIGH,CRITICAL
-          exit-code: '1'
-          ignore-unfixed: true
-          scanners: vuln
-          # the gate runs trivy inside a container that cannot see the
-          # workspace, so the ignore file must be mounted explicitly
-          trivyignores: .trivyignore
-          # Secret scanning of the baked image is deliberately off: the hits
-          # are by-design placeholders (create_db.sql's CHANGE_ME MySQL
-          # password, config.py's local-only SECRET_KEY fallback), and real
-          # source secrets are enforced by the gitleaks job above.
-          # pip also vendors old msgpack/urllib3 inside its own _vendor
-          # directory — package-manager internals, not runtime dependencies.
-          skip-dirs: "/opt/venv/lib/python3.12/site-packages/pip/_vendor,/usr/local/lib/python3.12/site-packages/pip/_vendor"
+        # Plain pinned binary instead of trivy-action: same scanner the action
+        # wraps, but the ignore file, skip-dirs and findings output are all
+        # directly visible here. gitleaks covers secrets at source level.
+        run: |
+          curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin v0.75.0
+          trivy image --severity HIGH,CRITICAL --ignore-unfixed --scanners vuln \
+            --skip-dirs "/opt/venv/lib/python3.12/site-packages/pip/_vendor,/usr/local/lib/python3.12/site-packages/pip/_vendor" \
+            --exit-code 1 lalita-erp-api:scan
       # no SARIF upload: code scanning (GHAS) is not enabled on this private
       # repository; the exit-code gate above is the enforcement point.
 

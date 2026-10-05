@@ -127,7 +127,8 @@ def test_ci_enforces_security_gates() -> None:
     for tool in ("gitleaks", "semgrep", "trivy", "tfsec"):
         assert tool.lower() in workflow.lower(), f"CI no longer runs {tool}"
     assert "github/codeql-action" not in workflow, "CodeQL must stay removed (no GHAS)"
-    assert "trivy-action@v" in workflow, "trivy action must use a real (v-prefixed) tag"
+    assert "trivy image --severity HIGH,CRITICAL" in workflow, "trivy must gate the built image"
+    assert "github/codeql-action/upload-sarif" not in workflow
 
     ci = read(".github/workflows/ci.yml")
     assert "pytest tests -q --maxfail=0" in ci
