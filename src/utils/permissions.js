@@ -17,6 +17,15 @@ export const canCreateCustomer = (role) => role === ROLES.SALES_AGENT;
 export const canRecordPayment = (role) => isAdmin(role) || role === ROLES.ACCOUNTS;
 export const canManageBills = (role) => isAdmin(role) || role === ROLES.ACCOUNTS;
 export const canManageUsers = (role) => isAdmin(role);
+/** Billing desk: raise, edit, issue and cancel tax invoices. */
+export const canCreateInvoice = (role) => isAdmin(role) || role === ROLES.ACCOUNTS;
+export const canEditInvoice = canCreateInvoice;
+export const canIssueInvoice = canCreateInvoice;
+export const canCancelInvoice = canCreateInvoice;
+export const canPayInvoice = (role) => isAdmin(role) || role === ROLES.ACCOUNTS;
+/** Everyone who can open the Billing page can read the book / download PDFs. */
+export const canViewBilling = (role) => isAdmin(role)
+  || [ROLES.ACCOUNTS, ROLES.MANAGEMENT, ROLES.SALES_MANAGER, ROLES.CUSTOMER].includes(role);
 
 /** Permission strings the backend enforces, exposed for feature-level gating. */
 export const PERMISSIONS = {
@@ -26,16 +35,22 @@ export const PERMISSIONS = {
   CUSTOMER_CREATE: 'customer:create',
   USER_MANAGE: 'user:manage',
   AUDIT_VIEW: 'audit:view',
+  INVOICE_CREATE: 'invoice:create',
+  INVOICE_UPDATE: 'invoice:update',
+  INVOICE_ISSUE: 'invoice:issue',
+  INVOICE_CANCEL: 'invoice:cancel',
+  INVOICE_VIEW_ALL: 'invoice:view_all',
+  INVOICE_VIEW_OWN: 'invoice:view_own',
 };
 
 const ROLE_PERMISSIONS = {
   [ROLES.SUPER_ADMIN]: ['*'],
   [ROLES.ADMIN]: Object.values(PERMISSIONS),
-  [ROLES.SALES_MANAGER]: [PERMISSIONS.BOOKING_CREATE, PERMISSIONS.BOOKING_APPROVE, PERMISSIONS.CUSTOMER_CREATE],
+  [ROLES.SALES_MANAGER]: [PERMISSIONS.BOOKING_CREATE, PERMISSIONS.BOOKING_APPROVE, PERMISSIONS.CUSTOMER_CREATE, PERMISSIONS.INVOICE_VIEW_ALL],
   [ROLES.SALES_AGENT]: [PERMISSIONS.BOOKING_CREATE, PERMISSIONS.CUSTOMER_CREATE],
-  [ROLES.ACCOUNTS]: [PERMISSIONS.PAYMENT_CREATE],
-  [ROLES.MANAGEMENT]: [],
-  [ROLES.CUSTOMER]: [],
+  [ROLES.ACCOUNTS]: [PERMISSIONS.PAYMENT_CREATE, PERMISSIONS.INVOICE_CREATE, PERMISSIONS.INVOICE_UPDATE, PERMISSIONS.INVOICE_ISSUE, PERMISSIONS.INVOICE_CANCEL, PERMISSIONS.INVOICE_VIEW_ALL],
+  [ROLES.MANAGEMENT]: [PERMISSIONS.INVOICE_VIEW_ALL],
+  [ROLES.CUSTOMER]: [PERMISSIONS.INVOICE_VIEW_OWN],
 };
 
 /** True when the role holds `permission` (super admin holds every permission). */

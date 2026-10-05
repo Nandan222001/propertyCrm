@@ -93,6 +93,7 @@ PUBLIC_ID_PREFIXES = {
     "bookings": "BKG",
     "payments": "PAY",
     "receipts": "RCT",
+    "invoices": "INV",
     "agents": "AGT",
     "commissions": "COM",
     "documents": "DOC",

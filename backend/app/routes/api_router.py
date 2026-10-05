@@ -11,6 +11,7 @@ from fastapi import APIRouter
 from app.routes.agent_routes import router as agent_router
 from app.routes.audit_routes import router as audit_router
 from app.routes.auth_routes import router as auth_router
+from app.routes.billing_routes import router as billing_router
 from app.routes.booking_routes import router as booking_router
 from app.routes.commission_routes import router as commission_router
 from app.routes.customer_routes import router as customer_router
@@ -44,6 +45,7 @@ for router in (
     customer_router,
     booking_router,
     payment_router,
+    billing_router,
     agent_router,
     commission_router,
     notification_router,

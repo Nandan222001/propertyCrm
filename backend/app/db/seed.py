@@ -19,6 +19,7 @@ from app.core.constants import (
     COMPANY,
     ApprovalStatus,
     BookingStatus,
+    InvoiceStatus,
     PaymentStatus,
     PlotStatus,
     Role,
@@ -28,6 +29,7 @@ from app.core.crypto import encrypt
 from app.core.security import blind_index, hash_password
 from app.db.base import utcnow
 from app.models.audit import AppSetting, Notification
+from app.models.billing import Invoice, InvoiceItem, InvoiceStatusHistory
 from app.models.booking import Booking, BookingStatusHistory
 from app.models.customer import Customer, CustomerConsent
 from app.models.payment import Agent, Commission, Payment, Receipt
@@ -351,6 +353,155 @@ def _seed_payments(session: Session, bookings: dict[str, Booking], customers: li
     session.flush()
 
 
+def _seed_invoices(session: Session, bookings: dict[str, Booking]) -> None:
+    """Demo tax invoices across the whole lifecycle (idempotent by number).
+
+    Totals follow :func:`app.services.billing_service.compute_totals` — the
+    seeded amounts are pre-computed with the same arithmetic the API applies.
+    """
+    year = date.today().year
+    gst = Decimal("0.18")
+    today = date.today()
+
+    def item(description, quantity, unit, unit_price, discount=Decimal("0"), hsn=None):
+        line_total = (quantity * unit_price - discount).quantize(Decimal("0.01"))
+        return InvoiceItem(
+            description=description, hsn_sac=hsn, quantity=quantity, unit=unit,
+            unit_price=unit_price, discount_amount=discount, line_total=line_total,
+        )
+
+    INVOICE_SEED = [
+        # number, plot, status, items, gst_rate, discount, due_offset_days, paid, shared
+        (
+            f"INV-{year}-0101", "A-012", InvoiceStatus.ISSUED.value, [
+                item("Instalment 11 of 12 — plot sale consideration", Decimal("1"), "NOS", Decimal("184000")),
+                item("Documentation & registration assistance", Decimal("1"), "NOS", Decimal("2500")),
+            ], Decimal("0"), Decimal("0"), 9, Decimal("0"), False,
+        ),
+        (
+            f"INV-{year}-0102", "A-012", InvoiceStatus.OVERDUE.value, [
+                item("Development & infrastructural charges — Phase II", Decimal("2400"), "SQFT", Decimal("25")),
+            ], gst, Decimal("0"), -6, Decimal("30000"), True,
+        ),
+        (
+            f"INV-{year}-0103", "B-104", InvoiceStatus.DRAFT.value, [
+                item("Instalment 4 of 6 — plot sale consideration", Decimal("1"), "NOS", Decimal("210000")),
+            ], Decimal("0"), Decimal("10000"), None, Decimal("0"), False,
+        ),
+        (
+            f"INV-{year}-0104", "C-015", InvoiceStatus.PAID.value, [
+                item("Club house & amenity charges", Decimal("1"), "NOS", Decimal("100000"), hsn="995461"),
+            ], gst, Decimal("0"), -3, Decimal("118000"), True,
+        ),
+        (
+            f"INV-{year}-0105", "B-033", InvoiceStatus.CANCELLED.value, [
+                item("Car parking allotment — covered bay", Decimal("1"), "NOS", Decimal("75000")),
+            ], gst, Decimal("0"), None, Decimal("0"), False,
+        ),
+        (
+            f"INV-{year}-0106", "A-101", InvoiceStatus.PARTIALLY_PAID.value, [
+                item("Instalment 5 of 12 — plot sale consideration", Decimal("1"), "NOS", Decimal("80000")),
+                item("Legal & conveyance charges", Decimal("1"), "NOS", Decimal("7500"), discount=Decimal("500")),
+            ], Decimal("0"), Decimal("0"), 12, Decimal("50000"), False,
+        ),
+    ]
+
+    for number, plot_number, status, items, gst_rate, discount, due_offset, paid, shared in INVOICE_SEED:
+        if session.query(Invoice).filter(Invoice.invoice_number == number).one_or_none() is not None:
+            continue
+        booking = bookings[plot_number]
+        subtotal = sum((entry.line_total for entry in items), Decimal("0")).quantize(Decimal("0.01"))
+        taxable = subtotal - discount
+        gst_amount = (taxable * gst_rate).quantize(Decimal("0.01"))
+        cgst = (gst_amount / 2).quantize(Decimal("0.01"))
+        sgst = gst_amount - cgst
+        exact_total = taxable + gst_amount
+        total = exact_total.quantize(Decimal("1"))
+        invoice = Invoice(
+            public_id=number,
+            invoice_number=number,
+            booking_id=booking.id,
+            customer_id=booking.customer_id,
+            agent_id=booking.agent_id,
+            issue_date=today - timedelta(days=10),
+            due_date=(today + timedelta(days=due_offset)) if due_offset is not None else None,
+            status=status,
+            subtotal=subtotal,
+            discount_amount=discount,
+            taxable_value=taxable,
+            gst_rate=gst_rate,
+            gst_amount=gst_amount,
+            cgst_amount=cgst,
+            sgst_amount=sgst,
+            round_off=(total - exact_total).quantize(Decimal("0.01")),
+            total_amount=total,
+            amount_paid=paid,
+            balance_amount=max(total - paid, Decimal("0")),
+            notes="Please quote the invoice number with every payment.",
+            terms=(
+                "Payment is due on or before the due date. Interest @ 12% p.a. applies on "
+                "delayed instalments. Plot allotment is subject to realisation of funds."
+            ),
+            is_shared_with_customer=shared,
+            shared_at=utcnow() if shared else None,
+            issued_by_id=None if status == InvoiceStatus.DRAFT.value else booking.customer_id,
+            issued_at=None if status == InvoiceStatus.DRAFT.value else utcnow(),
+            cancellation_reason=(
+                "Raised in error — duplicate of the instalment bill" if status == InvoiceStatus.CANCELLED.value else None
+            ),
+        )
+        invoice.items = items
+        session.add(invoice)
+        session.flush()
+
+        # Lifecycle timeline.
+        session.add(InvoiceStatusHistory(
+            invoice_id=invoice.id, from_status=None, to_status=InvoiceStatus.DRAFT.value,
+            changed_by_label="seed", reason="Seeded demo invoice",
+        ))
+        if status != InvoiceStatus.DRAFT.value:
+            session.add(InvoiceStatusHistory(
+                invoice_id=invoice.id, from_status=InvoiceStatus.DRAFT.value, to_status=status,
+                changed_by_label="seed", reason="Seeded demo lifecycle",
+            ))
+
+        # Fully-paid demo bill: mirror the collection into the ledger so the
+        # PDF "payments received" block and the ledger stay coherent.
+        if status == InvoiceStatus.PAID.value and paid > 0:
+            received = today - timedelta(days=5)
+            if not session.query(Payment).filter(Payment.invoice_id == invoice.id).count():
+                payment = Payment(
+                    public_id=f"PAY-INV-{number.rsplit('-', 1)[-1]}",
+                    booking_id=booking.id,
+                    customer_id=booking.customer_id,
+                    invoice_id=invoice.id,
+                    amount=paid,
+                    mode="NEFT",
+                    reference="TXN90210",
+                    received_on=received,
+                    status=PaymentStatus.PAID.value,
+                    balance_after=max(booking.balance - paid, Decimal("0")),
+                )
+                session.add(payment)
+                session.flush()
+                booking.paid_amount = (booking.paid_amount + paid).quantize(Decimal("0.01"))
+                session.add(Receipt(
+                    public_id=f"RCT-INV-{number.rsplit('-', 1)[-1]}",
+                    receipt_number=f"RCT-{received.year}-{number.rsplit('-', 1)[-1]}",
+                    payment_id=payment.id,
+                    customer_id=booking.customer_id,
+                    booking_id=booking.id,
+                    issued_on=received,
+                    amount=paid,
+                    final_price=booking.final_price,
+                    balance=max(booking.final_price - booking.paid_amount, Decimal("0")),
+                    mode="NEFT",
+                    reference="TXN90210",
+                    is_shared_with_customer=True,
+                ))
+    session.flush()
+
+
 def _seed_governance(session: Session, customers: list[Customer], bookings: dict[str, Booking]) -> None:
     defaults = [
         ("company.name", COMPANY["name"], "company", "Registered entity name"),
@@ -428,6 +579,7 @@ def seed_all(session: Session) -> None:
     plots = _seed_plots(session, projects, agents, customers)
     bookings = _seed_bookings(session, plots, customers, agents)
     _seed_payments(session, bookings, customers)
+    _seed_invoices(session, bookings)
     _seed_governance(session, customers, bookings)
 
     # Link the portal login to its customer row.
@@ -435,9 +587,10 @@ def seed_all(session: Session) -> None:
     if portal.customer_id is None:
         portal.customer_id = customers[0].id
     session.flush()
+    invoice_count = session.query(Invoice).count()
     print(
         f"Seeded {len(users)} users, {len(projects)} projects, {len(plots)} plots, "
-        f"{len(customers)} customers, {len(bookings)} bookings"
+        f"{len(customers)} customers, {len(bookings)} bookings, {invoice_count} invoices"
     )
 
 

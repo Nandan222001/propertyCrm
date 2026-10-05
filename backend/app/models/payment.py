@@ -81,6 +81,10 @@ class Payment(Base, PkMixin, PublicIdMixin, TimestampMixin, SoftDeleteMixin):
     recorded_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
     approved_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
     approved_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
+    #: Set when the collection settles a billed invoice (billing ↔ ledger link).
+    invoice_id: Mapped[int | None] = mapped_column(
+        ForeignKey("invoices.id", ondelete="SET NULL"), index=True
+    )
 
     booking = relationship("Booking", lazy="joined")
     receipt = relationship("Receipt", back_populates="payment", uselist=False, lazy="joined")

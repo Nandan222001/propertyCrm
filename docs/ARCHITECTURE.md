@@ -23,15 +23,15 @@ app/
 ├── controllers/    request/response orchestration; translate service results into envelopes
 ├── services/       business rules, transactions, authorisation, audit
 ├── repositories/   the only place that builds queries (SQLAlchemy)
-├── models/         ORM entities (20 tables, mixins for pk/public-id/timestamps/soft-delete)
+├── models/         ORM entities (23 tables, mixins for pk/public-id/timestamps/soft-delete)
 ├── schemas/        Pydantic request/response contracts (validation lives here)
 ├── core/           config, security (JWT/crypto), permissions, exceptions, responses,
 │                   middleware, rate limiting, logging, request context, dependencies
 ├── db/             engine/session factory, metadata base, bootstrap, seed
 ├── utils/          money (Indian formatting/words), helpers
 └── main.py         application factory: middleware order, routers, lifespan
-migrations/         Alembic revisions (initial + security hardening)
-tests/              94 pytest cases across 7 security-focused modules
+migrations/         Alembic revisions (initial + security hardening + billing)
+tests/              pytest cases across security, workflow and billing modules
 ```
 
 Rules that keep it honest:
@@ -59,15 +59,16 @@ src/
 │   └── thunks.js             workflows: local-first update + optional API sync
 ├── api/                      fetch client (envelope, JWT refresh single-flight) + resource client
 ├── constants/                roles · navigation/routes · API endpoint table
-├── utils/                    money · names · date · status · id · csv · storage · whatsapp · permissions · security
+├── utils/                    money · names · date · status · id · csv · storage · whatsapp ·
+│                             permissions · security · billing (invoice maths) · pdf (offline bill renderer)
 ├── hooks/                    useAuth · useNotify · useDebouncedValue · useAsync · typed store hooks
 ├── components/
 │   ├── common/               Button-less primitives: Toast, PageHeader, FilterBar, Panel,
 │   │                         EmptyState, ModalShell, DataTable, StatTile, Badge, Avatar, ErrorBoundary
 │   └── layout/               Sidebar, Topbar, RoleContextBanner
 └── features/                 one folder per domain: auth, dashboard, projects, bookings,
-                              payments, customers, documents, agents, plots, approvals,
-                              notifications, users, admin
+                              payments, billing (tax invoices + PDF bills), customers,
+                              documents, agents, plots, approvals, notifications, users, admin
 ```
 
 ### SOLID / DRY in practice

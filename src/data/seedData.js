@@ -102,6 +102,7 @@ export const seedCrud = {
 export const COMPANY = {
   name: 'Lalita Realestate Infra',
   address: 'Head Office, Mumbai, Maharashtra',
+  gstin: '27AAACL1234K1ZV',
   phone: '+91 98765 00001',
   email: 'accounts@nmtsolution.demo'
 };
@@ -147,6 +148,129 @@ export const seedReceipts = seedPays
     shared: i < 4
   }));
 
+/**
+ * Demo tax invoices — the same object shape the /invoices API returns, so the
+ * Billing page renders identically in demo mode and against the live backend.
+ */
+export const seedInvoices = [
+  {
+    id: 'INV-2026-0101', public_id: 'INV-2026-0101', invoice_number: 'INV-2026-0101',
+    booking_number: 'BK-2026-0148', customer_name: 'Rajesh Sharma', agent_name: 'M. Kumar',
+    project_name: 'Green Meadows', plot_number: 'A-012',
+    issue_date: '25 Sep 2026', due_date: '09 Oct 2026', status: 'ISSUED',
+    subtotal: 186500, discount_amount: 0, taxable_value: 186500, gst_rate: 0,
+    gst_amount: 0, cgst_amount: 0, sgst_amount: 0, round_off: 0,
+    total_amount: 186500, amount_paid: 0, balance_amount: 186500,
+    items: [
+      { id: 1, description: 'Instalment 11 of 12 — plot sale consideration', hsn_sac: null, quantity: 1, unit: 'NOS', unit_price: 184000, discount_amount: 0, line_total: 184000 },
+      { id: 2, description: 'Documentation & registration assistance', hsn_sac: null, quantity: 1, unit: 'NOS', unit_price: 2500, discount_amount: 0, line_total: 2500 },
+    ],
+    history: [
+      { id: 2, to_status: 'ISSUED', from_status: 'DRAFT', changed_by_label: 'Neha Desai', reason: 'Issued · payment due 09 Oct 2026' },
+      { id: 1, to_status: 'DRAFT', from_status: null, changed_by_label: 'Neha Desai', reason: 'Invoice created' },
+    ],
+    notes: 'Please quote the invoice number with every payment.',
+    terms: 'Payment is due on or before the due date. Interest @ 12% p.a. applies on delayed instalments.',
+    is_shared_with_customer: false, cancellation_reason: null,
+  },
+  {
+    id: 'INV-2026-0102', public_id: 'INV-2026-0102', invoice_number: 'INV-2026-0102',
+    booking_number: 'BK-2026-0148', customer_name: 'Rajesh Sharma', agent_name: 'M. Kumar',
+    project_name: 'Green Meadows', plot_number: 'A-012',
+    issue_date: '25 Sep 2026', due_date: '29 Sep 2026', status: 'OVERDUE',
+    subtotal: 60000, discount_amount: 0, taxable_value: 60000, gst_rate: 0.18,
+    gst_amount: 10800, cgst_amount: 5400, sgst_amount: 5400, round_off: 0,
+    total_amount: 70800, amount_paid: 30000, balance_amount: 40800,
+    items: [
+      { id: 1, description: 'Development & infrastructural charges — Phase II', hsn_sac: '995461', quantity: 2400, unit: 'SQFT', unit_price: 25, discount_amount: 0, line_total: 60000 },
+    ],
+    history: [
+      { id: 3, to_status: 'OVERDUE', from_status: 'PARTIALLY_PAID', changed_by_label: 'System', reason: 'Past due date sweep' },
+      { id: 2, to_status: 'PARTIALLY_PAID', from_status: 'ISSUED', changed_by_label: 'Neha Desai', reason: '₹30,000 collected via NEFT' },
+      { id: 1, to_status: 'ISSUED', from_status: 'DRAFT', changed_by_label: 'Neha Desai', reason: 'Issued · payment due 29 Sep 2026' },
+    ],
+    notes: 'Please quote the invoice number with every payment.',
+    terms: 'Payment is due on or before the due date. Interest @ 12% p.a. applies on delayed instalments.',
+    is_shared_with_customer: true, cancellation_reason: null,
+  },
+  {
+    id: 'INV-2026-0103', public_id: 'INV-2026-0103', invoice_number: 'INV-2026-0103',
+    booking_number: 'BK-2026-0147', customer_name: 'Anita Verma', agent_name: 'S. Patel',
+    project_name: 'Silver Oaks', plot_number: 'B-104',
+    issue_date: '26 Sep 2026', due_date: null, status: 'DRAFT',
+    subtotal: 210000, discount_amount: 10000, taxable_value: 200000, gst_rate: 0,
+    gst_amount: 0, cgst_amount: 0, sgst_amount: 0, round_off: 0,
+    total_amount: 200000, amount_paid: 0, balance_amount: 200000,
+    items: [
+      { id: 1, description: 'Instalment 4 of 6 — plot sale consideration', hsn_sac: null, quantity: 1, unit: 'NOS', unit_price: 210000, discount_amount: 0, line_total: 210000 },
+    ],
+    history: [
+      { id: 1, to_status: 'DRAFT', from_status: null, changed_by_label: 'Neha Desai', reason: 'Invoice created' },
+    ],
+    notes: 'Loyalty adjustment applied.',
+    terms: 'Payment is due on or before the due date. Interest @ 12% p.a. applies on delayed instalments.',
+    is_shared_with_customer: false, cancellation_reason: null,
+  },
+  {
+    id: 'INV-2026-0104', public_id: 'INV-2026-0104', invoice_number: 'INV-2026-0104',
+    booking_number: 'BK-2026-0143', customer_name: 'Vikram Joshi', agent_name: 'S. Patel',
+    project_name: 'Silver Oaks', plot_number: 'C-015',
+    issue_date: '24 Sep 2026', due_date: '01 Oct 2026', status: 'PAID',
+    subtotal: 100000, discount_amount: 0, taxable_value: 100000, gst_rate: 0.18,
+    gst_amount: 18000, cgst_amount: 9000, sgst_amount: 9000, round_off: 0,
+    total_amount: 118000, amount_paid: 118000, balance_amount: 0,
+    items: [
+      { id: 1, description: 'Club house & amenity charges', hsn_sac: '995461', quantity: 1, unit: 'NOS', unit_price: 100000, discount_amount: 0, line_total: 100000 },
+    ],
+    history: [
+      { id: 3, to_status: 'PAID', from_status: 'PARTIALLY_PAID', changed_by_label: 'Neha Desai', reason: '₹1,18,000 collected via NEFT' },
+      { id: 2, to_status: 'ISSUED', from_status: 'DRAFT', changed_by_label: 'Neha Desai', reason: 'Issued · payment due 01 Oct 2026' },
+      { id: 1, to_status: 'DRAFT', from_status: null, changed_by_label: 'Neha Desai', reason: 'Invoice created' },
+    ],
+    notes: 'Please quote the invoice number with every payment.',
+    terms: 'Payment is due on or before the due date. Interest @ 12% p.a. applies on delayed instalments.',
+    is_shared_with_customer: true, cancellation_reason: null,
+  },
+  {
+    id: 'INV-2026-0105', public_id: 'INV-2026-0105', invoice_number: 'INV-2026-0105',
+    booking_number: 'BK-2026-0144', customer_name: 'Sneha Mehta', agent_name: 'M. Kumar',
+    project_name: 'Green Meadows', plot_number: 'B-033',
+    issue_date: '22 Sep 2026', due_date: null, status: 'CANCELLED',
+    subtotal: 75000, discount_amount: 0, taxable_value: 75000, gst_rate: 0.18,
+    gst_amount: 13500, cgst_amount: 6750, sgst_amount: 6750, round_off: 0,
+    total_amount: 88500, amount_paid: 0, balance_amount: 0,
+    items: [
+      { id: 1, description: 'Car parking allotment — covered bay', hsn_sac: null, quantity: 1, unit: 'NOS', unit_price: 75000, discount_amount: 0, line_total: 75000 },
+    ],
+    history: [
+      { id: 2, to_status: 'CANCELLED', from_status: 'DRAFT', changed_by_label: 'Arjun Shah', reason: 'Raised in error — duplicate of the instalment bill' },
+      { id: 1, to_status: 'DRAFT', from_status: null, changed_by_label: 'Neha Desai', reason: 'Invoice created' },
+    ],
+    notes: null, terms: null,
+    is_shared_with_customer: false, cancellation_reason: 'Raised in error — duplicate of the instalment bill',
+  },
+  {
+    id: 'INV-2026-0106', public_id: 'INV-2026-0106', invoice_number: 'INV-2026-0106',
+    booking_number: 'BK-2026-0145', customer_name: 'Priya Nair', agent_name: 'R. Gupta',
+    project_name: 'Green Meadows', plot_number: 'A-101',
+    issue_date: '21 Sep 2026', due_date: '17 Oct 2026', status: 'PARTIALLY_PAID',
+    subtotal: 87000, discount_amount: 0, taxable_value: 87000, gst_rate: 0,
+    gst_amount: 0, cgst_amount: 0, sgst_amount: 0, round_off: 0,
+    total_amount: 87000, amount_paid: 50000, balance_amount: 37000,
+    items: [
+      { id: 1, description: 'Instalment 5 of 12 — plot sale consideration', hsn_sac: null, quantity: 1, unit: 'NOS', unit_price: 80000, discount_amount: 0, line_total: 80000 },
+      { id: 2, description: 'Legal & conveyance charges', hsn_sac: null, quantity: 1, unit: 'NOS', unit_price: 7500, discount_amount: 500, line_total: 7000 },
+    ],
+    history: [
+      { id: 2, to_status: 'PARTIALLY_PAID', from_status: 'ISSUED', changed_by_label: 'Neha Desai', reason: '₹50,000 collected via UPI' },
+      { id: 1, to_status: 'ISSUED', from_status: 'DRAFT', changed_by_label: 'Neha Desai', reason: 'Issued · payment due 17 Oct 2026' },
+    ],
+    notes: 'Please quote the invoice number with every payment.',
+    terms: 'Payment is due on or before the due date. Interest @ 12% p.a. applies on delayed instalments.',
+    is_shared_with_customer: false, cancellation_reason: null,
+  },
+];
+
 export const roleConfigs = {
   'SUPER ADMIN': {
     badge: 'SUPER ADMIN',
@@ -156,7 +280,7 @@ export const roleConfigs = {
     subtitle: 'System infrastructure, tenant security, global audit logs & root configuration.',
     defaultUser: { name: 'Devendra Singhania', email: 'superadmin@nmtsolution.demo', role: 'SUPER ADMIN' },
     permissions: ['ALL', 'SYSTEM_AUDIT', 'INFRASTRUCTURE', 'DATABASE_BACKUPS', 'IAM_PROVISIONING', 'MASTER_RECORDS'],
-    workspaceNav: ['Overview', 'Approvals', 'Projects & plots', 'Bookings', 'Payments', 'Customers', 'Agents', 'Commissions'],
+    workspaceNav: ['Overview', 'Approvals', 'Projects & plots', 'Bookings', 'Payments', 'Billing', 'Customers', 'Agents', 'Commissions'],
     insightsNav: ['Reports', 'Documents', 'Notifications', 'User & role management', 'Administration']
   },
   'ADMIN': {
@@ -167,7 +291,7 @@ export const roleConfigs = {
     subtitle: 'Overall project portfolio, customer bookings, collection reconciliations and operations.',
     defaultUser: { name: 'Arjun Shah', email: 'admin@nmtsolution.demo', role: 'ADMIN' },
     permissions: ['PROJECTS_CRUD', 'BOOKINGS_CRUD', 'PAYMENTS_CRUD', 'AGENTS_CRUD', 'REPORTS_VIEW', 'USER_MANAGEMENT'],
-    workspaceNav: ['Overview', 'Approvals', 'Projects & plots', 'Bookings', 'Payments', 'Customers', 'Agents', 'Commissions'],
+    workspaceNav: ['Overview', 'Approvals', 'Projects & plots', 'Bookings', 'Payments', 'Billing', 'Customers', 'Agents', 'Commissions'],
     insightsNav: ['Reports', 'Documents', 'Notifications', 'User & role management', 'Administration']
   },
   'SALES MANAGER': {
@@ -179,7 +303,7 @@ export const roleConfigs = {
     defaultUser: { name: 'Meera Kumar', email: 'manager@nmtsolution.demo', role: 'SALES MANAGER' },
     permissions: ['VIEW_ALL_LEADS', 'APPROVE_HOLDS', 'APPROVE_COMMISSIONS', 'ASSIGN_AGENTS', 'SALES_ANALYTICS'],
     workspaceNav: ['Overview', 'Projects & plots', 'Bookings', 'Customers', 'Agents', 'Commissions'],
-    insightsNav: ['Reports', 'Documents', 'Notifications']
+    insightsNav: ['Reports', 'Documents', 'Notifications', 'Billing']
   },
   'SALES AGENT': {
     badge: 'SALES AGENT',
@@ -200,7 +324,7 @@ export const roleConfigs = {
     subtitle: 'Payment receipts, installment reconciliation, aging debtor analysis, and commission payouts.',
     defaultUser: { name: 'Neha Desai', email: 'accounts@nmtsolution.demo', role: 'ACCOUNTS' },
     permissions: ['RECORD_PAYMENTS', 'MANAGE_LEDGER', 'RECONCILE_ACCOUNTS', 'DISBURSE_COMMISSIONS', 'FINANCIAL_REPORTS'],
-    workspaceNav: ['Overview', 'Payments', 'Bookings', 'Customers', 'Commissions'],
+    workspaceNav: ['Overview', 'Payments', 'Billing', 'Bookings', 'Customers', 'Commissions'],
     insightsNav: ['Reports', 'Documents', 'Notifications']
   },
   'MANAGEMENT': {
@@ -211,7 +335,7 @@ export const roleConfigs = {
     subtitle: 'High-level Gross Development Value (GDV), cash flow forecasts, absorption velocity and project ROI.',
     defaultUser: { name: 'Vikramaditya Birla', email: 'management@nmtsolution.demo', role: 'MANAGEMENT' },
     permissions: ['EXECUTIVE_BI', 'CASHFLOW_VIEW', 'PORTFOLIO_ANALYTICS', 'BOARD_REPORTS', 'EXPORT_DATA'],
-    workspaceNav: ['Overview', 'Projects & plots', 'Bookings', 'Payments'],
+    workspaceNav: ['Overview', 'Projects & plots', 'Bookings', 'Payments', 'Billing'],
     insightsNav: ['Reports', 'Documents', 'Notifications']
   },
   'CUSTOMER': {
@@ -222,7 +346,7 @@ export const roleConfigs = {
     subtitle: 'View your plots, registry status, payments, pending dues, bills and documents. View-only access.',
     defaultUser: { name: 'Rajesh Sharma', email: 'customer@nmtsolution.demo', role: 'CUSTOMER', customerName: 'Rajesh Sharma' },
     permissions: ['VIEW_MY_PLOTS', 'VIEW_MY_PAYMENTS', 'VIEW_MY_BILLS', 'VIEW_MY_DOCUMENTS'],
-    workspaceNav: ['Overview', 'Payments', 'Documents'],
+    workspaceNav: ['Overview', 'Payments', 'Billing', 'Documents'],
     insightsNav: []
   }
 };

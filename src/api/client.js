@@ -144,3 +144,36 @@ export async function authedRequest(path, options = {}) {
     throw error;
   }
 }
+
+/**
+ * Authenticated binary download (PDF bills, CSV exports).
+ * Returns a `Blob`; falls back to the same error contract as `request`.
+ */
+export async function requestBlob(path) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), API_TIMEOUT_MS);
+  try {
+    const response = await fetch(buildUrl(path), {
+      method: 'GET',
+      signal: controller.signal,
+      credentials: 'omit',
+      headers: { Accept: 'application/pdf', 'X-Requested-With': 'XMLHttpRequest', ...authHeaders() },
+    });
+    if (!response.ok) {
+      const payload = await response.json().catch(() => ({}));
+      throw new ApiError(payload?.error?.message || response.statusText || 'Download failed', {
+        status: response.status,
+        code: payload?.error?.code || `http_${response.status}`,
+      });
+    }
+    return await response.blob();
+  } catch (error) {
+    if (error instanceof ApiError) throw error;
+    if (error?.name === 'AbortError') {
+      throw new ApiError('The server took too long to respond', { code: 'timeout' });
+    }
+    throw new ApiUnavailableError();
+  } finally {
+    clearTimeout(timeout);
+  }
+}

@@ -54,7 +54,7 @@ docker compose up --build
 | Customer portal | `customer@nmtsolution.demo` | `Demo@12345` |
 
 The customer portal is read-only: it exposes only that customer's bookings,
-receipts, dues, registry status and documents.
+invoices (bills), receipts, dues, registry status and documents.
 
 ---
 
@@ -65,6 +65,15 @@ receipts, dues, registry status and documents.
   agreement → registration, with an immutable status timeline.
 * **Collections** — token advance, instalments, receipts (office + customer copy),
   ageing buckets, over-collection protection, ledger and daily reconciliation.
+* **Billing** — tax invoices with line items (HSN/SAC, qty, rate, per-line and
+  invoice-level discounts), server-computed GST with CGST/SGST split and
+  round-off, `INV-YYYY-NNNN` numbering, lifecycle
+  `draft → issued → partially paid → paid / overdue → cancelled` with an
+  append-only status timeline, collections recorded straight against a bill
+  (they flow into the payments ledger and issue a numbered receipt), overdue
+  sweep, billing KPIs, and print-ready **A4 PDF bills** served by the API
+  (`GET /invoices/{id}/pdf`) — the SPA also renders the same PDF offline in
+  demo mode, so "download bill" works without a backend.
 * **Commissions** — accrual on confirmation, TDS split, approval and payout.
 * **Customers** — master data, per-customer 360° profile, portal access, consent,
   data-subject requests.

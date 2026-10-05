@@ -5,7 +5,7 @@
  */
 import { readJson, writeJson } from '../utils/storage';
 
-const COLLECTION_KEYS = ['projects', 'plots', 'bookings', 'payments', 'receipts', 'customers', 'registry'];
+const COLLECTION_KEYS = ['projects', 'plots', 'bookings', 'payments', 'receipts', 'invoices', 'customers', 'registry'];
 const PERSISTED_SLICES = ['auth', 'domain'];
 
 export const createPersistenceMiddleware = () => (store) => (next) => (action) => {

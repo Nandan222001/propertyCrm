@@ -9,6 +9,7 @@ from app.models.audit import (
     Notification,
     SecurityEvent,
 )
+from app.models.billing import Invoice, InvoiceItem, InvoiceStatusHistory
 from app.models.booking import Booking, BookingStatusHistory
 from app.models.customer import Customer, CustomerConsent
 from app.models.payment import Agent, Commission, Payment, Receipt
@@ -28,6 +29,9 @@ __all__ = [
     "CustomerConsent",
     "DataSubjectRequest",
     "Document",
+    "Invoice",
+    "InvoiceItem",
+    "InvoiceStatusHistory",
     "LoginAttempt",
     "Notification",
     "Payment",
