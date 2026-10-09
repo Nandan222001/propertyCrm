@@ -18,10 +18,18 @@ from sqlalchemy import Boolean, ForeignKey, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.constants import ApprovalStatus
-from app.db.base import Base, PkMixin, PublicIdMixin, SoftDeleteMixin, TimestampMixin, UTCDateTime
+from app.db.base import (
+    Base,
+    PkMixin,
+    PublicIdMixin,
+    SoftDeleteMixin,
+    TenantMixin,
+    TimestampMixin,
+    UTCDateTime,
+)
 
 
-class Customer(Base, PkMixin, PublicIdMixin, TimestampMixin, SoftDeleteMixin):
+class Customer(Base, PkMixin, PublicIdMixin, TenantMixin, TimestampMixin, SoftDeleteMixin):
     __tablename__ = "customers"
 
     name: Mapped[str] = mapped_column(String(120), nullable=False, index=True)
@@ -49,6 +57,10 @@ class Customer(Base, PkMixin, PublicIdMixin, TimestampMixin, SoftDeleteMixin):
     agent_id: Mapped[int | None] = mapped_column(
         ForeignKey("agents.id", ondelete="SET NULL"), index=True
     )
+    #: The project the customer was added for (so a project's directory lists only its customers).
+    project_id: Mapped[int | None] = mapped_column(
+        ForeignKey("projects.id", ondelete="SET NULL"), index=True
+    )
     approved_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
     approved_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
 
@@ -60,6 +72,7 @@ class Customer(Base, PkMixin, PublicIdMixin, TimestampMixin, SoftDeleteMixin):
     anonymised_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
 
     agent = relationship("Agent", back_populates="customers", lazy="joined")
+    project = relationship("Project", lazy="joined")
     bookings = relationship("Booking", back_populates="customer", lazy="selectin")
     documents = relationship("Document", back_populates="customer", lazy="selectin")
 

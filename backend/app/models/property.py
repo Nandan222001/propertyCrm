@@ -18,13 +18,21 @@ from sqlalchemy import (
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.constants import DocumentKind, PlotStatus
-from app.db.base import Base, PkMixin, PublicIdMixin, SoftDeleteMixin, TimestampMixin, UTCDateTime
+from app.db.base import (
+    Base,
+    PkMixin,
+    PublicIdMixin,
+    SoftDeleteMixin,
+    TenantMixin,
+    TimestampMixin,
+    UTCDateTime,
+)
 
 
-class Project(Base, PkMixin, PublicIdMixin, TimestampMixin, SoftDeleteMixin):
+class Project(Base, PkMixin, PublicIdMixin, TenantMixin, TimestampMixin, SoftDeleteMixin):
     __tablename__ = "projects"
 
-    name: Mapped[str] = mapped_column(String(120), nullable=False, unique=True)
+    name: Mapped[str] = mapped_column(String(120), nullable=False)
     phase: Mapped[str | None] = mapped_column(String(60))
     city: Mapped[str | None] = mapped_column(String(80), index=True)
     state: Mapped[str | None] = mapped_column(String(80))
@@ -41,8 +49,12 @@ class Project(Base, PkMixin, PublicIdMixin, TimestampMixin, SoftDeleteMixin):
 
     plots = relationship("Plot", back_populates="project", lazy="selectin", cascade="all, delete-orphan")
 
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "name", name="uq_projects_tenant_name"),
+    )
 
-class Plot(Base, PkMixin, PublicIdMixin, TimestampMixin, SoftDeleteMixin):
+
+class Plot(Base, PkMixin, PublicIdMixin, TenantMixin, TimestampMixin, SoftDeleteMixin):
     __tablename__ = "plots"
 
     plot_number: Mapped[str] = mapped_column(String(24), nullable=False, index=True)
@@ -68,7 +80,7 @@ class Plot(Base, PkMixin, PublicIdMixin, TimestampMixin, SoftDeleteMixin):
     )
 
 
-class Document(Base, PkMixin, PublicIdMixin, TimestampMixin, SoftDeleteMixin):
+class Document(Base, PkMixin, PublicIdMixin, TenantMixin, TimestampMixin, SoftDeleteMixin):
     """Metadata for the document vault; files live in encrypted object storage."""
 
     __tablename__ = "documents"

@@ -40,6 +40,7 @@ class CustomerCreate(CustomerBase):
     pan_number: str | None = Field(default=None, max_length=10)
     kyc_reference: str | None = Field(default=None, max_length=60)
     agent_code: str | None = Field(default=None, max_length=16)
+    project_id: int | None = Field(default=None, ge=1)
 
     @field_validator("email")
     @classmethod
@@ -109,6 +110,8 @@ class CustomerResponse(TimestampedResponse):
     source: str | None = None
     agent_id: int | None = None
     agent_name: str | None = None
+    project_id: int | None = None
+    project_name: str | None = None
     consent_given: bool = False
     marketing_opt_in: bool = False
     anonymised_at: datetime | None = None

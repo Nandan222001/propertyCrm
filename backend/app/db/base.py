@@ -13,7 +13,7 @@ from __future__ import annotations
 import uuid
 from datetime import UTC, datetime
 
-from sqlalchemy import Boolean, DateTime, MetaData, String, func
+from sqlalchemy import Boolean, DateTime, ForeignKey, MetaData, String, func
 from sqlalchemy.orm import DeclarativeBase, Mapped, declared_attr, mapped_column
 from sqlalchemy.types import TypeDecorator
 
@@ -99,6 +99,7 @@ PUBLIC_ID_PREFIXES = {
     "documents": "DOC",
     "notifications": "NTF",
     "data_subject_requests": "DSR",
+    "tenants": "TEN",
 }
 
 
@@ -146,6 +147,41 @@ class TimestampMixin:
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
     )
+
+
+class TenantMixin:
+    """Row belongs to exactly one tenant (organisation). Required on business data.
+
+    Isolation is enforced centrally in :mod:`app.db.tenancy` (a session-level
+    query filter plus automatic stamping on insert), so repositories and
+    services never write ``WHERE tenant_id = …`` by hand and cannot forget it.
+    """
+
+    @declared_attr
+    def tenant_id(cls) -> Mapped[int]:
+        return mapped_column(
+            ForeignKey("tenants.id", ondelete="RESTRICT"), nullable=False, index=True,
+            comment="owning tenant",
+        )
+
+
+class OptionalTenantMixin:
+    """Tenant-scoped like :class:`TenantMixin`, but NULL means *platform-level*.
+
+    Used where platform staff (super admins), pre-login events and platform audit
+    entries legitimately have no tenant.
+    """
+
+    @declared_attr
+    def tenant_id(cls) -> Mapped[int | None]:
+        return mapped_column(
+            ForeignKey("tenants.id", ondelete="RESTRICT"), nullable=True, index=True,
+            comment="owning tenant; NULL = platform",
+        )
+
+
+#: Marker bases the tenancy filter targets (both kinds are isolated).
+TENANT_SCOPED = (TenantMixin, OptionalTenantMixin)
 
 
 class SoftDeleteMixin:

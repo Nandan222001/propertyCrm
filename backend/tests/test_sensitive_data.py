@@ -90,12 +90,12 @@ def test_audit_state_snapshots_exclude_pii(client, session, admin_headers, uniqu
     assert "9876500999" not in serialised
 
 
-def test_right_to_erasure_scrubs_identifiers(client, session, super_admin_headers, unique_email, unique_phone):
+def test_right_to_erasure_scrubs_identifiers(client, session, admin_headers, unique_email, unique_phone):
     created = client.post(
         "/api/v1/customers",
         json={"name": "Erasure Probe", "email": unique_email, "phone": unique_phone,
               "consent_given": True},
-        headers=super_admin_headers,
+        headers=admin_headers,
     )
     assert created.status_code == 201
     public_id = created.json()["data"]["public_id"]
@@ -103,7 +103,7 @@ def test_right_to_erasure_scrubs_identifiers(client, session, super_admin_header
 
     erased = client.delete(
         f"/api/v1/customers/{customer_id}/personal-data?reason=Data subject request DR-2026-001",
-        headers=super_admin_headers,
+        headers=admin_headers,
     )
     assert erased.status_code == 200, erased.text
 
@@ -114,21 +114,21 @@ def test_right_to_erasure_scrubs_identifiers(client, session, super_admin_header
     assert "Erased customer" in customer.name
 
 
-def test_personal_data_export_requires_permission(client, customer_headers, super_admin_headers):
+def test_personal_data_export_requires_permission(client, customer_headers, admin_headers):
     denied = client.get("/api/v1/customers/1/personal-data", headers=customer_headers)
     assert denied.status_code == 403
-    allowed = client.get("/api/v1/customers/1/personal-data", headers=super_admin_headers)
+    allowed = client.get("/api/v1/customers/1/personal-data", headers=admin_headers)
     assert allowed.status_code == 200
     assert "customer" in allowed.json()["data"]
 
 
-def test_settings_endpoint_masks_secret_values(client, super_admin_headers):
+def test_settings_endpoint_masks_secret_values(client, admin_headers):
     client.put(
         "/api/v1/settings/integrations.whatsapp_token",
         json={"value": "super-secret-token", "description": "WhatsApp Business API token"},
-        headers=super_admin_headers,
+        headers=admin_headers,
     )
-    response = client.get("/api/v1/settings", headers=super_admin_headers)
+    response = client.get("/api/v1/settings", headers=admin_headers)
     assert response.status_code == 200
     assert "super-secret-token" not in response.text
     assert "***" in response.text

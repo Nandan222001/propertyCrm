@@ -19,7 +19,7 @@ from decimal import Decimal
 
 from sqlalchemy.orm import Session
 
-from app.core.constants import BookingStatus, Permission, PlotStatus
+from app.core.constants import BookingStatus, Permission, PlotStatus, Role
 from app.core.context import ActorContext, PaginationContext
 from app.core.exceptions import BusinessRuleError, ConflictError, PermissionDeniedError
 from app.core.responses import Paginated
@@ -38,6 +38,7 @@ from app.schemas.booking import (
     BookingUpdate,
 )
 from app.services.base_service import BaseService
+from app.services.notification_service import emit
 
 #: Plot state implied by each booking state.
 PLOT_STATUS_FOR_BOOKING = {
@@ -207,6 +208,11 @@ class BookingService(BaseService[Booking]):
             summary=f"Booking {booking.booking_number} {'confirmed' if approved else 'submitted for approval'}",
         )
 
+        if not approved:
+            emit(self.db, title="Booking awaiting approval",
+                 body=f"{booking.booking_number} · Plot {plot.plot_number} was submitted by {self.actor.name}.",
+                 category="APPROVAL", audience_role=Role.ADMIN.value, booking_id=booking.id)
+
         # An admin-confirmed booking accrues the commission immediately.
         if approved and booking.agent_id is not None:
             from app.services.commission_service import CommissionService
@@ -276,6 +282,7 @@ class BookingService(BaseService[Booking]):
                             reason=payload.reason or "Approved by admin", ip_address=self.actor.ip_address)
         self._audit("workflow.approve", booking, before={"status": previous},
                     after={"status": booking.status}, summary=f"Booking {booking.booking_number} approved")
+        self._tell_agent(booking, "approved", "info")
 
         # Accrue the agent commission on confirmation (idempotent).
         if booking.agent_id is not None:
@@ -293,6 +300,13 @@ class BookingService(BaseService[Booking]):
             )
         return booking
 
+    def _tell_agent(self, booking: Booking, outcome: str, severity: str) -> None:
+        """The booking's own agent hears the decision; no other agent does."""
+        agent = self.agents.get(booking.agent_id) if booking.agent_id else None
+        if agent is not None and agent.user_id:
+            emit(self.db, title=f"Booking {outcome}", body=f"{booking.booking_number} was {outcome} by {self.actor.name}.",
+                 category="APPROVAL", severity=severity, user_id=agent.user_id, booking_id=booking.id)
+
     def reject(self, booking_id: int, payload: BookingDecision) -> Booking:
         self._authorise("approve")
         booking = self.bookings.get_or_404(booking_id)
@@ -309,6 +323,7 @@ class BookingService(BaseService[Booking]):
                             reason=booking.rejection_reason, ip_address=self.actor.ip_address)
         self._audit("workflow.reject", booking, before={"status": previous},
                     after={"status": booking.status}, summary=f"Booking rejected: {booking.rejection_reason}")
+        self._tell_agent(booking, "rejected", "warning")
         return booking
 
     def change_status(self, booking_id: int, payload: BookingStatusUpdate) -> Booking:

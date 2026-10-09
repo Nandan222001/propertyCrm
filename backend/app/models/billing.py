@@ -24,15 +24,23 @@ from sqlalchemy import (
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.constants import InvoiceStatus
-from app.db.base import Base, PkMixin, PublicIdMixin, SoftDeleteMixin, TimestampMixin, UTCDateTime
+from app.db.base import (
+    Base,
+    PkMixin,
+    PublicIdMixin,
+    SoftDeleteMixin,
+    TenantMixin,
+    TimestampMixin,
+    UTCDateTime,
+)
 
 
-class Invoice(Base, PkMixin, PublicIdMixin, TimestampMixin, SoftDeleteMixin):
+class Invoice(Base, PkMixin, PublicIdMixin, TenantMixin, TimestampMixin, SoftDeleteMixin):
     """A tax invoice (bill) raised against a plot booking."""
 
     __tablename__ = "invoices"
 
-    invoice_number: Mapped[str] = mapped_column(String(24), nullable=False, unique=True, index=True)
+    invoice_number: Mapped[str] = mapped_column(String(24), nullable=False, index=True)
     booking_id: Mapped[int] = mapped_column(
         ForeignKey("bookings.id", ondelete="RESTRICT"), nullable=False, index=True
     )
@@ -93,7 +101,7 @@ class Invoice(Base, PkMixin, PublicIdMixin, TimestampMixin, SoftDeleteMixin):
     )
 
     __table_args__ = (
-        UniqueConstraint("invoice_number", name="uq_invoices_invoice_number"),
+        UniqueConstraint("tenant_id", "invoice_number", name="uq_invoices_tenant_invoice_number"),
     )
 
 

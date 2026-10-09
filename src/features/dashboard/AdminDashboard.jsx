@@ -1,14 +1,22 @@
 import React, { useState } from 'react';
 import { ArrowUpRight, ChevronRight, Download, Plus, Search, CalendarDays } from 'lucide-react';
+import { fmtINR } from '../../utils/money';
+import { compactINR, inventoryStats, monthlySeries, salesStats } from '../../utils/dashboardStats';
 
-export function AdminDashboard({ bookings = [], pays = [], go, D, notify }) {
+export function AdminDashboard({ bookings = [], pays = [], plots = [], go, D, notify }) {
   const [chartRange, setChartRange] = useState('Last 6 months');
 
+  const sales = salesStats(bookings);
+  const inventory = inventoryStats(plots);
+  const series = monthlySeries(bookings, chartRange === 'Last quarter' ? 3 : chartRange === 'This year' ? 12 : 6);
+  const money = (n) => compactINR(n);
+  const yTop = compactINR(series.max);
+
   const stats = [
-    { title: 'Total sales value', val: '₹12.6', unit: 'Cr', trend: '↗ 12.8%', type: 'indigo' },
-    { title: 'Total collection', val: '₹7.9', unit: 'Cr', trend: '↗ 8.2%', type: 'green' },
-    { title: 'Pending payments', val: '₹4.7', unit: 'Cr', trend: '↓ 3.4%', type: 'amber' },
-    { title: 'Available plots', val: '176', unit: '/ 384 plots', trend: '', type: 'blue' }
+    { title: 'Total sales value', ...money(sales.sales), foot: `${sales.deals} booking${sales.deals === 1 ? '' : 's'}`, type: 'indigo' },
+    { title: 'Total collection', ...money(sales.collected), foot: sales.sales ? `${Math.round((sales.collected / sales.sales) * 100)}% of sales value` : 'No collections yet', type: 'green' },
+    { title: 'Pending payments', ...money(sales.pending), foot: 'Balance still to collect', type: 'amber' },
+    { title: 'Available plots', val: String(inventory.available), unit: `/ ${inventory.total} plots`, type: 'blue' },
   ];
 
   return (
@@ -26,20 +34,13 @@ export function AdminDashboard({ bookings = [], pays = [], go, D, notify }) {
               {s.val}<span>{s.unit}</span>
             </div>
             {s.type === 'blue' && (
-              <div className="progress-track"><span /></div>
+              <div className="progress-track"><span style={{ width: `${inventory.total ? Math.round((inventory.available / inventory.total) * 100) : 0}%` }} /></div>
             )}
             <div className="stat-foot">
               {s.type === 'blue' ? (
-                <>46% inventory available <span className="trend neutral">4 projects</span></>
+                <>{inventory.total ? Math.round((inventory.available / inventory.total) * 100) : 0}% inventory available</>
               ) : (
-                <>
-                  <b className={`trend ${s.type === 'amber' ? 'down' : 'up'}`}>{s.trend}</b> vs last month
-                  <div className={`sparkline spark-${s.type}`}>
-                    {[25, 34, 42, 53, 45, 68, 60, 80, 73, 100].map((x, i) => (
-                      <i key={i} style={{ height: `${x}%` }} />
-                    ))}
-                  </div>
-                </>
+                <>{s.foot}</>
               )}
             </div>
           </article>
@@ -63,74 +64,58 @@ export function AdminDashboard({ bookings = [], pays = [], go, D, notify }) {
             <span><i className="legend-dot indigo-dot" />Sales value</span>
             <span><i className="legend-dot green-dot" />Collection</span>
           </div>
-          <div className="chart-wrap">
-            <div className="y-labels">
-              <span>3 Cr</span><span>2 Cr</span><span>1 Cr</span><span>0</span>
-            </div>
-            <div className="chart">
-              <div className="grid-lines"><i /><i /><i /><i /></div>
-              <div className="bars">
-                {[
-                  ['Apr', '55%', '40%'],
-                  ['May', '70%', '52%'],
-                  ['Jun', '62%', '48%'],
-                  ['Jul', '85%', '65%'],
-                  ['Aug', '75%', '58%'],
-                  ['Sep', '95%', '78%']
-                ].map(([m, s, c]) => (
-                  <div className="bar-group" key={m}>
-                    <div className="bar" style={{ height: s }} />
-                    <div className="bar collection" style={{ height: c }} />
+          {series.max === 0 ? (
+            <p className="empty-note">No bookings in this period yet.</p>
+          ) : (
+            <>
+              <div className="chart-wrap">
+                <div className="y-labels">
+                  <span>{yTop.val}{yTop.unit && ` ${yTop.unit}`}</span><span /><span /><span>0</span>
+                </div>
+                <div className="chart">
+                  <div className="grid-lines"><i /><i /><i /><i /></div>
+                  <div className="bars">
+                    {series.buckets.map((m) => (
+                      <div className="bar-group" key={m.key} title={`${m.label}: sales ₹${fmtINR(m.sales)} · collected ₹${fmtINR(m.collected)}`}>
+                        <div className="bar" style={{ height: `${m.salesPct}%` }} />
+                        <div className="bar collection" style={{ height: `${m.collectedPct}%` }} />
+                      </div>
+                    ))}
                   </div>
-                ))}
+                </div>
               </div>
-            </div>
-          </div>
-          <div className="x-labels">
-            {['Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep'].map(m => (
-              <span key={m}>{m}</span>
-            ))}
-          </div>
+              <div className="x-labels">
+                {series.buckets.map((m) => <span key={m.key}>{m.label}</span>)}
+              </div>
+            </>
+          )}
         </article>
 
         <article className="panel inventory-panel">
           <div className="panel-head">
             <div>
               <h2>Inventory Allocation</h2>
-              <p>Current distribution across 384 master plots</p>
+              <p>Current distribution across {inventory.total} master plot{inventory.total === 1 ? '' : 's'}</p>
             </div>
             <button className="text-button" onClick={() => go('Projects & plots')}>
               View plots →
             </button>
           </div>
           <div className="donut-area">
-            <div className="donut">
-              <div className="donut-hole">
-                <b>384</b>
-                <span>TOTAL PLOTS</span>
+            <div className="donut" style={{ background: inventory.gradient }}>
+              <div className="donut-center">
+                <b>{inventory.total}</b>
+                <small>TOTAL PLOTS</small>
               </div>
             </div>
             <div className="donut-legend">
-              <div className="donut-item">
-                <i style={{ background: '#5565dc' }} />
-                <span>Available</span>
-                <b>176 (46%)</b>
-              </div>
-              <div className="donut-item">
-                <i style={{ background: '#25a879' }} />
-                <span>Booked</span>
-                <b>92 (24%)</b>
-              </div>
-              <div className="donut-item">
-                <i style={{ background: '#f59e0b' }} />
-                <span>Sold</span>
-                <b>80 (21%)</b>
-              </div>
-              <div className="donut-item">
-                <i style={{ background: '#94a3b8' }} />
-                <span>On hold</span>
-                <b>36 (9%)</b>
-              </div>
+              {inventory.rows.map((r) => (
+                <div className="donut-item" key={r.key}>
+                  <i style={{ background: r.color }} />
+                  <span>{r.label}</span>
+                  <b>{r.count} ({r.pct}%)</b>
+                </div>
+              ))}
             </div>
           </div>
         </article>

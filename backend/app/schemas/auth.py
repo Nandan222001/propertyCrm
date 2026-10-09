@@ -41,6 +41,7 @@ class RegisterRequest(SafeText):
     role: Role = Role.SALES_AGENT
     title: str | None = Field(default=None, max_length=120)
     consent: bool = Field(default=False, description="Acceptance of the privacy notice")
+    tenant: str = Field(min_length=2, max_length=48, description="Organisation (tenant) slug to join")
 
     @field_validator("email")
     @classmethod
@@ -130,6 +131,11 @@ class SessionUser(ORMModel):
     permissions: list[str] = Field(default_factory=list)
     last_login_at: datetime | None = None
     must_change_password: bool = False
+    #: Organisation the user belongs to; ``None`` for platform (super admin) accounts.
+    tenant_id: int | None = None
+    tenant_name: str | None = None
+    tenant_slug: str | None = None
+    is_platform: bool = False
 
 
 class LoginResponse(ORMModel):

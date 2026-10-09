@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.constants import AuditAction, Permission, Role, UserStatus
@@ -10,6 +11,7 @@ from app.core.exceptions import BusinessRuleError, ConflictError, PermissionDeni
 from app.core.responses import Paginated
 from app.core.security import hash_password
 from app.db.base import utcnow
+from app.models.tenant import Tenant
 from app.models.user import User
 from app.repositories.finance_repository import AgentRepository
 from app.repositories.user_repository import UserRepository
@@ -74,6 +76,7 @@ class UserService(BaseService[User]):
         if self.users.get_by_email(email):
             raise ConflictError("A user with this e-mail already exists")
         self._assert_escalation_allowed(payload.role)
+        self._assert_seat_available()
 
         user = User(
             name=payload.name,
@@ -132,8 +135,8 @@ class UserService(BaseService[User]):
 
     def set_permission_grants(self, user_id: int, grants: list[dict]) -> list[dict]:
         """Only a super admin may hand out permissions beyond a role."""
-        if Role(self.actor.role) != Role.SUPER_ADMIN:
-            raise PermissionDeniedError("Only a super admin can change permission grants")
+        if not self.actor.can(Permission.ROLE_MANAGE):
+            raise PermissionDeniedError("Your role cannot change permission grants")
         user = self.users.get_or_404(user_id)
         applied = self.rbac.set_grants(user, grants, granted_by=self.actor.name)
         self._audit(AuditAction.CONFIG_CHANGE, user, summary=f"Permission grants updated ({len(applied)})")
@@ -157,9 +160,24 @@ class UserService(BaseService[User]):
 
     # --------------------------------------------------------------- helpers
     def _assert_escalation_allowed(self, target_role: Role) -> None:
-        """Privilege-escalation guard: admins cannot mint super admins."""
+        """Privilege-escalation guard: organisation staff can never mint platform accounts."""
         actor_role = Role(self.actor.role)
-        if target_role == Role.SUPER_ADMIN and actor_role != Role.SUPER_ADMIN:
-            raise PermissionDeniedError("Only a super admin can manage super admin accounts")
-        if actor_role not in (Role.SUPER_ADMIN, Role.ADMIN):
+        if target_role == Role.SUPER_ADMIN:
+            raise PermissionDeniedError("Platform accounts are managed outside an organisation")
+        if actor_role != Role.ADMIN:
             raise PermissionDeniedError("Your role cannot manage user accounts")
+
+    def _assert_seat_available(self) -> None:
+        """Enforce the tenant's ``max_users`` (seat) limit when creating accounts."""
+        if self.actor.tenant_id is None:
+            return
+        tenant = self.db.get(Tenant, self.actor.tenant_id)
+        if tenant is None:
+            return
+        seats = int(self.db.execute(
+            select(func.count(User.id)).where(User.is_deleted.is_(False))
+        ).scalar_one() or 0)
+        if seats >= tenant.max_users:
+            raise BusinessRuleError(
+                f"Your plan allows {tenant.max_users} users. Contact the platform administrator to add seats."
+            )

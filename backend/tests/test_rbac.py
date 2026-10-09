@@ -18,9 +18,17 @@ def test_permission_matrix_is_declared_once_and_complete():
     assert granted == set(Permission), "matrix must cover the whole permission catalogue"
 
 
-def test_super_admin_is_the_only_role_with_wildcard_power():
-    assert len(permissions_for(Role.SUPER_ADMIN)) == len(Permission)
-    assert not has_permission(Role.ADMIN, Permission.DATA_ERASURE)
+def test_super_admin_is_platform_only_and_admin_runs_the_organisation():
+    # The platform owner manages tenants — and has no access to any tenant's data.
+    platform = permissions_for(Role.SUPER_ADMIN)
+    assert Permission.TENANT_MANAGE in platform and Permission.TENANT_VIEW in platform
+    for business in (Permission.PROJECT_VIEW, Permission.BOOKING_VIEW_ALL, Permission.CUSTOMER_VIEW_ALL,
+                     Permission.PAYMENT_VIEW_ALL, Permission.INVOICE_VIEW_ALL, Permission.PII_REVEAL):
+        assert business not in platform
+    # Tenant administration (audit, roles, erasure) belongs to the organisation's ADMIN.
+    assert has_permission(Role.ADMIN, Permission.DATA_ERASURE)
+    assert has_permission(Role.ADMIN, Permission.AUDIT_VIEW)
+    assert not has_permission(Role.ADMIN, Permission.TENANT_MANAGE)
     assert not has_permission(Role.SALES_AGENT, Permission.BOOKING_APPROVE)
     assert not has_permission(Role.CUSTOMER, Permission.CUSTOMER_VIEW_ALL)
 
@@ -88,12 +96,12 @@ def test_admin_cannot_create_super_admin(client, admin_headers, unique_email):
     assert response.status_code == 403
 
 
-def test_permission_grants_require_super_admin(client, admin_headers, super_admin_headers, unique_email):
+def test_permission_grants_require_role_manage(client, admin_headers, accounts_headers, unique_email):
     created = client.post(
         "/api/v1/users",
         json={"name": "Grant Probe", "email": unique_email, "role": "ACCOUNTS",
               "temporary_password": "Strong@12345"},
-        headers=super_admin_headers,
+        headers=admin_headers,
     )
     assert created.status_code == 201
     user_id = created.json()["data"]["id"]
@@ -101,14 +109,14 @@ def test_permission_grants_require_super_admin(client, admin_headers, super_admi
     denied = client.put(
         f"/api/v1/users/{user_id}/permissions",
         json={"grants": [{"permission": "audit:view", "granted": True}]},
-        headers=admin_headers,
+        headers=accounts_headers,
     )
     assert denied.status_code == 403
 
     granted = client.put(
         f"/api/v1/users/{user_id}/permissions",
         json={"grants": [{"permission": "audit:view", "granted": True}]},
-        headers=super_admin_headers,
+        headers=admin_headers,
     )
     assert granted.status_code == 200
     assert any(item["permission"] == "audit:view" for item in granted.json()["data"])

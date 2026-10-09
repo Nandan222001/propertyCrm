@@ -11,6 +11,7 @@ from app.core.responses import Paginated
 from app.core.validators import mask_address, mask_email, mask_name, mask_phone
 from app.db.base import utcnow
 from app.models.customer import Customer, CustomerConsent
+from app.models.property import Project
 from app.repositories.customer_repository import (
     CustomerConsentRepository,
     CustomerRepository,
@@ -25,6 +26,7 @@ from app.schemas.customer import (
     DataSubjectRequestCreate,
 )
 from app.services.base_service import BaseService
+from app.services.notification_service import emit
 
 
 class CustomerService(BaseService[Customer]):
@@ -109,6 +111,8 @@ class CustomerService(BaseService[Customer]):
             source=customer.source,
             agent_id=customer.agent_id,
             agent_name=agent.name if agent else None,
+            project_id=customer.project_id,
+            project_name=customer.project.name if customer.project else None,
             consent_given=customer.consent_given,
             marketing_opt_in=customer.marketing_opt_in,
             anonymised_at=customer.anonymised_at,
@@ -134,6 +138,9 @@ class CustomerService(BaseService[Customer]):
                 raise BusinessRuleError(f"Unknown agent code {payload.agent_code}")
             agent_id = agent.id
 
+        if payload.project_id is not None and self.db.get(Project, payload.project_id) is None:
+            raise BusinessRuleError("Unknown project")
+
         values = payload.model_dump(exclude={"agent_code"})
         values["agent_id"] = agent_id
         values["status"] = ApprovalStatus.PENDING_APPROVAL.value
@@ -156,6 +163,10 @@ class CustomerService(BaseService[Customer]):
             )
         self._audit(AuditAction.CREATE, customer, after={"status": customer.status, "agent_id": agent_id},
                     summary="Customer created (pending approval)")
+        # Tell the approvers — and only them — that something is waiting for sign-off.
+        emit(self.db, title="Customer awaiting approval",
+             body=f"{customer.name} was added by {self.actor.name} and needs admin approval.",
+             category="APPROVAL", audience_role=Role.ADMIN.value)
         return customer
 
     def update_customer(self, customer_id: int, payload: CustomerUpdate) -> Customer:
@@ -210,6 +221,13 @@ class CustomerService(BaseService[Customer]):
             after={"status": customer.status},
             summary=f"Customer {payload.status.value}: {payload.reason or 'no reason given'}",
         )
+        # The agent who added this customer hears the outcome (nobody else does).
+        agent = self.agents.get(customer.agent_id) if customer.agent_id else None
+        if agent is not None and agent.user_id:
+            outcome = "approved" if payload.status == ApprovalStatus.APPROVED else "rejected"
+            emit(self.db, title=f"Customer {outcome}", body=f"{customer.name} was {outcome} by {self.actor.name}.",
+                 category="APPROVAL", severity="info" if outcome == "approved" else "warning",
+                 user_id=agent.user_id)
         return customer
 
     # --------------------------------------------------------------- privacy

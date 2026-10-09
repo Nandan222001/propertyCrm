@@ -23,7 +23,7 @@ export function RecordModal({ kind, close, save, context, initial, role }) {
     ['name', 'Full Name', 'text', 'Enter full name'],
     ['email', 'Email Address', 'email', 'name@company.com'],
     ['phone', 'Mobile Number', 'tel', '+91 98765 43210'],
-    ['role', 'Role', 'select', ['ADMIN', 'SUPER ADMIN', 'SALES MANAGER', 'SALES AGENT', 'ACCOUNTS', 'MANAGEMENT']],
+    ['role', 'Role', 'select', ['ADMIN', 'SALES MANAGER', 'SALES AGENT', 'ACCOUNTS', 'MANAGEMENT']],
     ['status', 'Account Status', 'select', ['Active', 'Invited', 'Suspended']]
   ] : record ? [
     ['name', 'Name / Title', 'text', 'e.g. Master record or phase'],

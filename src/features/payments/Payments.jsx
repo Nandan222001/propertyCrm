@@ -16,7 +16,7 @@ import { Badge } from '../../components/common/Badge';
 import { Mini } from '../../components/common/StatTile';
 import { RoleContextBanner } from '../../components/layout/RoleContextBanner';
 
-export function Payments({ pays, receipts, project, search, filter, F, D, notify, role, onOpenBill, onShare, onRemind }) {
+export function Payments({ pays, receipts, project, search, filter, F, D, notify, role, onOpenBill, onShare, onRemind, onStatus }) {
   const [view, setView] = useState('ledger');
   const canBill = canManageBills(role);
   const customerView = role === 'CUSTOMER';
@@ -77,6 +77,15 @@ export function Payments({ pays, receipts, project, search, filter, F, D, notify
                 <Badge>{p[7]}</Badge>,
                 customerView ? p[8] : (
                   <div className="row-actions" key={`${p[0]}-${p[1]}`}>
+                    {canRecordPayment(role) && p[5] !== '0' && onStatus && (
+                      <select
+                        className="select-mini" value={p[7]} aria-label={`Change status for ${p[0]}`}
+                        onChange={(e) => onStatus(p, e.target.value)}
+                      >
+                        {[...new Set([p[7], 'PENDING', ...(parseAmt(p[4]) > 0 ? ['PARTIALLY PAID'] : []), 'OVERDUE'])]
+                          .map((s) => <option key={s} value={s}>{s}</option>)}
+                      </select>
+                    )}
                     {p[5] !== '0' && (
                       <button className="icon-action wa-icon" onClick={() => onRemind(p)} title="WhatsApp payment reminder">
                         <MessageCircle size={14} />
@@ -86,7 +95,7 @@ export function Payments({ pays, receipts, project, search, filter, F, D, notify
                 )
               ])}
             />
-            <div className="table-pagination">Showing {list.length} ledgers <span>Balance updates automatically when a payment is recorded</span></div>
+            <div className="table-pagination">Showing {list.length} ledgers <span>Balance updates automatically when a payment is recorded · use Record Payment to mark as paid</span></div>
           </>
         )}
 

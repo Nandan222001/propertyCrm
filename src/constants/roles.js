@@ -19,5 +19,9 @@ export const ROLE_ORDER = [
 /** Roles allowed to approve agent-entered bookings/customers. */
 export const APPROVER_ROLES = [ROLES.SUPER_ADMIN, ROLES.ADMIN];
 
-/** Only a super-admin session may preview other role workspaces. */
-export const PREVIEW_ROLES = [ROLES.SUPER_ADMIN];
+/**
+ * Backend roles arrive as `SALES_MANAGER`; the UI vocabulary is `SALES MANAGER`.
+ * An empty value stays empty (= signed out) — it must never default to a real role.
+ * Unknown values are passed through upper-cased so they are visible, not hidden.
+ */
+export const toUiRole = (apiRole) => String(apiRole || '').trim().replace(/[_\s]+/g, ' ').toUpperCase();

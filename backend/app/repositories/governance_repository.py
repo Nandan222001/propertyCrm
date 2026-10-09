@@ -72,26 +72,52 @@ class NotificationRepository(BaseRepository[Notification]):
     sortable = {"id": Notification.id, "created_at": Notification.created_at, "due_at": Notification.due_at}
     default_sort = "created_at"
 
-    def for_audience(self, *, role: str | None, user_id: int | None, customer_id: int | None) -> list[Notification]:
-        """Role queue + personal queue, newest first (one query, no duplicates)."""
-        from sqlalchemy import or_
+    @staticmethod
+    def visible_to(*, role: str | None, user_id: int | None, customer_id: int | None):
+        """SQL predicate: what one actor may see. Pure function of the caller's identity.
+
+        * a notification addressed to a *user* is visible to that user only;
+        * a role notification (no user) is visible to staff of that role;
+        * a customer's own notification (no user, audience none/CUSTOMER) is visible to
+          that customer — never because of a role match.
+        """
+        from sqlalchemy import and_, or_
 
         clauses = []
-        if role:
-            clauses.append(Notification.audience_role == role)
         if user_id:
             clauses.append(Notification.user_id == user_id)
         if customer_id:
-            clauses.append(Notification.customer_id == customer_id)
-        if not clauses:
+            clauses.append(and_(
+                Notification.user_id.is_(None),
+                Notification.customer_id == customer_id,
+                or_(Notification.audience_role.is_(None), Notification.audience_role == "CUSTOMER"),
+            ))
+        elif role:
+            clauses.append(and_(Notification.user_id.is_(None), Notification.audience_role == role))
+        return or_(*clauses) if clauses else None
+
+    def for_audience(self, *, role: str | None, user_id: int | None, customer_id: int | None) -> list[Notification]:
+        """Role queue + personal queue, unread first then newest (one query, no duplicates)."""
+        visible = self.visible_to(role=role, user_id=user_id, customer_id=customer_id)
+        if visible is None:
             return []
         stmt = (
             select(Notification)
-            .where(Notification.is_deleted == 0, or_(*clauses))
+            .where(visible)
             .order_by(Notification.is_read.asc(), Notification.created_at.desc())
             .limit(200)
         )
         return list(self.db.execute(stmt).scalars().unique().all())
+
+    def is_visible(self, notification_id: int, *, role: str | None, user_id: int | None,
+                   customer_id: int | None) -> bool:
+        visible = self.visible_to(role=role, user_id=user_id, customer_id=customer_id)
+        if visible is None:
+            return False
+        stmt = select(Notification.id).where(
+            Notification.id == notification_id, visible
+        )
+        return self.db.execute(stmt).first() is not None
 
     def mark_read(self, notification: Notification) -> Notification:
         notification.is_read = True

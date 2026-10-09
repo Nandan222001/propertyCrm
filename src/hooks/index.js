@@ -2,7 +2,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useAppDispatch, useAppSelector } from '../store';
 import { selectCurrentUser, selectMode, selectRole, selectSession } from '../store/selectors';
-import { hasPermission, isAdmin, canApprove, canCreateBooking, canCreateCustomer, canManageBills, canRecordPayment } from '../utils/permissions';
+import { hasPermission, isAdmin, isPlatformAdmin, canApprove, canCreateBooking, canCreateCustomer, canManageBills, canRecordPayment } from '../utils/permissions';
 import { notify } from '../store/thunks';
 
 export { useAppDispatch, useAppSelector };
@@ -20,6 +20,7 @@ export function useAuth() {
     mode,
     signedIn: Boolean(session),
     isAdmin: isAdmin(role),
+    isPlatform: isPlatformAdmin(role),
     canApprove: canApprove(role),
     canCreateBooking: canCreateBooking(role),
     canCreateCustomer: canCreateCustomer(role),

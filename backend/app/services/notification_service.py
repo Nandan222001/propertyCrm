@@ -70,16 +70,24 @@ class NotificationService(BaseService[Notification]):
         self._audit(AuditAction.CREATE, notification, summary=f"Notification '{notification.title}'")
         return notification
 
-    def mark_read(self, notification_id: int) -> Notification:
+    def _own(self, notification_id: int) -> Notification:
+        """Fetch a notification only if it is in *this* actor's queue (404/403 otherwise)."""
         notification = self.notifications.get_or_404(notification_id)
-        if notification.customer_id and notification.customer_id != self.actor.customer_id:
-            raise PermissionDeniedError("This notification belongs to another customer")
+        if not self.notifications.is_visible(
+            notification_id, role=self.actor.role, user_id=self.actor.user_id,
+            customer_id=self.actor.customer_id,
+        ):
+            raise PermissionDeniedError("This notification is not addressed to you")
+        return notification
+
+    def mark_read(self, notification_id: int) -> Notification:
+        notification = self._own(notification_id)
         self.notifications.mark_read(notification)
         return notification
 
     def take_action(self, notification_id: int) -> Notification:
         self._authorise("update")
-        notification = self.notifications.get_or_404(notification_id)
+        notification = self._own(notification_id)
         self.notifications.mark_actioned(notification, self.actor.name)
         self._audit(AuditAction.UPDATE, notification, summary="Follow-up actioned")
         return notification
@@ -109,6 +117,28 @@ class NotificationService(BaseService[Notification]):
             created += 1
         self.db.flush()
         return created
+
+
+def emit(
+    db: Session, *, title: str, body: str | None = None, category: str = "FOLLOW_UP",
+    severity: str = "info", audience_role: str | None = None, user_id: int | None = None,
+    customer_id: int | None = None, booking_id: int | None = None,
+) -> Notification | None:
+    """Queue a notification for exactly one audience (a role, or one user).
+
+    Workflow events call this so the right people hear about them and nobody else:
+    pass ``user_id`` for a person, ``audience_role`` for everyone holding that role.
+    The tenant is stamped automatically on flush, so queues never cross organisations.
+    """
+    if audience_role is None and user_id is None and customer_id is None:
+        return None
+    notification = Notification(
+        title=title, body=body, category=category, severity=severity,
+        audience_role=audience_role, user_id=user_id, customer_id=customer_id, booking_id=booking_id,
+    )
+    db.add(notification)
+    db.flush()
+    return notification
 
 
 class SettingService(BaseService[AppSetting]):

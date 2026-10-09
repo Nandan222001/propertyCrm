@@ -6,7 +6,7 @@
 import { readJson, writeJson } from '../utils/storage';
 
 const COLLECTION_KEYS = ['projects', 'plots', 'bookings', 'payments', 'receipts', 'invoices', 'customers', 'registry'];
-const PERSISTED_SLICES = ['auth', 'domain'];
+const PERSISTED_SLICES = ['auth', 'domain', 'tenants'];
 
 export const createPersistenceMiddleware = () => (store) => (next) => (action) => {
   const result = next(action);
@@ -19,6 +19,7 @@ export const createPersistenceMiddleware = () => (store) => (next) => (action) =
     writeJson('collections', Object.fromEntries(COLLECTION_KEYS.map((key) => [key, state.domain[key]])));
     writeJson('crud', state.domain.crud);
     writeJson('follow_ups', state.domain.followUps);
+    writeJson('tenants', state.tenants.items);
   }
   return result;
 };

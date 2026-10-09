@@ -11,6 +11,7 @@ import {
   seedCustomers, seedRegistry, seedCrud,
 } from '../../data/seedData';
 import { readJson } from '../../utils/storage';
+import { signedOut } from './authSlice';
 import { nowIso } from '../../utils/date';
 
 /** Resolve a row's identity across the tuple-shaped and object-shaped seeds. */
@@ -25,6 +26,9 @@ const withCrudIds = (saved) => Object.fromEntries(
 );
 
 const saved = readJson('collections', null) || {};
+
+/** Collections that hold a tenant's business data (cleared on sign-out / failed load in live mode). */
+const LIVE_COLLECTIONS = ['projects', 'plots', 'bookings', 'payments', 'receipts', 'invoices', 'customers'];
 
 const initialState = {
   projects: saved.projects || seedProjects,
@@ -46,6 +50,13 @@ const initialState = {
 const domainSlice = createSlice({
   name: 'domain',
   initialState,
+  extraReducers: (builder) => {
+    builder.addCase(signedOut, (state) => {
+      if (state.mode !== 'live') return;
+      LIVE_COLLECTIONS.forEach((key) => { state[key] = []; });
+      state.registry = {};
+    });
+  },
   reducers: {
     /** Replace a whole collection (API hydration or seed reset). */
     collectionReplaced(state, action) {
@@ -54,12 +65,22 @@ const domainSlice = createSlice({
     },
     workspaceHydrated(state, action) {
       const payload = action.payload || {};
+      // Authoritative: a tenant with no bookings gets an EMPTY list, never the demo dataset.
       Object.entries(payload).forEach(([key, rows]) => {
-        if (key in state && Array.isArray(rows) && rows.length) state[key] = rows;
+        if (key in state && Array.isArray(rows)) state[key] = rows;
       });
+      state.registry = {};
       state.mode = 'live';
       state.status = 'ready';
       state.error = '';
+    },
+    /** Live sign-in whose data could not be loaded: empty collections, never demo records. */
+    workspaceFailed(state, action) {
+      LIVE_COLLECTIONS.forEach((key) => { state[key] = []; });
+      state.registry = {};
+      state.mode = 'live';
+      state.status = 'error';
+      state.error = action.payload || 'Workspace data unavailable';
     },
     workspaceDemo(state, action) {
       state.mode = 'demo';
@@ -88,6 +109,31 @@ const domainSlice = createSlice({
           ? row.map((value, i) => (i in changes ? changes[i] : value))
           : { ...row, ...changes };
       });
+    },
+    /**
+     * Insert or update a project. Plots, bookings, payments, receipts and invoices
+     * reference a project by name, so a rename is cascaded to keep them attached.
+     */
+    projectSaved(state, action) {
+      const { previousName, row } = action.payload;
+      const index = state.projects.findIndex((p) => p[0] === (previousName ?? row[0]));
+      if (index >= 0) state.projects[index] = row;
+      else state.projects.unshift(row);
+      if (previousName && previousName !== row[0]) {
+        const next = row[0];
+        state.plots = state.plots.map((r) => (r[8] === previousName ? r.map((v, i) => (i === 8 ? next : v)) : r));
+        state.bookings = state.bookings.map((r) => (r[2] === previousName ? r.map((v, i) => (i === 2 ? next : v)) : r));
+        state.payments = state.payments.map((r) => (r[2] === previousName ? r.map((v, i) => (i === 2 ? next : v)) : r));
+        state.receipts = state.receipts.map((r) => (r.project === previousName ? { ...r, project: next } : r));
+        state.invoices = state.invoices.map((r) => (r.project_name === previousName ? { ...r, project_name: next } : r));
+      }
+    },
+    /** Ledger rows are keyed by customer name, so match on customer + plot. */
+    paymentStatusSet(state, action) {
+      const { customer, plot, status } = action.payload;
+      state.payments = (state.payments || []).map((row) => (
+        row[0] === customer && row[1] === plot ? row.map((value, i) => (i === 7 ? status : value)) : row
+      ));
     },
     rowRemoved(state, action) {
       const { key, id } = action.payload;
@@ -123,7 +169,7 @@ const domainSlice = createSlice({
 
 export const {
   collectionReplaced, workspaceHydrated, workspaceDemo, workspaceLoading,
-  rowUpserted, rowPatched, rowRemoved, registryStatusSet, followUpSet,
-  crudRowUpserted, crudRowRemoved, domainError,
+  rowUpserted, rowPatched, rowRemoved, projectSaved, paymentStatusSet, registryStatusSet, followUpSet,
+  crudRowUpserted, crudRowRemoved, domainError, workspaceFailed,
 } = domainSlice.actions;
 export default domainSlice.reducer;

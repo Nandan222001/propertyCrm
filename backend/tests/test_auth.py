@@ -37,7 +37,7 @@ def test_login_failure_is_generic_for_unknown_and_wrong_password(client):
     assert unknown.json()["error"]["message"] == wrong_password.json()["error"]["message"]
 
 
-def test_failed_logins_lock_the_account(client, super_admin_headers):
+def test_failed_logins_lock_the_account(client, admin_headers):
     # Use a purpose-built account so the lockout does not break other tests.
     created = client.post(
         "/api/v1/users",
@@ -47,7 +47,7 @@ def test_failed_logins_lock_the_account(client, super_admin_headers):
             "role": "SALES_AGENT",
             "temporary_password": "Probe@12345",
         },
-        headers=super_admin_headers,
+        headers=admin_headers,
     )
     if created.status_code == 409:  # already created by an earlier run
         pass
@@ -65,7 +65,7 @@ def test_failed_logins_lock_the_account(client, super_admin_headers):
     assert locked, "account should lock after repeated failures"
 
     if user_id:
-        unlocked = client.post(f"/api/v1/users/{user_id}/unlock", headers=super_admin_headers)
+        unlocked = client.post(f"/api/v1/users/{user_id}/unlock", headers=admin_headers)
         assert unlocked.status_code == 200
 
 
@@ -115,12 +115,12 @@ def test_malformed_and_tampered_tokens_are_rejected(client):
         assert response.status_code == 401
 
 
-def test_password_change_requires_current_password_and_revokes_sessions(client, unique_email, super_admin_headers):
+def test_password_change_requires_current_password_and_revokes_sessions(client, unique_email, admin_headers):
     created = client.post(
         "/api/v1/users",
         json={"name": "Password Probe", "email": unique_email, "role": "SALES_AGENT",
               "temporary_password": "Initial@12345"},
-        headers=super_admin_headers,
+        headers=admin_headers,
     )
     assert created.status_code == 201
 
@@ -188,6 +188,7 @@ def test_registration_requires_consent_and_unique_email(client, unique_email):
         "confirm_password": "Strong@12345",
         "role": "CUSTOMER",
         "consent": False,
+        "tenant": "lalita",
     }
     assert client.post("/api/v1/auth/register", json=body).status_code in (400, 422)
     body["consent"] = True

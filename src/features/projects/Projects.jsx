@@ -14,10 +14,16 @@ import { projects, agents, seedUsers } from '../../data/seedData';
 import { Table } from '../../components/common/DataTable';
 import { Badge } from '../../components/common/Badge';
 import { Mini } from '../../components/common/StatTile';
+import { ProjectModal } from './ProjectModal';
+import { PlotViewModal, ProjectViewModal } from './ProjectViews';
 import { PlotMap3D } from '../../features/plots/PlotMap3D';
 import { RoleContextBanner } from '../../components/layout/RoleContextBanner';
 
-export function Projects({ plots, search, project, filter, F, tab, TB, notify, projects, role, onBook }) {
+export function Projects({ plots, search, project, filter, F, tab, TB, notify, projects, role, onBook, onSaveProject }) {
+  const [editing, setEditing] = useState(undefined); // undefined = closed, null = new, row = edit
+  const [viewPlot, setViewPlot] = useState(null);
+  const [viewProject, setViewProject] = useState(null);
+  const canManage = isAdmin(role) && Boolean(onSaveProject);
   const customerView = role === 'CUSTOMER';
   const canBook = canCreateBooking(role);
 
@@ -39,7 +45,7 @@ export function Projects({ plots, search, project, filter, F, tab, TB, notify, p
     p[6],
     p[7],
     <div className="table-actions-cell" key={p[0]}>
-      <button className="icon-action" onClick={() => notify(`Plot ${p[0]} · ${p[2]} sq.ft · ${p[3]} facing · ₹${p[4]}`)} title="View Specs">
+      <button className="icon-action" onClick={() => setViewPlot(p)} title="View Specs">
         <Eye size={14} />
       </button>
       {canBook && p[5] === 'AVAILABLE' && (
@@ -50,22 +56,34 @@ export function Projects({ plots, search, project, filter, F, tab, TB, notify, p
     </div>
   ]);
 
+  const totals = projects.reduce((t, p) => ({
+    plots: t.plots + parseAmt(p[2]), booked: t.booked + parseAmt(p[3]), hold: t.hold + parseAmt(p[4]),
+  }), { plots: 0, booked: 0, hold: 0 });
+
   return (
     <>
       <RoleContextBanner role={role} page="Projects & plots" />
 
       <div className="mini-stats four">
-        <Mini title="TOTAL PROJECTS" value="4" />
-        <Mini title="TOTAL PLOTS" value="384" />
-        <Mini title="AVAILABLE FOR SALE" value="176" color="green-text" />
-        <Mini title="ON HOLD / RESERVED" value="36" color="amber-text" />
+        <Mini title="TOTAL PROJECTS" value={projects.length} />
+        <Mini title="TOTAL PLOTS" value={totals.plots} />
+        <Mini title="AVAILABLE FOR SALE" value={Math.max(totals.plots - totals.booked - totals.hold, 0)} color="green-text" />
+        <Mini title="ON HOLD / RESERVED" value={totals.hold} color="amber-text" />
       </div>
 
       <div className="panel section-panel">
         <div className="tabs">
           <button className={tab === 'Plots' ? 'active' : ''} onClick={() => TB('Plots')}>Plot layout ({list.length})</button>
           <button className={tab === '3D' ? 'active' : ''} onClick={() => TB('3D')}>3D map</button>
-          <button className={tab === 'Projects' ? 'active' : ''} onClick={() => TB('Projects')}>Master projects (4)</button>
+          <button className={tab === 'Projects' ? 'active' : ''} onClick={() => TB('Projects')}>Master projects ({projects.length})</button>
+          {canManage && (
+            <button
+              className="button button-primary small-btn" style={{ marginLeft: 'auto' }}
+              onClick={() => { TB('Projects'); setEditing(null); }}
+            >
+              <Plus size={12} /> Add Project
+            </button>
+          )}
           <div className="table-tools">
             <span className="filter-label">FILTER STATUS:</span>
             {['All status', 'AVAILABLE', 'BOOKED', 'HOLD', 'SOLD'].map(s => (
@@ -78,8 +96,17 @@ export function Projects({ plots, search, project, filter, F, tab, TB, notify, p
 
         {tab === 'Projects' ? (
           <Table
-            headers={['PROJECT NAME', 'LOCATION & PHASE', 'TOTAL PLOTS', 'BOOKED', 'HOLD', 'EST. REVENUE', 'STATUS']}
-            rows={projects.map(p => [<b>{p[0]}</b>, p[1], p[2], p[3], p[4], `₹${p[5]}`, <Badge>Active</Badge>])}
+            headers={['PROJECT NAME', 'LOCATION & PHASE', 'TOTAL PLOTS', 'BOOKED', 'HOLD', 'EST. REVENUE', 'STATUS', 'ACTIONS']}
+            rows={projects
+              .filter(p => !search || p.slice(0, 6).join(' ').toLowerCase().includes(search.toLowerCase()))
+              .map(p => [
+                <b>{p[0]}</b>, p[1], p[2], p[3], p[4], p[5] === '—' ? '—' : `₹${p[5]}`,
+                <Badge>{p[11] === false ? 'Inactive' : 'Active'}</Badge>,
+                <div className="table-actions-cell" key={p[0]}>
+                  <button className="icon-action" title="View project" onClick={() => setViewProject(p)}><Eye size={14} /></button>
+                  {canManage && <button className="icon-action" title="Edit project" onClick={() => setEditing(p)}><Edit2 size={14} /></button>}
+                </div>,
+              ])}
           />
         ) : tab === '3D' ? (
           <PlotMap3D plots={list} role={role} notify={notify} onBook={canBook ? onBook : undefined} />
@@ -90,6 +117,23 @@ export function Projects({ plots, search, project, filter, F, tab, TB, notify, p
           />
         )}
       </div>
+      {viewPlot && <PlotViewModal plot={viewPlot} close={() => setViewPlot(null)} onBook={canBook ? onBook : undefined} />}
+      {viewProject && (
+        <ProjectViewModal
+          project={viewProject}
+          plots={plots}
+          close={() => setViewProject(null)}
+          onEdit={canManage ? setEditing : undefined}
+        />
+      )}
+      {editing !== undefined && (
+        <ProjectModal
+          editing={editing}
+          projects={projects}
+          close={() => setEditing(undefined)}
+          save={onSaveProject}
+        />
+      )}
     </>
   );
 }

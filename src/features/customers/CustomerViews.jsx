@@ -30,19 +30,21 @@ function Table({ headers, rows, empty = 'Nothing to show' }) {
 // ------------------------------------------------------------ customers list
 export function CustomersPage({ customers, bookings, role, search, project, onOpen, onAdd, onApprove, onReject, onWhatsApp }) {
   const rows = customers.filter(c => {
-    const owned = bookings.filter(b => b[1] === c.name);
-    const inProject = project === 'All projects' || owned.some(b => b[2] === project);
+    // A customer belongs to a project if it was added for it, or has a booking in it.
+    const inProject = project === 'All projects'
+      || c.project === project
+      || bookings.some(b => b[2] === project && (c.id != null && b[11] != null ? b[11] === c.id : b[1] === c.name));
     return inProject && Object.values(c).join(' ').toLowerCase().includes(search.toLowerCase());
   });
-  const pending = customers.filter(c => c.status === 'Pending Approval').length;
+  const pending = rows.filter(c => c.status === 'Pending Approval').length;
 
   return (
     <>
       <div className="mini-stats four">
-        <div className="mini-stat"><small>TOTAL CUSTOMERS</small><b>{customers.length}</b></div>
-        <div className="mini-stat"><small>APPROVED</small><b className="green-text">{customers.filter(c => c.status === 'Approved').length}</b></div>
+        <div className="mini-stat"><small>TOTAL CUSTOMERS</small><b>{rows.length}</b></div>
+        <div className="mini-stat"><small>APPROVED</small><b className="green-text">{rows.filter(c => c.status === 'Approved').length}</b></div>
         <div className="mini-stat"><small>AWAITING ADMIN APPROVAL</small><b className="amber-text">{pending}</b></div>
-        <div className="mini-stat"><small>WITH ACTIVE PLOTS</small><b>{new Set(bookings.filter(b => b[7] !== 'Rejected').map(b => b[1])).size}</b></div>
+        <div className="mini-stat"><small>WITH ACTIVE PLOTS</small><b>{new Set(bookings.filter(b => b[7] !== 'Rejected' && (project === 'All projects' || b[2] === project)).map(b => b[1])).size}</b></div>
       </div>
 
       <div className="panel section-panel">
@@ -216,7 +218,7 @@ export function DocumentsPage({ docs, notify, onOpenDocument }) {
               <Eye size={14} />
             </button>
             {(onOpenDocument || d.open) && (
-              <button className="icon-action" title="Print" onClick={onOpenDocument ? () => onOpenDocument(d) : d.open}>
+              <button className="icon-action" title="Print / Save as PDF" onClick={onOpenDocument ? () => onOpenDocument(d) : d.open}>
                 <Download size={14} />
               </button>
             )}

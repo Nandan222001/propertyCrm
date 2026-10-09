@@ -7,18 +7,32 @@
  * land in a devtools snapshot or a persisted slice.
  */
 import { createSlice } from '@reduxjs/toolkit';
-import { ROLES } from '../../constants/roles';
+import { ROLES, ROLE_ORDER, toUiRole } from '../../constants/roles';
 import { roleConfigs, seedUsers } from '../../data/seedData';
-import { readJson, readText } from '../../utils/storage';
+import { readJson } from '../../utils/storage';
 import { clientAudit, redact } from '../../utils/security';
 
 const defaultUserFor = (role = ROLES.ADMIN) =>
   roleConfigs[role]?.defaultUser || { name: 'Workspace User', email: `${role.toLowerCase().replace(/\s+/g, '')}@lalitainfra.com`, role };
 
+/**
+ * Role/session are persisted with writeJson, so read them with readJson. Older
+ * builds re-wrapped the value in quotes on every reload ("\"\\\"ADMIN...");
+ * peel those layers off and accept only a known role.
+ */
+const readStoredRole = (key) => {
+  let value = readJson(key, '');
+  for (let i = 0; i < 20 && typeof value === 'string' && /^\s*"/.test(value); i += 1) {
+    try { value = JSON.parse(value); } catch { break; }
+  }
+  const role = toUiRole(value);
+  return ROLE_ORDER.includes(role) ? role : '';
+};
+
 const initialState = {
   /** Role string of the active session ('' = signed out). */
-  session: readText('session', ''),
-  role: readText('role', ROLES.ADMIN) || ROLES.ADMIN,
+  session: readStoredRole('session'),
+  role: readStoredRole('role') || ROLES.ADMIN,
   users: readJson('users', null) || seedUsers,
   currentUser: readJson('current_user', null) || defaultUserFor(ROLES.ADMIN),
   permissions: [],
@@ -50,16 +64,20 @@ const authSlice = createSlice({
       state.status = 'signedIn';
       state.error = '';
       if (user) {
-        state.session = user.role;
-        state.role = user.role;
+        const uiRole = toUiRole(user.role);
+        state.session = uiRole;
+        state.role = uiRole;
         state.currentUser = {
           id: user.public_id || user.id,
           name: user.name,
           email: user.email,
-          role: user.role,
+          role: uiRole,
           title: user.title || '',
           phone: user.phone || '',
           agentCode: user.agent_code || '',
+          tenantId: user.tenant_id ?? null,
+          tenantName: user.tenant_name || '',
+          tenantSlug: user.tenant_slug || '',
         };
         state.permissions = permissions.length ? permissions : user.permissions || [];
       }
@@ -75,13 +93,6 @@ const authSlice = createSlice({
       state.role = ROLES.ADMIN;
       state.status = 'idle';
       clientAudit('auth.logout', {});
-    },
-    /** Super-admin "preview another role" switch. */
-    rolePreviewed(state, action) {
-      const role = action.payload;
-      state.role = role;
-      state.currentUser = state.users.find((u) => u.role === role) || defaultUserFor(role);
-      clientAudit('auth.role_preview', { role });
     },
     userSaved(state, action) {
       const user = action.payload;
@@ -101,6 +112,6 @@ const authSlice = createSlice({
 });
 
 export const {
-  signedIn, sessionLoaded, sessionFailed, signedOut, rolePreviewed, userSaved, userRemoved, authError,
+  signedIn, sessionLoaded, sessionFailed, signedOut, userSaved, userRemoved, authError,
 } = authSlice.actions;
 export default authSlice.reducer;

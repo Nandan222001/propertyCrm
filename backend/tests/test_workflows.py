@@ -259,3 +259,24 @@ def test_ledger_and_reports_render(client, accounts_headers, admin_headers):
     daily = client.get("/api/v1/reports/daily", headers=admin_headers)
     assert daily.status_code == 200
     assert daily.json()["data"]["report"] == "daily"
+
+
+def test_customer_remembers_the_project_it_was_added_for(client, agent_headers, unique_email, unique_phone):
+    projects = client.get("/api/v1/projects", headers=agent_headers).json()["data"]
+    project = projects[0]
+    created = client.post(
+        "/api/v1/customers",
+        headers=agent_headers,
+        json={"name": "Project Scoped", "email": unique_email, "phone": unique_phone, "project_id": project["id"]},
+    )
+    assert created.status_code in (200, 201), created.text
+    body = created.json()["data"]
+    assert body["project_id"] == project["id"]
+    assert body["project_name"] == project["name"]
+
+    unknown = client.post(
+        "/api/v1/customers",
+        headers=agent_headers,
+        json={"name": "Nowhere", "email": "nowhere-" + unique_email, "phone": "9" + unique_phone[1:][::-1], "project_id": 999999},
+    )
+    assert unknown.status_code == 409, unknown.text

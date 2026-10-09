@@ -24,7 +24,7 @@ export class ErrorBoundary extends React.Component {
     return (
       <div style={{ padding: 48, fontFamily: 'DM Sans, sans-serif' }}>
         <h1 style={{ fontSize: 20 }}>Something went wrong</h1>
-        <p style={{ color: '#8f99a9', fontSize: 12 }}>
+        <p style={{ color: '#8f99a9', fontSize: 13 }}>
           The screen failed to render. Reload to continue — no data was lost.
         </p>
         <button className="button button-primary" onClick={() => window.location.reload()}>Reload</button>

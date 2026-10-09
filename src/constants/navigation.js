@@ -1,7 +1,7 @@
 /** Route table, headings and icon map — one definition for sidebar + routes. */
 import {
   LayoutDashboard, Map, ClipboardList, Wallet, Users, Handshake, Percent,
-  ChartNoAxesCombined, FolderOpen, Bell, Settings, Shield, FileText, ReceiptIndianRupee,
+  ChartNoAxesCombined, FolderOpen, Bell, Settings, Shield, FileText, ReceiptIndianRupee, Building2,
 } from 'lucide-react';
 
 const PAGE = {
@@ -18,6 +18,7 @@ const PAGE = {
   REPORTS: 'Reports',
   DOCUMENTS: 'Documents',
   NOTIFICATIONS: 'Notifications',
+  TENANTS: 'Tenants',
   USERS: 'User & role management',
   ADMIN: 'Administration',
 };
@@ -39,6 +40,7 @@ export const PATH_FOR = {
   [PAGE.REPORTS]: '/reports',
   [PAGE.DOCUMENTS]: '/documents',
   [PAGE.NOTIFICATIONS]: '/notifications',
+  [PAGE.TENANTS]: '/tenants',
   [PAGE.USERS]: '/user-roles',
   [PAGE.ADMIN]: '/administration',
 };
@@ -60,6 +62,7 @@ export const PAGE_ICON = {
   [PAGE.REPORTS]: ChartNoAxesCombined,
   [PAGE.DOCUMENTS]: FolderOpen,
   [PAGE.NOTIFICATIONS]: Bell,
+  [PAGE.TENANTS]: Building2,
   [PAGE.USERS]: Shield,
   [PAGE.ADMIN]: Settings,
   [PAGE.CUSTOMER_DETAIL]: FileText,
@@ -77,37 +80,26 @@ export const PAGE_META = {
   [PAGE.REPORTS]: ['Reports & Business Intelligence', 'Real-time financial, operational, sales funnel and portfolio BI.'],
   [PAGE.DOCUMENTS]: ['Document Vault & Contracts', 'Booking forms, allotment letters, agreement copies, and tax invoices.'],
   [PAGE.NOTIFICATIONS]: ['Operational Follow-ups & Alerts', 'Payment overdue warnings, customer reminders, and system notifications.'],
+  [PAGE.TENANTS]: ['Tenant Management', 'Create organisations, assign their administrators, manage plans and seat limits, suspend or reactivate access.'],
   [PAGE.USERS]: ['Identity & Role-Based Access (RBAC)', 'Assign permissions, manage workspaces, and invite team members.'],
   [PAGE.ADMIN]: ['System Configuration & Master Rules', 'Tax rules, plot layout schemas, banking preferences, and company profiles.'],
 };
 
 /**
- * Sidebar counters per role. `{pending}` / `{users}` are filled from live
- * selectors, so the numbers can never drift from the underlying data.
+ * Sidebar counters per role. Every number is computed from the tenant's own rows
+ * (`{pending}`, `{overduePayments}`, …) — a counter is shown only when it can be
+ * derived, so a brand-new organisation never sees invented figures.
  */
 export const NAV_BADGES = {
-  'SALES AGENT': { Bookings: { text: '3' }, Notifications: { text: '2' } },
   ACCOUNTS: {
-    Payments: { text: '14', alert: true },
+    Payments: { text: '{overduePayments}', alert: true },
     Billing: { text: '{overdueInvoices}', alert: true },
-    Commissions: { text: '3' },
-    Notifications: { text: '6' },
-  },
-  'SALES MANAGER': {
-    Bookings: { text: '6' },
-    Commissions: { text: '3 pending' },
-    Notifications: { text: '4' },
   },
   'SUPER ADMIN': {
-    Approvals: { text: '{pending}', alert: true },
-    Notifications: { text: '5' },
-    'User & role management': { text: '{users}' },
+    Tenants: { text: '{tenants}' },
   },
   ADMIN: {
     Approvals: { text: '{pending}', alert: true },
-    Bookings: { text: '6' },
-    Payments: { text: '24', alert: true },
-    Notifications: { text: '3' },
+    Payments: { text: '{overduePayments}', alert: true },
   },
-  MANAGEMENT: { Notifications: { text: '2' } },
 };

@@ -25,6 +25,9 @@ class ActorContext:
     role: str = Role.CUSTOMER.value
     customer_id: int | None = None
     agent_id: int | None = None
+    #: Organisation the caller belongs to; ``None`` = platform account (super admin).
+    tenant_id: int | None = None
+    tenant_name: str | None = None
     extra_permissions: frozenset[str] = frozenset()
     revoked_permissions: frozenset[str] = frozenset()
     ip_address: str | None = None
@@ -52,6 +55,10 @@ class ActorContext:
         return scope_for(self.role)
 
     @property
+    def is_platform(self) -> bool:
+        return self.tenant_id is None and self.resolved_role == Role.SUPER_ADMIN
+
+    @property
     def is_customer_portal(self) -> bool:
         return self.resolved_role == Role.CUSTOMER
 
@@ -60,6 +67,7 @@ class ActorContext:
             "actor_id": self.user_id,
             "actor_label": self.name,
             "actor_role": self.role,
+            "tenant_id": self.tenant_id,
             "ip_address": self.ip_address,
             "request_id": self.request_id,
         }

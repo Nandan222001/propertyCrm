@@ -16,18 +16,62 @@ import { Badge } from '../../components/common/Badge';
 import { Mini } from '../../components/common/StatTile';
 import { RoleContextBanner } from '../../components/layout/RoleContextBanner';
 
-export function Commissions({ search, notify, role }) {
-  const isAgent = role === 'SALES AGENT';
-  const isManager = role === 'SALES MANAGER';
-  const isAccounts = role === 'ACCOUNTS';
+const STAGES = ['PROCESSING', 'APPROVED', 'PAYABLE', 'PAID'];
 
-  const data = [
+function CommissionSlip({ row, close }) {
+  const [agent, project, plot, dealValue, slab, amount, status] = row;
+  const deal = parseAmt(dealValue);
+  const rate = parseFloat(slab) / 100;
+  const stageIndex = STAGES.indexOf(status);
+  return (
+    <div className="modal-backdrop" onMouseDown={(e) => e.target === e.currentTarget && close()}>
+      <div className="modal">
+        <div className="modal-head">
+          <div>
+            <span className="modal-kicker">COMMISSION SLIP · {project} · Plot {plot}</span>
+            <h2>{agent}</h2>
+            <p>Status: {status}</p>
+          </div>
+          <button className="modal-close" onClick={close} aria-label="Close"><X size={17} /></button>
+        </div>
+        <div className="agent-tiles">
+          <div><small>Deal value</small><b>₹{dealValue}</b></div>
+          <div><small>Commission slab</small><b>{slab}</b></div>
+          <div><small>Commission amount</small><b>₹{amount}</b></div>
+        </div>
+        <h3 className="sheet-h">Calculation</h3>
+        <p className="bill-words">
+          ₹{fmtINR(deal)} × {slab} = <b>₹{fmtINR(Math.round(deal * rate))}</b>
+          {Math.round(deal * rate) !== parseAmt(amount) && ` (recorded amount ₹${amount})`}
+        </p>
+        <h3 className="sheet-h">Payout progress</h3>
+        <p className="bill-words">
+          {status === 'ON HOLD'
+            ? 'On hold — payout is paused until the hold is released.'
+            : STAGES.map((st, i) => (i <= stageIndex ? `✓ ${st}` : `○ ${st}`)).join('  →  ')}
+        </p>
+        <div className="modal-actions"><button className="button button-white" onClick={close}>Close</button></div>
+      </div>
+    </div>
+  );
+}
+
+/** Commission register (shared with the TDS & payroll report). */
+export const COMMISSION_ROWS = [
     ['M. Kumar', 'Green Meadows', 'A-012', '18,40,000', '2.0%', '36,800', 'APPROVED'],
     ['S. Patel', 'Green Meadows', 'C-078', '25,20,000', '2.0%', '50,400', 'PAYABLE'],
     ['R. Gupta', 'Silver Oaks', 'B-104', '12,60,000', '1.5%', '18,900', 'PAID'],
     ['A. Khan', 'Green Meadows', 'A-101', '9,60,000', '2.0%', '19,200', 'PROCESSING'],
     ['N. Bose', 'Park View', 'C-031', '24,75,000', '2.0%', '49,500', 'ON HOLD']
-  ];
+];
+
+export function Commissions({ search, notify, role }) {
+  const [viewing, setViewing] = useState(null);
+  const isAgent = role === 'SALES AGENT';
+  const isManager = role === 'SALES MANAGER';
+  const isAccounts = role === 'ACCOUNTS';
+
+  const data = COMMISSION_ROWS;
 
   return (
     <>
@@ -52,7 +96,7 @@ export function Commissions({ search, notify, role }) {
             `₹${a[5]}`,
             <Badge>{a[6]}</Badge>,
             <div className="table-actions-cell" key={a[0]}>
-              <button className="icon-action" onClick={() => notify(`Commission slip for ${a[0]} opened`)} title="Inspect calculation">
+              <button className="icon-action" onClick={() => setViewing(a)} title="Inspect calculation">
                 <Eye size={14} />
               </button>
               {isManager && a[6] === 'PROCESSING' && (
@@ -69,6 +113,7 @@ export function Commissions({ search, notify, role }) {
           ])}
         />
       </div>
+      {viewing && <CommissionSlip row={viewing} close={() => setViewing(null)} />}
     </>
   );
 }

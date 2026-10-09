@@ -8,7 +8,8 @@
     "build": "vite build",
     "preview": "vite preview --host 0.0.0.0",
     "smoke": "node scripts/render-smoke.mjs",
-    "verify": "npm run build && npm run smoke"
+    "verify": "npm run build && npm run smoke && npm run tenant-flow",
+    "tenant-flow": "node scripts/tenant-flow.mjs"
   },
   "dependencies": {
     "@reduxjs/toolkit": "^2.13.0",

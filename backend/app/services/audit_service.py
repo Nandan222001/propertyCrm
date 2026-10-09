@@ -19,6 +19,7 @@ from app.core.constants import AuditAction
 from app.core.context import ActorContext
 from app.core.logging import get_logger, log_security_event, request_id_var
 from app.db.base import utcnow
+from app.db.tenancy import current_scope
 from app.models.audit import AuditLog, SecurityEvent
 from app.repositories.governance_repository import AuditLogRepository, SecurityEventRepository
 
@@ -32,6 +33,7 @@ def persist_security_event(
     ip_address: str | None = None,
     path: str | None = None,
     context: dict | None = None,
+    tenant_id: int | None = None,
 ) -> SecurityEvent | None:
     """Write a security event in its own transaction (best effort).
 
@@ -51,6 +53,7 @@ def persist_security_event(
                 ip_address=ip_address,
                 path=path,
                 context=context,
+                tenant_id=tenant_id,
             )
             db.flush()
             db.expunge(record)
@@ -150,6 +153,11 @@ class AuditService:
             "ip_address": actor.ip_address if actor else None,
             "path": path,
             "context": context,
+            # The caller's tenant (or the bound session's) so a tenant admin only
+            # ever sees its own organisation's security signals.
+            "tenant_id": actor.tenant_id if actor and actor.tenant_id is not None else (
+                scope.tenant_id if (scope := current_scope(self.db)) is not None else None
+            ),
         }
         if settings.AUDIT_SEPARATE_SESSION:
             persisted = persist_security_event(**fields)

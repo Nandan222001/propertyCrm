@@ -8,6 +8,7 @@ import { authedRequest, request } from './client';
 
 const COLLECTION_PATHS = {
   users: ENDPOINTS.users,
+  tenants: ENDPOINTS.tenants,
   projects: ENDPOINTS.projects,
   plots: ENDPOINTS.plots,
   customers: ENDPOINTS.customers,
@@ -63,5 +64,16 @@ export const actions = {
   approvalQueue: () => authedRequest(ENDPOINTS.bookings.approvals),
   dailyReport: (params) => authedRequest(ENDPOINTS.reports.daily, { params }),
   auditTrail: (params) => authedRequest(ENDPOINTS.reports.auditTrail, { params }),
+  suspendTenant: (id, body) => authedRequest(ENDPOINTS.tenants.suspend(id), { method: 'POST', body }),
+  activateTenant: (id) => authedRequest(ENDPOINTS.tenants.activate(id), { method: 'POST', body: {} }),
+  addTenantAdmin: (id, body) => authedRequest(ENDPOINTS.tenants.admins(id), { method: 'POST', body }),
+  resetTenantAdminPassword: (id, userId) => authedRequest(ENDPOINTS.tenants.resetPassword(id, userId), { method: 'POST', body: {} }),
   acknowledgeEvent: (id, body) => authedRequest(ENDPOINTS.securityEvents.acknowledge(id), { method: 'POST', body }),
 };
+
+/** Per-agent sales totals (deals, gross sales, collected) for the Agents page. */
+actions.agentLeaderboard = () => authedRequest(`${ENDPOINTS.agents.list}/leaderboard`);
+
+/** The caller's own notification queue (the server scopes it by role / person). */
+actions.notificationQueue = () => authedRequest(ENDPOINTS.notifications.list);
+actions.notificationAction = (id) => authedRequest(`${ENDPOINTS.notifications.item(id)}/action`, { method: 'POST', body: {} });

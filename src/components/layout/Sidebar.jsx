@@ -1,13 +1,14 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { ChevronDown, LayoutDashboard, LogOut, X } from 'lucide-react';
 import { PAGE_ICON } from '../../constants/navigation';
-import { PREVIEW_ROLES, ROLE_ORDER } from '../../constants/roles';
 
 /** Left navigation rail: brand, workspace chip, role-aware nav, identity footer. */
 export function Sidebar({
-  role, roleConfig, user, nav, badgeFor, page, mobileOpen, projects, project,
-  session, onNavigate, onClose, onProjectChange, onRolePreview, onLogout,
+  role, roleConfig, user, nav, badgeFor, page, mobileOpen, projects, project, tenantName, showWorkspace = true,
+  session, onNavigate, onClose, onProjectChange, onLogout,
 }) {
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const pick = (value) => { onProjectChange(value); setPickerOpen(false); };
   const renderItems = (items) => items.map((name) => {
     const Icon = PAGE_ICON[name] || LayoutDashboard;
     const badge = badgeFor(name);
@@ -26,7 +27,7 @@ export function Sidebar({
         <div className="brand-mark">L</div>
         <div>
           <b>Lalita <span>Realestate Infra</span></b>
-          <small>ENTERPRISE REAL ESTATE</small>
+          <small>{tenantName || 'ENTERPRISE REAL ESTATE'}</small>
         </div>
         <button className="sidebar-close" onClick={onClose} aria-label="Close navigation">
           <X size={18} />
@@ -34,18 +35,39 @@ export function Sidebar({
       </div>
 
       <div className="workspace-card">
+        {showWorkspace && projects.length > 0 && (
+        <div className="workspace-picker">
         <button
           className="workspace"
-          onClick={() => onProjectChange(project === 'All projects' ? (projects[0]?.[0] || 'Green Meadows') : 'All projects')}
-          title="Switch project filter"
+          onClick={() => setPickerOpen((open) => !open)}
+          aria-haspopup="listbox"
+          aria-expanded={pickerOpen}
+          title="Choose project"
         >
-          <span className="workspace-icon">GM</span>
+          <span className="workspace-icon">{(project === 'All projects' ? 'All' : project).slice(0, 2).toUpperCase()}</span>
           <span>
-            <b>{project === 'All projects' ? (projects[0]?.[0] || 'Green Meadows') : project}</b>
-            <small>Phase II · Mumbai</small>
+            <b>{project === 'All projects' ? 'All projects' : project}</b>
+            <small>{project === 'All projects'
+              ? `${projects.length} project${projects.length === 1 ? '' : 's'}`
+              : (projects.find((p) => p[0] === project)?.[1] || '—')}</small>
           </span>
           <ChevronDown size={14} />
         </button>
+        {pickerOpen && (
+          <div className="workspace-menu" role="listbox">
+            <button role="option" aria-selected={project === 'All projects'} onClick={() => pick('All projects')}>All projects</button>
+            {projects.map((p) => (
+              <button key={p[0]} role="option" aria-selected={project === p[0]} onClick={() => pick(p[0])}>
+                {p[0]}<small>{p[1]}</small>
+              </button>
+            ))}
+            <button className="workspace-menu-manage" onClick={() => { setPickerOpen(false); onNavigate('Projects & plots'); }}>
+              Manage projects →
+            </button>
+          </div>
+        )}
+        </div>
+        )}
 
         <div className="sidebar-role-tag" style={{ borderLeftColor: roleConfig.color }}>
           <span className="role-dot" style={{ background: roleConfig.color }} />
@@ -75,12 +97,6 @@ export function Sidebar({
             <b>{user?.name || 'Workspace User'}</b>
             <small>{role}</small>
           </div>
-
-          {PREVIEW_ROLES.includes(session) && (
-            <select value={role} onChange={(e) => onRolePreview(e.target.value)} title="Preview another role">
-              {ROLE_ORDER.map((r) => <option key={r} value={r}>{r}</option>)}
-            </select>
-          )}
 
           <button className="logout-button" onClick={onLogout} title="Sign out of workspace">
             <LogOut size={14} />

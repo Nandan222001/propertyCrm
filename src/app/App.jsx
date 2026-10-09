@@ -16,14 +16,14 @@ import { Sidebar, Topbar } from '../components/layout';
 import { useAppDispatch, useAppSelector, useAuth, useNotify } from '../hooks';
 import {
   selectAllowedPages, selectBillReceipt, selectBillingSummary, selectBookingForPrint, selectDomain,
-  selectDocuments, selectHeading, selectNavBadge, selectNavigation, selectPage,
+  selectDocuments, selectHeading, selectTenants, selectTenantsMeta, selectNavBadge, selectNavigation, selectPage,
   selectPendingApprovals, selectPlotForPrint, selectRoleConfig, selectScopedData, selectUi,
 } from '../store/selectors';
 import { hasSession } from '../api';
 import {
   createBooking, createCustomer, decideBooking, decideCustomer, deleteRecord, hydrateWorkspace,
-  markReceiptShared, previewRole, recordPayment, registerCustomerAccount, saveRecord, setFollowUp,
-  setRegistryStatus, signIn, signOut, saveInvoice, issueInvoice, cancelInvoice, payInvoice,
+  markReceiptShared, recordPayment, saveProject, setInvoiceStatus, setPaymentStatus, registerCustomerAccount, saveRecord, setFollowUp,
+  setRegistryStatus, actionNotification, loadNotifications, signIn, signOut, saveInvoice, issueInvoice, cancelInvoice, payInvoice,
   shareInvoice, downloadInvoicePdf,
 } from '../store/thunks';
 import {
@@ -38,7 +38,8 @@ import { AccountsDashboard } from '../features/dashboard/AccountsDashboard';
 import { ManagementDashboard } from '../features/dashboard/ManagementDashboard';
 import { SalesAgentDashboard } from '../features/dashboard/SalesAgentDashboard';
 import { SalesManagerDashboard } from '../features/dashboard/SalesManagerDashboard';
-import { SuperAdminDashboard } from '../features/dashboard/SuperAdminDashboard';
+import { PlatformDashboard } from '../features/dashboard/PlatformDashboard';
+import { TenantsPage } from '../features/tenants/TenantsPage';
 import { Projects } from '../features/projects/Projects';
 import { Bookings } from '../features/bookings/Bookings';
 import { Payments } from '../features/payments/Payments';
@@ -49,22 +50,20 @@ import { Reports } from '../features/reports/Reports';
 import { Notifications } from '../features/notifications/Notifications';
 import { Roles } from '../features/users/Roles';
 import { Administration } from '../features/admin/Administration';
-import { CrudWorkspace } from '../features/admin/CrudWorkspace';
 import { RecordModal } from '../features/admin/RecordModal';
 import { CustomerProfile, CustomersPage, DocumentsPage } from '../features/customers/CustomerViews';
 import { BookingModal, CustomerModal, PaymentModal } from '../features/bookings/FeatureModals';
 import { BillModal, BookingFormModal } from '../features/documents/PrintSheets';
 import { AgentInfoModal, AgentLookup } from '../features/agents/AgentLookup';
+import {
+  activateTenant, addTenantAdmin, loadTenantDetail, resetTenantAdminPassword, saveTenant, suspendTenant,
+} from '../store/tenantThunks';
+import { credentialCleared } from '../store/slices/tenantsSlice';
 import { openWhatsApp } from '../utils/whatsapp';
 import { agentKey } from '../utils/names';
 import { agents as agentRoster } from '../data/seedData';
 import { downloadCsv } from '../utils/csv';
 import { clientAudit } from '../utils/security';
-
-const CRUD_EXCLUDED = [
-  PAGES.OVERVIEW, PAGES.APPROVALS, PAGES.CUSTOMER_DETAIL, PAGES.CUSTOMERS,
-  PAGES.BOOKINGS, PAGES.PAYMENTS, PAGES.BILLING, PAGES.USERS, PAGES.DOCUMENTS,
-];
 
 export function App() {
   const dispatch = useAppDispatch();
@@ -75,6 +74,8 @@ export function App() {
 
   const ui = useAppSelector(selectUi);
   const domain = useAppSelector(selectDomain);
+  const notifications = useAppSelector((state) => state.notifications);
+  const unread = auth.mode === 'live' ? notifications.items.filter((n) => !n.is_read).length : null;
   const scoped = useAppSelector(selectScopedData);
   const nav = useAppSelector(selectNavigation);
   const allowedPages = useAppSelector(selectAllowedPages);
@@ -83,6 +84,8 @@ export function App() {
   const pendingApprovals = useAppSelector(selectPendingApprovals);
   const documents = useAppSelector(selectDocuments);
   const badgeFor = useAppSelector(selectNavBadge);
+  const tenants = useAppSelector(selectTenants);
+  const tenantsMeta = useAppSelector(selectTenantsMeta);
   const billReceipt = useAppSelector(selectBillReceipt);
   const billingSummary = useAppSelector(selectBillingSummary);
   const bookingPrint = useAppSelector(selectBookingForPrint);
@@ -105,6 +108,23 @@ export function App() {
   useEffect(() => {
     if (hasSession()) dispatch(hydrateWorkspace());
   }, [dispatch]);
+
+  // Keep the approval queue fresh: customers/bookings sent by agents appear without a reload.
+  useEffect(() => {
+    if (!hasSession() || ![PAGES.APPROVALS, PAGES.CUSTOMERS, PAGES.OVERVIEW, PAGES.BOOKINGS].includes(page)) return undefined;
+    dispatch(hydrateWorkspace({ silent: true }));
+    if (page !== PAGES.APPROVALS) return undefined;
+    const timer = setInterval(() => dispatch(hydrateWorkspace({ silent: true })), 20000);
+    return () => clearInterval(timer);
+  }, [page, dispatch]);
+
+  // My notification queue: on every page change and every 30s while signed in.
+  useEffect(() => {
+    if (!hasSession()) return undefined;
+    dispatch(loadNotifications());
+    const timer = setInterval(() => dispatch(loadNotifications()), 30000);
+    return () => clearInterval(timer);
+  }, [page, auth.mode, dispatch]);
 
   // Global search keyboard shortcut (⌘K / Ctrl-K).
   useEffect(() => {
@@ -190,8 +210,8 @@ export function App() {
   if (!auth.session) {
     return (
       <LoginScreen
-        onLogin={(selectedRole, user) => dispatch(signIn({
-          email: user?.email, password: user?.password, role: selectedRole, user,
+        onLogin={(selectedRole, user, credentials) => dispatch(signIn({
+          email: credentials?.email ?? user?.email, password: credentials?.password ?? user?.password, role: selectedRole, user,
         }))}
         onRegister={(account) => dispatch(registerCustomerAccount(account))}
         customers={domain.customers}
@@ -215,10 +235,11 @@ export function App() {
         projects={domain.projects}
         project={ui.project}
         session={auth.session}
+        tenantName={auth.isPlatform ? 'PLATFORM CONSOLE' : auth.user?.tenantName}
+        showWorkspace={!auth.isPlatform}
         onNavigate={go}
         onClose={() => dispatch(sidebarToggled(false))}
         onProjectChange={(value) => dispatch(projectChanged(value))}
-        onRolePreview={(value) => dispatch(previewRole(value))}
         onLogout={() => dispatch(signOut())}
       />
 
@@ -228,18 +249,19 @@ export function App() {
           role={role}
           roleConfig={roleConfig}
           session={auth.session}
+          tenantName={auth.isPlatform ? 'Platform' : auth.user?.tenantName}
           search={ui.search}
           user={auth.user}
+          unread={unread}
           onMenu={() => dispatch(sidebarToggled(true))}
           onSearch={(value) => dispatch(searchChanged(value))}
           onNavigate={go}
-          onRolePreview={(value) => dispatch(previewRole(value))}
           onLogout={() => dispatch(signOut())}
         />
 
         <div className="content">
           <PageHeader title={<>{heading[0]} {page === PAGES.OVERVIEW && <span className="wave">✳</span>}</>} subtitle={heading[1]}>
-            {!scoped.isCustomerRole && (
+            {!scoped.isCustomerRole && !auth.isPlatform && (
               <button className="button button-white" onClick={notifyExport}>
                 <Download size={14} /> Export CSV
               </button>
@@ -264,18 +286,10 @@ export function App() {
                 <Plus size={15} /> Add Customer
               </button>
             )}
-            {auth.isAdmin && [PAGES.PROJECTS, PAGES.AGENTS].includes(page) && (
-              <button
-                className="button button-white"
-                onClick={() => dispatch(modalOpened({ modal: 'record', crudPage: page }))}
-              >
-                <Plus size={15} /> {page === PAGES.AGENTS ? 'Add Agent' : 'Add Project'}
-              </button>
-            )}
           </PageHeader>
 
           <FilterBar
-            hidden={scoped.isCustomerRole}
+            hidden={scoped.isCustomerRole || auth.isPlatform}
             project={ui.project}
             projects={domain.projects}
             period={ui.period}
@@ -300,9 +314,9 @@ export function App() {
           {/* ---------------------------------------------------- page switch */}
           {page === PAGES.OVERVIEW && (
             <>
-              {role === ROLES.SUPER_ADMIN && <SuperAdminDashboard go={go} notify={notify} users={auth.users} />}
+              {role === ROLES.SUPER_ADMIN && <PlatformDashboard tenants={tenants} go={go} userName={auth.user?.name} />}
               {role === ROLES.ADMIN && (
-                <AdminDashboard bookings={domain.bookings} pays={domain.payments} go={go} D={(kind, preset) => dispatch(modalOpened({ modal: kind, preset }))} notify={notify} />
+                <AdminDashboard bookings={domain.bookings} pays={domain.payments} plots={domain.plots} go={go} D={(kind, preset) => dispatch(modalOpened({ modal: kind, preset }))} notify={notify} />
               )}
               {role === ROLES.SALES_MANAGER && (
                 <SalesManagerDashboard go={go} D={(kind, preset) => dispatch(modalOpened({ modal: kind, preset }))} notify={notify} agents={agentRoster} />
@@ -356,6 +370,7 @@ export function App() {
               notify={notify}
               projects={domain.projects}
               role={role}
+              onSaveProject={(form, editing) => dispatch(saveProject(form, editing))}
               onBook={(plot) => dispatch(modalOpened({ modal: 'booking', preset: { project: plot[8], plot: plot[0] } }))}
             />
           )}
@@ -369,9 +384,17 @@ export function App() {
               TB={(value) => dispatch(tabChanged(value))}
               role={role}
               onNew={() => dispatch(modalOpened({ modal: 'booking' }))}
-              onOpenCustomer={(name) => dispatch(customerSelected(
-                domain.customers.find((c) => c.name === name) || { name, mobile: '', email: '', address: '', agent: '' },
-              ))}
+              onOpenCustomer={(name, booking) => {
+                // Roles without a customer page (e.g. Management) see the booking form instead.
+                if (!allowedPages.includes(PAGES.CUSTOMER_DETAIL)) {
+                  dispatch(bookingPrintSet(booking[0]));
+                  return;
+                }
+                dispatch(customerSelected(
+                  domain.customers.find((c) => c.name === name) || { name, mobile: '', email: '', address: '', agent: '' },
+                ));
+                go(PAGES.CUSTOMER_DETAIL);
+              }}
               onApprove={(booking) => dispatch(decideBooking(booking, 'approve'))}
               onReject={(booking) => dispatch(decideBooking(booking, 'reject'))}
               onPrint={(booking) => dispatch(bookingPrintSet(booking[0]))}
@@ -392,6 +415,7 @@ export function App() {
               role={role}
               onOpenBill={(receipt) => dispatch(billOpened(receipt.no))}
               onShare={shareReceipt}
+              onStatus={(payment, status) => dispatch(setPaymentStatus(payment, status))}
               onRemind={(row) => openWhatsApp(
                 customerPhone(row[0]),
                 `Dear ${row[0]}, a payment of ₹${row[5]} for Plot ${row[1]} (${row[2]}) is due `
@@ -415,6 +439,7 @@ export function App() {
               onCreate={(form) => dispatch(saveInvoice(form))}
               onIssue={(invoice) => dispatch(issueInvoice(invoice))}
               onCancel={(invoice, reason) => dispatch(cancelInvoice(invoice, reason))}
+              onStatus={(invoice, status) => dispatch(setInvoiceStatus(invoice, status))}
               onPay={(invoice, payment) => dispatch(payInvoice(invoice, payment))}
               onPdf={(invoice) => dispatch(downloadInvoicePdf(invoice))}
               onShare={shareInvoiceBill}
@@ -442,21 +467,53 @@ export function App() {
             />
           )}
 
-          {page === PAGES.AGENTS && <Agents search={ui.search} notify={notify} role={role} />}
+          {page === PAGES.TENANTS && auth.isPlatform && (
+            <TenantsPage
+              tenants={tenants}
+              search={ui.search}
+              credential={tenantsMeta.credential}
+              loading={tenantsMeta.loading}
+              error={tenantsMeta.error}
+              onSave={(form, editing) => dispatch(saveTenant(form, editing))}
+              onSuspend={(tenant, reason) => dispatch(suspendTenant(tenant, reason))}
+              onActivate={(tenant) => dispatch(activateTenant(tenant))}
+              onAddAdmin={(tenant, form) => dispatch(addTenantAdmin(tenant, form))}
+              onResetPassword={(tenant, admin) => dispatch(resetTenantAdminPassword(tenant, admin))}
+              onOpenDetail={(tenant) => dispatch(loadTenantDetail(tenant))}
+              onDismissCredential={() => dispatch(credentialCleared())}
+            />
+          )}
+
+          {page === PAGES.AGENTS && <Agents search={ui.search} notify={notify} role={role} onView={(agent) => dispatch(agentInfoSet(agent))} />}
           {page === PAGES.COMMISSIONS && <Commissions search={ui.search} notify={notify} role={role} />}
-          {page === PAGES.REPORTS && <Reports notify={notify} role={role} />}
+          {page === PAGES.REPORTS && (
+            <Reports
+              notify={notify}
+              role={role}
+              bookings={scoped.bookings}
+              payments={scoped.payments}
+              plots={domain.plots}
+              projects={domain.projects}
+              onExport={(key, rows) => clientAudit('report.exported', { report: key, rows })}
+            />
+          )}
           {page === PAGES.DOCUMENTS && (
             <DocumentsPage
               docs={documents}
               notify={notify}
               onOpenDocument={(doc) => (doc.receiptNo
                 ? dispatch(billOpened(doc.receiptNo))
-                : dispatch(bookingPrintSet(doc.bookingId)))}
+                : dispatch(bookingPrintSet({ id: doc.bookingId, kind: doc.kind })))}
             />
           )}
           {page === PAGES.NOTIFICATIONS && (
             <Notifications
+              items={notifications.items}
+              live={auth.mode === 'live'}
+              onAction={(item) => dispatch(actionNotification(item))}
               fups={domain.followUps}
+              onNavigate={go}
+              allowedPages={allowedPages}
               FUP={(id, value) => dispatch(setFollowUp(id, value))}
               notify={notify}
               role={role}
@@ -474,7 +531,7 @@ export function App() {
             />
           )}
 
-          {page === PAGES.ADMIN && <Administration notify={notify} role={role} />}
+          {page === PAGES.ADMIN && <Administration notify={notify} role={role} onNavigate={go} allowedPages={allowedPages} />}
 
           {page === PAGES.CUSTOMER_DETAIL && (
             <CustomerProfile
@@ -490,20 +547,6 @@ export function App() {
               notify={notify}
             />
           )}
-
-          {auth.isAdmin && !CRUD_EXCLUDED.includes(page) && (
-            <CrudWorkspace
-              page={page}
-              records={domain.crud[page] || []}
-              project={ui.project}
-              search={ui.search}
-              role={role}
-              create={() => dispatch(modalOpened({ modal: 'record', crudPage: page }))}
-              edit={(record) => dispatch(modalOpened({ modal: 'record', crudPage: page, editRecord: record }))}
-              view={(record) => notify(`Inspecting ${record.name}`)}
-              remove={(record) => dispatch(deleteRecord(record))}
-            />
-          )}
         </div>
       </main>
 
@@ -514,6 +557,7 @@ export function App() {
           agentName={scoped.agentName}
           customers={domain.customers}
           plots={domain.plots}
+          projects={domain.projects}
           preset={ui.bookingPreset}
           close={() => dispatch(modalClosed())}
           save={(form) => dispatch(createBooking({ ...form, agent: scoped.agentName }))}
@@ -531,6 +575,8 @@ export function App() {
         <CustomerModal
           agentName={scoped.agentName}
           customers={domain.customers}
+          projects={domain.projects}
+          defaultProject={ui.project === 'All projects' ? '' : ui.project}
           close={() => dispatch(modalClosed())}
           save={(form) => dispatch(createCustomer(form))}
         />
@@ -560,6 +606,7 @@ export function App() {
           booking={bookingPrint}
           customer={domain.customers.find((c) => c.name === bookingPrint[1])}
           plot={plotForPrint}
+          kind={ui.bookingDocKind}
           close={() => dispatch(bookingPrintSet(null))}
           onWhatsApp={scoped.isCustomerRole ? undefined : () => whatsappBooking(bookingPrint)}
         />

@@ -16,6 +16,7 @@ import {
   amountInWords, fmtINR, parseAmt, computeTotals, GST_OPTIONS, invoiceDate,
   INVOICE_STATUS_LABEL, itemsPayload,
 } from '../../utils';
+import { getSettings } from '../../utils/settings';
 import { PrintModal } from '../documents/PrintSheets';
 
 const PAY_MODES = ['UPI', 'NEFT', 'RTGS', 'Cheque', 'Cash', 'Card'];
@@ -67,7 +68,7 @@ export function InvoiceFormModal({ bookings, editing, close, save }) {
   const options = useMemo(() => bookingOptions(bookings), [bookings]);
   const [bookingNumber, setBookingNumber] = useState(editing?.booking_number || options[0]?.number || '');
   const booking = options.find((o) => o.number === bookingNumber) || options[0];
-  const [gstRate, setGstRate] = useState(String(editing?.gst_rate ?? 0.18));
+  const [gstRate, setGstRate] = useState(String(editing?.gst_rate ?? getSettings().tax.defaultGst));
   const [discount, setDiscount] = useState(String(editing?.discount_amount || 0));
   const [dueDate, setDueDate] = useState('');
   const [notes, setNotes] = useState(editing?.notes || 'Please quote the invoice number with every payment.');
@@ -287,42 +288,53 @@ export function InvoiceCancelModal({ invoice, close, save }) {
 function InvoiceSheet({ invoice, customer }) {
   const items = invoice.items || [];
   const statusLabel = INVOICE_STATUS_LABEL[invoice.status] || invoice.status;
+  const money = (value) => `Rs. ${fmtINR(value)}`;
   return (
-    <div className="bill-sheet invoice-sheet">
-      <header className="bill-head">
+    <div className="bill-sheet invoice-sheet inv2">
+      <header className="inv2-head">
         <div>
           <h2>{COMPANY.name}</h2>
-          <p>{COMPANY.address} · GSTIN {COMPANY.gstin}</p>
-          <p>{COMPANY.phone} · {COMPANY.email}</p>
+          <p>{COMPANY.address}</p>
+          <p>GSTIN: {COMPANY.gstin}</p>
+          <p>Phone: {COMPANY.phone} · {COMPANY.email}</p>
         </div>
-        <div className="bill-copy-tag">{statusLabel.toUpperCase()}</div>
+        <div className="inv2-title">
+          <b>TAX INVOICE</b>
+          <span className={`inv2-status inv2-${String(invoice.status).toLowerCase()}`}>{statusLabel.toUpperCase()}</span>
+        </div>
       </header>
-      <div className="bill-title">TAX INVOICE</div>
 
-      <div className="inv-meta-grid">
-        <table className="bill-table">
-          <tbody>
-            <tr><th>Billed to</th><td><b>{invoice.customer_name}</b></td></tr>
-            <tr><th>Contact</th><td>{customer?.mobile ? `${customer.mobile} · ` : ''}{customer?.email || '—'}</td></tr>
-            <tr><th>Address</th><td>{customer?.address || '—'}</td></tr>
-          </tbody>
-        </table>
-        <table className="bill-table">
-          <tbody>
-            <tr><th>Invoice no.</th><td><b>{invoice.invoice_number}</b></td></tr>
-            <tr><th>Issue date</th><td>{invoiceDate(invoice.issue_date)}</td></tr>
-            <tr><th>Due date</th><td>{invoice.due_date ? invoiceDate(invoice.due_date) : '—'}</td></tr>
-            <tr><th>Booking</th><td>{invoice.booking_number || '—'}</td></tr>
-          </tbody>
-        </table>
+      <div className="inv2-boxes">
+        <div className="inv2-box">
+          <small>BILL TO</small>
+          <b>{invoice.customer_name}</b>
+          {customer?.mobile && <p>{customer.mobile}</p>}
+          {customer?.email && <p>{customer.email}</p>}
+          {customer?.address && <p>{customer.address}</p>}
+        </div>
+        <div className="inv2-box">
+          <small>INVOICE DETAILS</small>
+          <dl>
+            <dt>Invoice no.:</dt><dd>{invoice.invoice_number}</dd>
+            <dt>Issue date:</dt><dd>{invoice.issue_date}</dd>
+            <dt>Due date:</dt><dd>{invoice.due_date || '—'}</dd>
+            <dt>Booking:</dt><dd>{invoice.booking_number || '—'}</dd>
+          </dl>
+        </div>
       </div>
 
-      <table className="bill-table inv-items-table">
+      {(invoice.project_name || invoice.plot_number) && (
+        <div className="inv2-property">
+          <small>PROPERTY</small>
+          <b>{invoice.project_name}{invoice.plot_number ? ` · Plot ${invoice.plot_number}` : ''}</b>
+        </div>
+      )}
+
+      <table className="inv2-items">
         <thead>
           <tr>
-            <th>#</th><th className="inv-col-desc">Description</th><th>HSN/SAC</th>
-            <th className="inv-col-num">Qty</th><th className="inv-col-num">Rate</th>
-            <th className="inv-col-num">Disc</th><th className="inv-col-num">Amount</th>
+            <th>#</th><th>DESCRIPTION</th><th>HSN/SAC</th>
+            <th className="num">QTY</th><th className="num">RATE</th><th className="num">DISCOUNT</th><th className="num">AMOUNT</th>
           </tr>
         </thead>
         <tbody>
@@ -331,70 +343,59 @@ function InvoiceSheet({ invoice, customer }) {
               <td>{index + 1}</td>
               <td>{item.description}</td>
               <td>{item.hsn_sac || '—'}</td>
-              <td className="inv-col-num">{fmtINR(item.quantity)} {item.unit}</td>
-              <td className="inv-col-num">₹{fmtINR(item.unit_price)}</td>
-              <td className="inv-col-num">{Number(item.discount_amount) > 0 ? `₹${fmtINR(item.discount_amount)}` : '—'}</td>
-              <td className="inv-col-num"><b>₹{fmtINR(item.line_total)}</b></td>
+              <td className="num">{fmtINR(item.quantity)} {item.unit}</td>
+              <td className="num">{money(item.unit_price)}</td>
+              <td className="num">{Number(item.discount_amount) > 0 ? money(item.discount_amount) : '—'}</td>
+              <td className="num"><b>{money(item.line_total)}</b></td>
             </tr>
           ))}
         </tbody>
       </table>
 
-      <div className="inv-totals-block">
-        <div className="inv-totals-rows">
-          <span>Subtotal</span><b>₹{fmtINR(invoice.subtotal)}</b>
-          {Number(invoice.discount_amount) > 0 && (<><span>Less: discount</span><b>- ₹{fmtINR(invoice.discount_amount)}</b></>)}
-          <span>Taxable value</span><b>₹{fmtINR(invoice.taxable_value)}</b>
+      <div className="inv2-totals-wrap">
+        <p className="inv2-words">Amount in words: <b>{amountInWords(invoice.total_amount)}</b></p>
+        <div className="inv2-totals">
+          <div><span>Subtotal</span><span>{money(invoice.subtotal)}</span></div>
+          {Number(invoice.discount_amount) > 0 && <div><span>Less: discount</span><span>- {money(invoice.discount_amount)}</span></div>}
+          <div><span>Taxable value</span><span>{money(invoice.taxable_value)}</span></div>
           {Number(invoice.gst_rate) > 0 && (
             <>
-              <span>CGST @ {Number(invoice.gst_rate) / 2 * 100}%</span><b>₹{fmtINR(invoice.cgst_amount)}</b>
-              <span>SGST @ {Number(invoice.gst_rate) / 2 * 100}%</span><b>₹{fmtINR(invoice.sgst_amount)}</b>
+              <div><span>CGST @ {Number(invoice.gst_rate) / 2 * 100}%</span><span>{money(invoice.cgst_amount)}</span></div>
+              <div><span>SGST @ {Number(invoice.gst_rate) / 2 * 100}%</span><span>{money(invoice.sgst_amount)}</span></div>
             </>
           )}
-          {Number(invoice.round_off) !== 0 && (<><span>Round off</span><b>₹{fmtINR(invoice.round_off)}</b></>)}
-          <span className="inv-grand">TOTAL PAYABLE</span><b className="inv-grand">₹{fmtINR(invoice.total_amount)}</b>
+          {Number(invoice.round_off) !== 0 && <div><span>Round off</span><span>{money(invoice.round_off)}</span></div>}
+          <div className="inv2-grand"><span>TOTAL PAYABLE</span><span>{money(invoice.total_amount)}</span></div>
           {Number(invoice.amount_paid) > 0 && (
             <>
-              <span>Paid to date</span><b>₹{fmtINR(invoice.amount_paid)}</b>
-              <span>Balance due</span><b>₹{fmtINR(invoice.balance_amount)}</b>
+              <div><span>Paid to date</span><span>{money(invoice.amount_paid)}</span></div>
+              <div className="inv2-balance"><span>Balance due</span><span>{money(invoice.balance_amount)}</span></div>
             </>
           )}
         </div>
       </div>
-      <p className="bill-words">Amount in words: <b>{amountInWords(invoice.total_amount)}</b></p>
 
       {(invoice.history || []).length > 0 && (
-        <>
-          <h3 className="sheet-h">Lifecycle</h3>
-          <table className="bill-table">
-            <tbody>
-              {(invoice.history || []).slice(0, 6).map((entry, index) => (
-                <tr key={entry.id || index}>
-                  <th>{INVOICE_STATUS_LABEL[entry.to_status] || entry.to_status}</th>
-                  <td>{entry.reason || '—'}{entry.changed_by_label ? ` · by ${entry.changed_by_label}` : ''}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </>
+        <section className="inv2-section">
+          <small>LIFECYCLE</small>
+          {(invoice.history || []).slice(0, 6).map((entry, index) => (
+            <p key={entry.id || index}>
+              {entry.to_status} — {entry.reason || '—'}{entry.changed_by_label ? ` · by ${entry.changed_by_label}` : ''}
+            </p>
+          ))}
+        </section>
       )}
-
-      {(invoice.notes || invoice.terms) && (
-        <>
-          <h3 className="sheet-h">Notes &amp; terms</h3>
-          {invoice.notes && <p className="bill-words">{invoice.notes}</p>}
-          {invoice.terms && <ol className="sheet-terms"><li>{invoice.terms}</li></ol>}
-        </>
-      )}
+      {invoice.notes && <section className="inv2-section"><small>NOTES</small><p>{invoice.notes}</p></section>}
+      {invoice.terms && <section className="inv2-section"><small>TERMS</small><p>{invoice.terms}</p></section>}
       {invoice.status === 'CANCELLED' && invoice.cancellation_reason && (
-        <p className="bill-words"><b>CANCELLED — {invoice.cancellation_reason}</b></p>
+        <section className="inv2-section"><p><b>CANCELLED — {invoice.cancellation_reason}</b></p></section>
       )}
 
-      <footer className="bill-sign three">
+      <footer className="inv2-sign">
         <div><i /> Customer signature</div>
-        <div><i /> Sales agent{invoice.agent_name ? ` · ${invoice.agent_name}` : ''}</div>
         <div><i /> Authorised signatory</div>
       </footer>
+      <p className="inv2-foot">Computer-generated tax invoice · {invoice.invoice_number}</p>
     </div>
   );
 }

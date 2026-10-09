@@ -6,8 +6,10 @@ export function RoleContextBanner({ role, page }) {
   const cfg = roleConfigs[role] || roleConfigs['ADMIN'];
 
   const pageDescriptions = {
+    'Tenants': {
+      'SUPER ADMIN': 'Platform Console — Onboard organisations, assign their administrators, manage plans and seat limits, and suspend or reactivate access. Tenant business data is never shown here.'
+    },
     'Projects & plots': {
-      'SUPER ADMIN': 'Root Access — Full CRUD control over project portfolios, master layout creation, plot boundaries, and base pricing per sqft.',
       'ADMIN': 'Operations Command — Add new projects, manage master plot inventory, reassign plots, and oversee project delivery schedules.',
       'SALES MANAGER': 'Sales Manager View — Monitoring inventory availability across phases, tracking plot reservations, and reviewing hold requests.',
       'SALES AGENT': 'Sales Agent View — Filter and search available plots for your active clients. Instant pricing calculation and reservation hold actions.',
@@ -15,7 +17,6 @@ export function RoleContextBanner({ role, page }) {
       'MANAGEMENT': 'Boardroom View — Macro plot absorption velocity, realization yield per square yard, and phase rollout analytics.'
     },
     'Bookings': {
-      'SUPER ADMIN': 'Root Access — Complete audit log of all bookings, override permissions, cancellation approvals, and contract audits.',
       'ADMIN': 'Operations Command — Full booking register, installment plan modifications, customer reassignment, and formal allotment execution.',
       'SALES MANAGER': 'Leadership Desk — Review pipeline bookings from your sales force. Sign off on agreement approvals and booking holds.',
       'SALES AGENT': 'My Deals Desk — Create and manage bookings for your customers. Track token advance receipts and milestone agreement statuses.',
@@ -23,7 +24,6 @@ export function RoleContextBanner({ role, page }) {
       'MANAGEMENT': 'Executive BI — High-level sales velocity, monthly contract bookings count, and average booking value trends.'
     },
     'Payments': {
-      'SUPER ADMIN': 'Root Access — Banking gateway configurations, payment ledger audit trail, and multi-currency exchange reconciliations.',
       'ADMIN': 'Operations Command — Overview of cash collections, customer installment tracking, and pending installment reminders.',
       'SALES MANAGER': 'Sales Leadership — Track collection velocity across agents to ensure deals are backed by cleared payments.',
       'SALES AGENT': 'Deal Realization — View payment clearance statuses for your clients to track when your commission milestone unlocks.',
@@ -31,7 +31,6 @@ export function RoleContextBanner({ role, page }) {
       'MANAGEMENT': 'Executive View — Net cash flow realization, liquidity analysis, and monthly recurring collections trajectory.'
     },
     'Billing': {
-      'SUPER ADMIN': 'Root Access — Full billing desk control: raise GST invoices, issue, collect, cancel and audit every tax invoice with PDF bills.',
       'ADMIN': 'Operations Command — Raise instalment and service-charge bills against bookings, issue them for collection, and download print-ready PDFs.',
       'SALES MANAGER': 'Sales Leadership — Review the invoice book for your team\'s bookings: billed, collected, outstanding and overdue positions.',
       'ACCOUNTS': 'Billing Desk — Full authority to draft line-item GST invoices, issue bills, record collections (auto receipt + ledger), and share PDF bills.',
@@ -39,7 +38,6 @@ export function RoleContextBanner({ role, page }) {
       'CUSTOMER': 'My Bills — View and download the tax invoices raised for your bookings, with payment status and balance due.'
     },
     'Commissions': {
-      'SUPER ADMIN': 'Root Access — Master commission slab configurations, payout authorization policies, and fiscal compliance audit.',
       'ADMIN': 'Operations Command — Manage agent eligibility, tier qualifications, and verify deal attribution.',
       'SALES MANAGER': 'Sales Leadership — Review agent deal performance and approve monthly commission slips for the team.',
       'SALES AGENT': 'My Commission Statement — View your personal earnings, commission slabs (2.0% – 2.5%), TDS deduction breakdown, and bank payout dates.',
@@ -47,7 +45,6 @@ export function RoleContextBanner({ role, page }) {
       'MANAGEMENT': 'Board View — Total sales cost ratio, commission payout percentage against Gross Development Value (GDV).'
     },
     'Reports': {
-      'SUPER ADMIN': 'Root BI — Enterprise-wide transactional data dumps, server audit metrics, and complete data export.',
       'ADMIN': 'Operations BI — Comprehensive operations reports across projects, bookings, payments, and agent throughput.',
       'SALES MANAGER': 'Sales BI — Agent leaderboard rankings, lead-to-booking conversion funnel velocity, and lost deal analysis.',
       'SALES AGENT': 'Personal BI — My Monthly Sales Target realization curve and customer inquiry conversion ratios.',
@@ -55,7 +52,6 @@ export function RoleContextBanner({ role, page }) {
       'MANAGEMENT': 'Executive BI — Portfolio Profit & Loss, Return on Capital Employed (ROCE), and inventory absorption curves.'
     },
     'Notifications': {
-      'SUPER ADMIN': 'System Alerts — Server telemetry, security scans, database snapshot backups, and administrative events.',
       'ADMIN': 'Operations Alerts — Customer booking agreements ready, project milestones, and pending staff requests.',
       'SALES MANAGER': 'Sales Alerts — Deal reservation hold requests, agent milestone achievements, and urgent customer inquiries.',
       'SALES AGENT': 'My Follow-up Alerts — Upcoming customer site visits, appointment reminders, and allotment letter notices.',

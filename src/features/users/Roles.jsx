@@ -19,7 +19,6 @@ import { RoleContextBanner } from '../../components/layout/RoleContextBanner';
 
 export function Roles({ role, notify, users = [], create, edit, remove }) {
   const matrix = [
-    ['SUPER ADMIN', '✓', '✓', '✓', '✓', '✓', '✓', '✓', '✓'],
     ['ADMIN', '✓', '✓', '✓', '✓', '✓', '✓', '✓', '✓'],
     ['SALES MANAGER', '●', '✓', '●', '✓', '●', '✓', '✓', '—'],
     ['SALES AGENT', '—', '●', '—', '●', '—', '●', '●', '—'],

@@ -27,8 +27,17 @@ class UserRepository(BaseRepository[User]):
     default_sort = "created_at"
 
     def get_by_email(self, email: str) -> User | None:
-        """Case-insensitive lookup; emails are always stored lower-cased."""
-        return self.get_by(email=(email or "").strip().lower())
+        """Case-insensitive lookup; emails are always stored lower-cased.
+
+        An e-mail identifies exactly one account on the whole platform (it is how
+        sign-in finds the tenant), so this lookup deliberately crosses tenants.
+        """
+        stmt = (
+            self._base_query()
+            .where(User.email == (email or "").strip().lower())
+            .execution_options(all_tenants=True)
+        )
+        return self.db.execute(stmt).scalars().first()
 
     def active(self) -> list[User]:
         return self.list(filters={"status": UserStatus.ACTIVE.value})

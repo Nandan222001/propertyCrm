@@ -273,15 +273,15 @@ export const seedInvoices = [
 
 export const roleConfigs = {
   'SUPER ADMIN': {
-    badge: 'SUPER ADMIN',
+    badge: 'PLATFORM ADMIN',
     color: '#7b39ed',
     bg: '#f3e8ff',
-    title: 'Platform Governance & System Health',
-    subtitle: 'System infrastructure, tenant security, global audit logs & root configuration.',
+    title: 'Platform Console',
+    subtitle: 'Organisations (tenants), their administrators, plans and access — never their business data.',
     defaultUser: { name: 'Devendra Singhania', email: 'superadmin@lalitainfra.com', role: 'SUPER ADMIN' },
-    permissions: ['ALL', 'SYSTEM_AUDIT', 'INFRASTRUCTURE', 'DATABASE_BACKUPS', 'IAM_PROVISIONING', 'MASTER_RECORDS'],
-    workspaceNav: ['Overview', 'Approvals', 'Projects & plots', 'Bookings', 'Payments', 'Billing', 'Customers', 'Agents', 'Commissions'],
-    insightsNav: ['Reports', 'Documents', 'Notifications', 'User & role management', 'Administration']
+    permissions: ['TENANT_VIEW', 'TENANT_MANAGE', 'PLATFORM_AUDIT'],
+    workspaceNav: ['Overview', 'Tenants'],
+    insightsNav: []
   },
   'ADMIN': {
     badge: 'ADMIN',

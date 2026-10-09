@@ -17,6 +17,7 @@ from __future__ import annotations
 import time
 from datetime import timedelta
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
@@ -27,6 +28,7 @@ from app.core.exceptions import (
     AuthenticationError,
     ConflictError,
     NotFoundError,
+    ValidationError,
 )
 from app.core.logging import get_logger
 from app.core.rate_limit import LoginThrottle
@@ -39,6 +41,7 @@ from app.core.security import (
 )
 from app.db.base import utcnow
 from app.models.audit import LoginAttempt
+from app.models.tenant import Tenant
 from app.models.user import AuthToken, User
 from app.repositories.user_repository import (
     AuthTokenRepository,
@@ -59,6 +62,7 @@ logger = get_logger(__name__)
 
 #: Single, deliberately vague message — prevents account enumeration.
 INVALID_CREDENTIALS = "Invalid e-mail address or password"
+TENANT_SUSPENDED = "Your organisation's access is suspended. Contact the platform administrator."
 
 
 class AuthService:
@@ -83,7 +87,7 @@ class AuthService:
             self.audit.security_event(
                 "auth.account_locked",
                 f"Sign-in attempted on locked account {email}",
-                actor=ActorContext(user_id=user.id, name=user.name, email=email, role=user.role,
+                actor=ActorContext(user_id=user.id, tenant_id=user.tenant_id, name=user.name, email=email, role=user.role,
                                    ip_address=ip, user_agent=user_agent),
             )
             raise AccountLockedError(f"Account locked. Try again in {max(remaining // 60, 1)} minute(s).")
@@ -101,6 +105,10 @@ class AuthService:
             self._record_attempt(user, email, False, "suspended", ip, user_agent)
             raise AuthenticationError("This account is suspended. Contact your administrator.")
 
+        if not self._tenant_is_active(user):
+            self._record_attempt(user, email, False, "tenant_suspended", ip, user_agent)
+            raise AuthenticationError(TENANT_SUSPENDED)
+
         if settings.CONSENT_REQUIRED and user.role == Role.CUSTOMER.value and not user.consent_given_at:
             # Portal users must have accepted the privacy notice (DPDP §7).
             pass  # recorded as an event, not a hard block, for staff-created accounts
@@ -113,7 +121,7 @@ class AuthService:
             resource="auth",
             resource_id=user.public_id,
             summary=f"{user.role} signed in",
-            actor=ActorContext(user_id=user.id, public_id=user.public_id, name=user.name, email=email,
+            actor=ActorContext(user_id=user.id, tenant_id=user.tenant_id, public_id=user.public_id, name=user.name, email=email,
                                role=user.role, ip_address=ip, user_agent=user_agent),
         )
         return {"user": self.session_user(user), "tokens": tokens}
@@ -148,6 +156,8 @@ class AuthService:
         user = self.users.get_or_404(stored.user_id)
         if not user.is_active or user.is_deleted:
             raise AuthenticationError("Account is not active")
+        if not self._tenant_is_active(user):
+            raise AuthenticationError(TENANT_SUSPENDED)
 
         new_token = self._issue_tokens(user, ip=ip, user_agent=user_agent, rotate_from=stored)
         self.audit.log(
@@ -155,7 +165,7 @@ class AuthService:
             resource="auth",
             resource_id=user.public_id,
             summary="Access token refreshed",
-            actor=ActorContext(user_id=user.id, name=user.name, email=user.email, role=user.role,
+            actor=ActorContext(user_id=user.id, tenant_id=user.tenant_id, name=user.name, email=user.email, role=user.role,
                                ip_address=ip, user_agent=user_agent),
         )
         return new_token
@@ -176,11 +186,14 @@ class AuthService:
     # ------------------------------------------------------------ registration
     def register(self, payload: RegisterRequest, *, ip: str | None, user_agent: str | None) -> dict:
         email = payload.email.lower().strip()
+        tenant = self.db.execute(
+            select(Tenant).where(Tenant.slug == payload.tenant.strip().lower())
+        ).scalars().first()
+        if tenant is None or not tenant.is_active:
+            raise ValidationError("Unknown or inactive organisation", code="invalid_tenant")
         if self.users.get_by_email(email):
             raise ConflictError("An account with this e-mail already exists")
         if settings.CONSENT_REQUIRED and not payload.consent:
-            from app.core.exceptions import ValidationError
-
             raise ValidationError("Please accept the privacy notice to continue", code="consent_required")
 
         user = User(
@@ -193,6 +206,7 @@ class AuthService:
             password_hash=hash_password(payload.password),
             password_changed_at=utcnow(),
             consent_given_at=utcnow() if payload.consent else None,
+            tenant_id=tenant.id,
         )
         self.users.create(user)
         tokens = self._issue_tokens(user, ip=ip, user_agent=user_agent)
@@ -200,11 +214,11 @@ class AuthService:
             "auth.register",
             f"New {payload.role.value} account created",
             severity="info",
-            actor=ActorContext(user_id=user.id, name=user.name, email=email, role=user.role,
+            actor=ActorContext(user_id=user.id, tenant_id=user.tenant_id, name=user.name, email=email, role=user.role,
                                ip_address=ip, user_agent=user_agent),
         )
         self.audit.log(action=AuditAction.CREATE, resource="user", resource_id=user.public_id,
-                       summary="Self-registration", actor=ActorContext(user_id=user.id, name=user.name,
+                       summary="Self-registration", actor=ActorContext(user_id=user.id, tenant_id=user.tenant_id, name=user.name,
                                                                        email=email, role=user.role))
         return {"user": self.session_user(user), "tokens": tokens}
 
@@ -217,12 +231,8 @@ class AuthService:
             )
             raise AuthenticationError("Current password is incorrect")
         if payload.new_password != payload.confirm_password:
-            from app.core.exceptions import ValidationError
-
             raise ValidationError("New passwords do not match", code="password_mismatch")
         if verify_password(payload.new_password, user.password_hash):
-            from app.core.exceptions import ValidationError
-
             raise ValidationError("Choose a password you have not used before", code="password_reused")
 
         user.password_hash = hash_password(payload.new_password)
@@ -254,7 +264,7 @@ class AuthService:
             )
         )
         self.audit.log(action=AuditAction.UPDATE, resource="auth", resource_id=user.public_id,
-                       summary="Password reset requested", actor=ActorContext(user_id=user.id, name=user.name,
+                       summary="Password reset requested", actor=ActorContext(user_id=user.id, tenant_id=user.tenant_id, name=user.name,
                                                                               email=user.email, role=user.role,
                                                                               ip_address=ip))
         return raw
@@ -279,11 +289,23 @@ class AuthService:
         self.db.flush()
         self.audit.log(action=AuditAction.PASSWORD_CHANGE, resource="user", resource_id=user.public_id,
                        summary="Password reset completed",
-                       actor=ActorContext(user_id=user.id, name=user.name, email=user.email, role=user.role))
+                       actor=ActorContext(user_id=user.id, tenant_id=user.tenant_id, name=user.name, email=user.email, role=user.role))
 
     # --------------------------------------------------------------- helpers
+    def _tenant_is_active(self, user: User) -> bool:
+        """Platform accounts have no tenant; everyone else needs an active one."""
+        if user.tenant_id is None:
+            return user.role == Role.SUPER_ADMIN.value
+        tenant = self.db.get(Tenant, user.tenant_id)
+        return tenant is not None and tenant.is_active
+
     def session_user(self, user: User) -> SessionUser:
+        tenant = self.db.get(Tenant, user.tenant_id) if user.tenant_id is not None else None
         return SessionUser(
+            tenant_id=user.tenant_id,
+            tenant_name=tenant.name if tenant else None,
+            tenant_slug=tenant.slug if tenant else None,
+            is_platform=user.tenant_id is None and user.role == Role.SUPER_ADMIN.value,
             id=user.id,
             public_id=user.public_id,
             name=user.name,
@@ -309,6 +331,7 @@ class AuthService:
             role=user.role,
             customer_id=user.customer_id,
             agent_id=self.rbac.agent_id_for(user),
+            tenant_id=user.tenant_id,
             extra_permissions=extra_permissions or frozenset(),
             revoked_permissions=revoked or frozenset(),
         )
@@ -362,7 +385,7 @@ class AuthService:
             "auth.login_failed",
             f"Failed sign-in attempt #{attempts} for {email}",
             severity="error" if attempts >= settings.MAX_FAILED_LOGINS else "warning",
-            actor=ActorContext(user_id=user.id, name=user.name, email=email, role=user.role, ip_address=ip,
+            actor=ActorContext(user_id=user.id, tenant_id=user.tenant_id, name=user.name, email=email, role=user.role, ip_address=ip,
                                user_agent=ua),
             context={"attempts": attempts, "locked": user.is_locked},
         )

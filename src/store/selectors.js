@@ -97,25 +97,28 @@ export const selectDocuments = createSelector([selectScopedData], ({ bookings, r
   ...bookings.flatMap((b) => [
     { key: `bf-${b[0]}`, title: 'Booking Form', sub: `${b[1]} · ${b[3]}`, date: b[4], kind: 'Booking', bookingId: b[0] },
     ...(['Confirmed', 'Agreement', 'Registered'].includes(b[7])
-      ? [{ key: `al-${b[0]}`, title: 'Allotment Letter', sub: `${b[1]} · ${b[3]}`, date: b[4], kind: 'Allotment' }] : []),
+      ? [{ key: `al-${b[0]}`, title: 'Allotment Letter', sub: `${b[1]} · ${b[3]}`, date: b[4], kind: 'Allotment', bookingId: b[0] }] : []),
     ...(b[7] === 'Agreement'
-      ? [{ key: `ag-${b[0]}`, title: 'Agreement to Sale', sub: `${b[1]} · ${b[3]}`, date: b[4], kind: 'Agreement' }] : []),
+      ? [{ key: `ag-${b[0]}`, title: 'Agreement to Sale', sub: `${b[1]} · ${b[3]}`, date: b[4], kind: 'Agreement', bookingId: b[0] }] : []),
   ]),
   ...receipts.map((r) => ({ key: r.no, title: `Receipt ${r.no}`, sub: `${r.customer} · ₹${r.amount}`, date: r.date, kind: 'Receipt', receiptNo: r.no })),
 ]);
 
 /** Nav badge rules live here (one place) rather than inside the sidebar JSX. */
 export const selectNavBadge = createSelector(
-  [selectRole, selectPendingApprovals, selectUsers, selectDomain],
-  (role, pending, users, domain) => (item) => {
+  [selectRole, selectPendingApprovals, selectUsers, selectDomain, (state) => state.tenants.items],
+  (role, pending, users, domain, tenants) => (item) => {
     const table = NAV_BADGES[role] || {};
     const badge = table[item];
     if (!badge) return null;
     const overdueInvoices = domain.invoices.filter((inv) => inv.status === 'OVERDUE').length;
+    const overduePayments = domain.payments.filter((p) => p[7] === 'OVERDUE').length;
     const text = String(badge.text)
       .replace('{pending}', String(pending))
       .replace('{users}', String(users.length))
-      .replace('{overdueInvoices}', String(overdueInvoices));
+      .replace('{overdueInvoices}', String(overdueInvoices))
+      .replace('{overduePayments}', String(overduePayments))
+      .replace('{tenants}', String(tenants.length));
     if (!text || text === '0') return null;
     return { text, alert: Boolean(badge.alert) };
   },
@@ -147,3 +150,9 @@ export const selectBillingSummary = createSelector([selectScopedData], ({ invoic
     }), {}),
   };
 });
+
+export const selectTenants = (state) => state.tenants.items;
+export const selectTenantsMeta = createSelector(
+  [(state) => state.tenants.status, (state) => state.tenants.error, (state) => state.tenants.credential],
+  (status, error, credential) => ({ loading: status === 'loading', error, credential }),
+);

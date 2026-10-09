@@ -10,6 +10,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.core.constants import Role, UserStatus
 from app.db.base import (
     Base,
+    OptionalTenantMixin,
     PkMixin,
     PublicIdMixin,
     SoftDeleteMixin,
@@ -19,7 +20,7 @@ from app.db.base import (
 )
 
 
-class User(Base, PkMixin, PublicIdMixin, TimestampMixin, SoftDeleteMixin):
+class User(Base, PkMixin, PublicIdMixin, OptionalTenantMixin, TimestampMixin, SoftDeleteMixin):
     """Staff, agent and customer-portal accounts in one identity table.
 
     The ``role`` column is the coarse boundary; fine-grained behaviour comes from

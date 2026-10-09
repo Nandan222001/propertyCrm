@@ -65,7 +65,7 @@ export function Bookings({ bookings, project, search, tab, TB, role, onNew, onOp
             <Badge>{b[7]}</Badge>,
             b[8],
             <div className="row-actions" key={b[0]}>
-              <button className="icon-action" onClick={() => onOpenCustomer(b[1])} title="Customer profile">
+              <button className="icon-action" onClick={() => onOpenCustomer(b[1], b)} title="View customer">
                 <Eye size={14} />
               </button>
               <button className="icon-action" onClick={() => onPrint(b)} title="Print booking form">

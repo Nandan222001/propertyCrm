@@ -1,10 +1,9 @@
 import React from 'react';
 import { Bell, LogOut, Menu, Search, Shield } from 'lucide-react';
-import { PREVIEW_ROLES, ROLE_ORDER } from '../../constants/roles';
 
 /** Top app bar: breadcrumb, global search, role pill and identity. */
 export function Topbar({
-  page, role, roleConfig, session, search, user, onMenu, onSearch, onNavigate, onRolePreview, onLogout,
+  page, role, roleConfig, session, tenantName, search, user, unread = null, onMenu, onSearch, onNavigate, onLogout,
 }) {
   return (
     <header className="topbar">
@@ -13,7 +12,7 @@ export function Topbar({
       </button>
 
       <div className="breadcrumb">
-        Workspace <span>/</span> <b>{page}</b>
+        {tenantName || 'Workspace'} <span>/</span> <b>{page}</b>
       </div>
 
       <div className="top-actions">
@@ -33,22 +32,9 @@ export function Topbar({
           <kbd>⌘K</kbd>
         </div>
 
-        {PREVIEW_ROLES.includes(session) && (
-          <div className="role-switch-quick">
-            <select
-              value={role}
-              onChange={(e) => onRolePreview(e.target.value)}
-              className="select-mini role-topbar-select"
-              aria-label="Preview role"
-            >
-              {ROLE_ORDER.map((r) => <option key={r} value={r}>Role: {r}</option>)}
-            </select>
-          </div>
-        )}
-
         <button className="top-icon" onClick={() => onNavigate('Notifications')} title="View alerts">
           <Bell size={17} />
-          <em />
+          {(unread === null || unread > 0) && <em />}
         </button>
 
         <div className="top-divider" />

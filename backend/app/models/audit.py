@@ -9,13 +9,22 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from sqlalchemy import JSON, ForeignKey, Integer, String, Text
+from sqlalchemy import JSON, ForeignKey, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.db.base import Base, PkMixin, PublicIdMixin, TimestampMixin, UTCDateTime, utcnow
+from app.db.base import (
+    Base,
+    OptionalTenantMixin,
+    PkMixin,
+    PublicIdMixin,
+    TenantMixin,
+    TimestampMixin,
+    UTCDateTime,
+    utcnow,
+)
 
 
-class AuditLog(Base, PkMixin, TimestampMixin):
+class AuditLog(Base, PkMixin, OptionalTenantMixin, TimestampMixin):
     """Business audit trail: who did what, to which record, from where."""
 
     __tablename__ = "audit_logs"
@@ -36,7 +45,7 @@ class AuditLog(Base, PkMixin, TimestampMixin):
     occurred_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow, index=True)
 
 
-class SecurityEvent(Base, PkMixin, TimestampMixin):
+class SecurityEvent(Base, PkMixin, OptionalTenantMixin, TimestampMixin):
     """Anomaly / abuse signals consumed by alerting (docs/INCIDENT_RESPONSE.md)."""
 
     __tablename__ = "security_events"
@@ -66,7 +75,7 @@ class LoginAttempt(Base, PkMixin, TimestampMixin):
     occurred_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow, index=True)
 
 
-class DataSubjectRequest(Base, PkMixin, TimestampMixin):
+class DataSubjectRequest(Base, PkMixin, TenantMixin, TimestampMixin):
     """DPDP/GDPR request register (access, correction, erasure, portability)."""
 
     __tablename__ = "data_subject_requests"
@@ -82,12 +91,12 @@ class DataSubjectRequest(Base, PkMixin, TimestampMixin):
     completed_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
 
 
-class AppSetting(Base, PkMixin, TimestampMixin):
+class AppSetting(Base, PkMixin, OptionalTenantMixin, TimestampMixin):
     """Runtime configuration with change history (who flipped the switch)."""
 
     __tablename__ = "app_settings"
 
-    key: Mapped[str] = mapped_column(String(80), nullable=False, unique=True, index=True)
+    key: Mapped[str] = mapped_column(String(80), nullable=False, index=True)
     value: Mapped[str | None] = mapped_column(Text)
     value_type: Mapped[str] = mapped_column(String(16), default="string", nullable=False)
     category: Mapped[str] = mapped_column(String(48), default="general", index=True)
@@ -95,8 +104,12 @@ class AppSetting(Base, PkMixin, TimestampMixin):
     description: Mapped[str | None] = mapped_column(String(255))
     updated_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
 
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "key", name="uq_app_settings_tenant_key"),
+    )
 
-class Notification(Base, PkMixin, PublicIdMixin, TimestampMixin):
+
+class Notification(Base, PkMixin, PublicIdMixin, OptionalTenantMixin, TimestampMixin):
     """Follow-up queue: reminders, approvals, overdue alerts per role/owner."""
 
     __tablename__ = "notifications"

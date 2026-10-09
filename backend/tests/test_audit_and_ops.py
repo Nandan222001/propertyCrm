@@ -37,8 +37,11 @@ def test_failed_login_is_recorded(client, session):
     assert after > before
 
 
-def test_audit_log_endpoint_requires_audit_permission(client, admin_headers, super_admin_headers):
-    assert client.get("/api/v1/audit-logs", headers=admin_headers).status_code == 403
+def test_audit_log_endpoint_requires_audit_permission(client, agent_headers, admin_headers, super_admin_headers):
+    # Field staff never read the audit trail; an organisation's admin reads its own,
+    # the platform owner reads the platform's.
+    assert client.get("/api/v1/audit-logs", headers=agent_headers).status_code == 403
+    assert client.get("/api/v1/audit-logs", headers=admin_headers).status_code == 200
     assert client.get("/api/v1/audit-logs", headers=super_admin_headers).status_code == 200
 
 
@@ -54,16 +57,17 @@ def test_security_event_acknowledgement(client, super_admin_headers, session):
     assert row.acknowledged_at is not None
 
 
-def test_activity_summary_reports_security_counters(client, super_admin_headers):
-    summary = client.get("/api/v1/reports/audit-trail?days=30", headers=super_admin_headers)
+def test_activity_summary_reports_security_counters(client, admin_headers):
+    summary = client.get("/api/v1/reports/audit-trail?days=30", headers=admin_headers)
     assert summary.status_code == 200
     data = summary.json()["data"]
     assert {"actions", "security_events"} <= set(data)
     assert {"login_failures", "denied", "rate_limited"} <= set(data["security_events"])
 
 
-def test_retention_sweep_is_permission_gated_and_dry_safe(client, super_admin_headers):
-    response = client.post("/api/v1/ops/retention-sweep?days=7300", headers=super_admin_headers)
+def test_retention_sweep_is_permission_gated_and_dry_safe(client, admin_headers, agent_headers):
+    assert client.post("/api/v1/ops/retention-sweep?days=7300", headers=agent_headers).status_code == 403
+    response = client.post("/api/v1/ops/retention-sweep?days=7300", headers=admin_headers)
     assert response.status_code == 200
     assert "audit_logs_deleted" in response.json()["data"]
 

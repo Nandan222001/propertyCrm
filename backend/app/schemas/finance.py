@@ -34,10 +34,21 @@ class AgentCreate(SafeText):
 
 class AgentUpdate(SafeText):
     name: str | None = Field(default=None, min_length=2, max_length=120)
+    code: str | None = Field(default=None, min_length=2, max_length=16, pattern=r"^[A-Za-z0-9\-]+$")
     email: str | None = Field(default=None, max_length=190)
     phone: str | None = Field(default=None, max_length=20)
     commission_rate: Decimal | None = Field(default=None, ge=0, le=Decimal("0.25"))
     is_active: str | None = Field(default=None, pattern=r"^(ACTIVE|INACTIVE)$")
+
+    @field_validator("email")
+    @classmethod
+    def _email(cls, value: str | None) -> str | None:
+        return validate_email(value) if value else None
+
+    @field_validator("phone")
+    @classmethod
+    def _phone(cls, value: str | None) -> str | None:
+        return normalise_mobile(value) if value else None
 
 
 class AgentPerformance(ORMModel):

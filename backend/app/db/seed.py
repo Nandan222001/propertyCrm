@@ -28,12 +28,14 @@ from app.core.constants import (
 from app.core.crypto import encrypt
 from app.core.security import blind_index, hash_password
 from app.db.base import utcnow
+from app.db.tenancy import clear_scope, set_scope
 from app.models.audit import AppSetting, Notification
 from app.models.billing import Invoice, InvoiceItem, InvoiceStatusHistory
 from app.models.booking import Booking, BookingStatusHistory
 from app.models.customer import Customer, CustomerConsent
 from app.models.payment import Agent, Commission, Payment, Receipt
 from app.models.property import Document, Plot, Project
+from app.models.tenant import Tenant
 from app.models.user import User
 
 DEMO_PASSWORD = os.getenv("SEED_DEMO_PASSWORD", "Demo@12345")
@@ -46,7 +48,6 @@ PROJECT_SEED = [
 ]
 
 USER_SEED = [
-    ("Devendra Singhania", "superadmin@nmtsolution.demo", Role.SUPER_ADMIN, "Chief Technology Officer"),
     ("Arjun Shah", "admin@nmtsolution.demo", Role.ADMIN, "Operations Director"),
     ("Meera Kumar", "manager@nmtsolution.demo", Role.SALES_MANAGER, "VP of Sales & Strategy"),
     ("Sanjay Patel", "agent@nmtsolution.demo", Role.SALES_AGENT, "Senior Property Consultant"),
@@ -99,6 +100,70 @@ BOOKING_SEED = [
     ("B-110", 6, "630000", BookingStatus.CONFIRMED, "6 monthly installments"),
     ("C-044", 7, "200000", BookingStatus.PENDING_APPROVAL, "12 monthly installments"),
 ]
+
+
+PLATFORM_ADMIN = ("Devendra Singhania", "superadmin@nmtsolution.demo", "Platform Owner")
+
+#: The demo organisation that owns the full dataset below.
+DEFAULT_TENANT = {"name": COMPANY["name"], "slug": "lalita", "plan": "ENTERPRISE", "max_users": 100}
+#: A second, small organisation so tenant isolation is visible in a demo.
+SECOND_TENANT = {"name": "Skyline Realty", "slug": "skyline", "plan": "STANDARD", "max_users": 25}
+
+
+def _tenant_admin_id(session: Session) -> int | None:
+    """The admin of the tenant the session is bound to (approver / issuer of seeded rows)."""
+    admin = session.query(User).filter(User.role == Role.ADMIN.value).order_by(User.id).first()
+    return admin.id if admin else None
+
+
+def _seed_tenant(session: Session, spec: dict) -> Tenant:
+    tenant = session.query(Tenant).filter(Tenant.slug == spec["slug"]).one_or_none()
+    if tenant is None:
+        tenant = Tenant(
+            name=spec["name"], slug=spec["slug"], plan=spec["plan"], max_users=spec["max_users"],
+            contact_name="Demo contact", contact_email=f"hello@{spec['slug']}.demo",
+        )
+        session.add(tenant)
+        session.flush()
+    return tenant
+
+
+def _seed_platform_admin(session: Session) -> User:
+    """The platform owner has no tenant (``tenant_id`` NULL) and sees no business data."""
+    name, email, title = PLATFORM_ADMIN
+    user = session.query(User).filter(User.email == email).one_or_none()
+    if user is None:
+        user = User(
+            public_id="USR-000", name=name, email=email, phone="+919876500000",
+            role=Role.SUPER_ADMIN.value, title=title, status=UserStatus.ACTIVE.value,
+            password_hash=hash_password(DEMO_PASSWORD), password_changed_at=utcnow(),
+            tenant_id=None,
+        )
+        session.add(user)
+        session.flush()
+    return user
+
+
+def _seed_second_tenant(session: Session, tenant: Tenant) -> None:
+    """A deliberately small dataset that must never be visible to the default tenant."""
+    set_scope(session, tenant.id)
+    if session.query(User).filter(User.email == "admin@skyline.demo").one_or_none() is None:
+        session.add(User(
+            public_id="USR-S01", name="Priya Menon", email="admin@skyline.demo", phone="+919876511001",
+            role=Role.ADMIN.value, title="Administrator", status=UserStatus.ACTIVE.value,
+            password_hash=hash_password(DEMO_PASSWORD), password_changed_at=utcnow(),
+        ))
+    project = session.query(Project).filter(Project.name == "Skyline Heights").one_or_none()
+    if project is None:
+        project = Project(name="Skyline Heights", phase="Phase I", city="Nashik",
+                          total_plots=3, base_rate_per_sqft=Decimal("3100.00"),
+                          estimated_revenue=Decimal("2.40"))
+        session.add(project)
+        session.flush()
+        for number, area, price in (("S-001", "1500", "465000"), ("S-002", "1800", "558000"), ("S-003", "2100", "651000")):
+            session.add(Plot(project_id=project.id, plot_number=number, layout="Layout S", facing="East",
+                             area_sqft=Decimal(area), price=Decimal(price), status=PlotStatus.AVAILABLE.value))
+    session.flush()
 
 
 def _seed_users(session: Session) -> dict[str, User]:
@@ -274,8 +339,10 @@ def _seed_bookings(session: Session, plots: dict[str, Plot], customers: list[Cus
             payment_plan=plan,
             status=status.value,
             created_by_id=None,
-            approved_by_id=None if status == BookingStatus.PENDING_APPROVAL else customer.id,
+            approved_by_id=None if status == BookingStatus.PENDING_APPROVAL else _tenant_admin_id(session),
         )
+        if customer.project_id is None:
+            customer.project_id = plot.project_id
         session.add(booking)
         session.flush()
         session.add(
@@ -444,7 +511,7 @@ def _seed_invoices(session: Session, bookings: dict[str, Booking]) -> None:
             ),
             is_shared_with_customer=shared,
             shared_at=utcnow() if shared else None,
-            issued_by_id=None if status == InvoiceStatus.DRAFT.value else booking.customer_id,
+            issued_by_id=None if status == InvoiceStatus.DRAFT.value else _tenant_admin_id(session),
             issued_at=None if status == InvoiceStatus.DRAFT.value else utcnow(),
             cancellation_reason=(
                 "Raised in error — duplicate of the instalment bill" if status == InvoiceStatus.CANCELLED.value else None
@@ -571,7 +638,17 @@ def _seed_governance(session: Session, customers: list[Customer], bookings: dict
 
 
 def seed_all(session: Session) -> None:
-    """Populate the demo dataset (idempotent; safe to run repeatedly)."""
+    """Populate the demo dataset (idempotent; safe to run repeatedly).
+
+    Layout: one platform owner (no tenant), the full ERP dataset inside the
+    default tenant, and a second small tenant to demonstrate isolation.
+    """
+    clear_scope(session)
+    default_tenant = _seed_tenant(session, DEFAULT_TENANT)
+    second_tenant = _seed_tenant(session, SECOND_TENANT)
+    _seed_platform_admin(session)
+
+    set_scope(session, default_tenant.id)  # everything below is stamped with this tenant
     users = _seed_users(session)
     projects = _seed_projects(session)
     agents = _seed_agents(session, users)
@@ -588,6 +665,8 @@ def seed_all(session: Session) -> None:
         portal.customer_id = customers[0].id
     session.flush()
     invoice_count = session.query(Invoice).count()
+    _seed_second_tenant(session, second_tenant)
+    clear_scope(session)
     print(
         f"Seeded {len(users)} users, {len(projects)} projects, {len(plots)} plots, "
         f"{len(customers)} customers, {len(bookings)} bookings, {invoice_count} invoices"

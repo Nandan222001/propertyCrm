@@ -14,6 +14,7 @@ from app.models.booking import Booking, BookingStatusHistory
 from app.models.customer import Customer, CustomerConsent
 from app.models.payment import Agent, Commission, Payment, Receipt
 from app.models.property import Document, Plot, Project
+from app.models.tenant import Tenant
 from app.models.user import AuthToken, User, UserPermissionGrant
 
 __all__ = [
@@ -39,6 +40,7 @@ __all__ = [
     "Project",
     "Receipt",
     "SecurityEvent",
+    "Tenant",
     "User",
     "UserPermissionGrant",
 ]

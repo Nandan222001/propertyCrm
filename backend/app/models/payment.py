@@ -16,13 +16,21 @@ from sqlalchemy import (
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.constants import PaymentStatus
-from app.db.base import Base, PkMixin, PublicIdMixin, SoftDeleteMixin, TimestampMixin, UTCDateTime
+from app.db.base import (
+    Base,
+    PkMixin,
+    PublicIdMixin,
+    SoftDeleteMixin,
+    TenantMixin,
+    TimestampMixin,
+    UTCDateTime,
+)
 
 
-class Agent(Base, PkMixin, PublicIdMixin, TimestampMixin, SoftDeleteMixin):
+class Agent(Base, PkMixin, PublicIdMixin, TenantMixin, TimestampMixin, SoftDeleteMixin):
     __tablename__ = "agents"
 
-    code: Mapped[str] = mapped_column(String(16), nullable=False, unique=True, index=True)
+    code: Mapped[str] = mapped_column(String(16), nullable=False, index=True)
     name: Mapped[str] = mapped_column(String(120), nullable=False, index=True)
     email: Mapped[str | None] = mapped_column(String(190))
     phone: Mapped[str | None] = mapped_column(String(20))
@@ -30,11 +38,15 @@ class Agent(Base, PkMixin, PublicIdMixin, TimestampMixin, SoftDeleteMixin):
     commission_rate: Mapped[Decimal] = mapped_column(Numeric(5, 4), default=Decimal("0.0200"), nullable=False)
     is_active: Mapped[str] = mapped_column(String(16), default="ACTIVE", nullable=False)
 
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "code", name="uq_agents_tenant_code"),
+    )
+
     customers = relationship("Customer", back_populates="agent", lazy="selectin")
     bookings = relationship("Booking", back_populates="agent", lazy="selectin")
 
 
-class Commission(Base, PkMixin, PublicIdMixin, TimestampMixin, SoftDeleteMixin):
+class Commission(Base, PkMixin, PublicIdMixin, TenantMixin, TimestampMixin, SoftDeleteMixin):
     __tablename__ = "commissions"
 
     agent_id: Mapped[int] = mapped_column(ForeignKey("agents.id", ondelete="CASCADE"), nullable=False, index=True)
@@ -55,7 +67,7 @@ class Commission(Base, PkMixin, PublicIdMixin, TimestampMixin, SoftDeleteMixin):
     agent = relationship("Agent", lazy="joined")
 
 
-class Payment(Base, PkMixin, PublicIdMixin, TimestampMixin, SoftDeleteMixin):
+class Payment(Base, PkMixin, PublicIdMixin, TenantMixin, TimestampMixin, SoftDeleteMixin):
     """One collection event against a booking (the ledger's source of truth)."""
 
     __tablename__ = "payments"
@@ -90,12 +102,12 @@ class Payment(Base, PkMixin, PublicIdMixin, TimestampMixin, SoftDeleteMixin):
     receipt = relationship("Receipt", back_populates="payment", uselist=False, lazy="joined")
 
 
-class Receipt(Base, PkMixin, PublicIdMixin, TimestampMixin):
+class Receipt(Base, PkMixin, PublicIdMixin, TenantMixin, TimestampMixin):
     """Bill/receipt generated for a collection; supports office + customer copy."""
 
     __tablename__ = "receipts"
 
-    receipt_number: Mapped[str] = mapped_column(String(24), nullable=False, unique=True, index=True)
+    receipt_number: Mapped[str] = mapped_column(String(24), nullable=False, index=True)
     payment_id: Mapped[int] = mapped_column(
         ForeignKey("payments.id", ondelete="CASCADE"), nullable=False, unique=True
     )
@@ -115,5 +127,5 @@ class Receipt(Base, PkMixin, PublicIdMixin, TimestampMixin):
     payment = relationship("Payment", back_populates="receipt")
 
     __table_args__ = (
-        UniqueConstraint("receipt_number", name="uq_receipts_receipt_number"),
+        UniqueConstraint("tenant_id", "receipt_number", name="uq_receipts_tenant_receipt_number"),
     )

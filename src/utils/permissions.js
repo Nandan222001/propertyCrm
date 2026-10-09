@@ -7,9 +7,11 @@
  */
 import { ROLES } from '../constants/roles';
 
-const ADMINS = [ROLES.ADMIN, ROLES.SUPER_ADMIN];
+/** Organisation-level administrators. The platform owner (SUPER ADMIN) is deliberately NOT one. */
+const ADMINS = [ROLES.ADMIN];
 
 export const isAdmin = (role) => ADMINS.includes(role);
+export const isPlatformAdmin = (role) => role === ROLES.SUPER_ADMIN;
 export const isCustomer = (role) => role === ROLES.CUSTOMER;
 export const canCreateBooking = (role) => isAdmin(role) || role === ROLES.SALES_AGENT;
 export const canApprove = (role) => isAdmin(role);

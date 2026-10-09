@@ -67,8 +67,10 @@ const render = (store, route = '/') => renderToString(
 
 // 1. Signed out -> the login screen must render.
 try {
-  const html = render(createStore());
-  if (!/Lalita|Sign in|Login/i.test(html)) failures.push('signed-out screen rendered unexpected markup');
+  const fresh = createStore();
+  const html = render(fresh);
+  if (fresh.getState().auth.session !== '') failures.push(`pristine store must be signed out, got session "${fresh.getState().auth.session}"`);
+  if (!/Sign In to/i.test(html) || /Workspace \//.test(html)) failures.push('pristine browser must show the login screen, not a workspace');
   console.log('  ✓ signed-out login screen');
 } catch (error) {
   failures.push(`signed-out render threw: ${error.message}`);
@@ -88,7 +90,7 @@ for (const role of ROLES) {
 }
 
 // 3. Deep links on the heavier pages.
-for (const [role, route] of [['ADMIN', '/bookings'], ['ACCOUNTS', '/payments'], ['ACCOUNTS', '/billing'], ['CUSTOMER', '/billing'], ['ADMIN', '/projects-plots'], ['SUPER ADMIN', '/user-roles'], ['CUSTOMER', '/documents']]) {
+for (const [role, route] of [['ADMIN', '/bookings'], ['ACCOUNTS', '/payments'], ['ACCOUNTS', '/billing'], ['CUSTOMER', '/billing'], ['ADMIN', '/projects-plots'], ['SUPER ADMIN', '/user-roles'], ['CUSTOMER', '/documents'], ['ADMIN', '/reports'], ['ADMIN', '/administration'], ['SUPER ADMIN', '/reports'], ['MANAGEMENT', '/reports'], ['ADMIN', '/approvals'], ['ADMIN', '/commissions'], ['ADMIN', '/agents'], ['ADMIN', '/notifications']]) {
   try {
     const store = createStore();
     store.dispatch(signedIn({ role, user: { name: `${role} Tester`, role } }));

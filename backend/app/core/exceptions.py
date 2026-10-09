@@ -20,6 +20,7 @@ from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.core.logging import get_logger, log_security_event, request_id_var
+from app.db.tenancy import TenantIsolationError
 
 logger = get_logger(__name__)
 
@@ -197,6 +198,17 @@ def register_exception_handlers(app: FastAPI) -> None:
             status_code=status.HTTP_409_CONFLICT,
             code="conflict",
             message="The record conflicts with existing data (duplicate or missing reference)",
+        )
+
+    @app.exception_handler(TenantIsolationError)
+    async def _tenant_isolation(request: Request, exc: TenantIsolationError):
+        # Deliberately indistinguishable from "does not exist": no cross-tenant oracle.
+        logger.warning("Tenant isolation violation on %s: %s", request.url.path, exc,
+                       extra={"event": "security.tenant_isolation"})
+        return _envelope(
+            status_code=status.HTTP_404_NOT_FOUND,
+            code="not_found",
+            message="A referenced record was not found",
         )
 
     @app.exception_handler(SQLAlchemyError)

@@ -50,5 +50,14 @@ export const ENDPOINTS = {
   reports: { daily: '/reports/daily', auditTrail: '/reports/audit-trail' },
   auditLogs: { list: '/audit-logs' },
   securityEvents: { list: '/security-events', acknowledge: (id) => `/security-events/${id}/acknowledge` },
+  tenants: {
+    list: '/tenants',
+    item: (id) => `/tenants/${id}`,
+    suspend: (id) => `/tenants/${id}/suspend`,
+    activate: (id) => `/tenants/${id}/activate`,
+    admins: (id) => `/tenants/${id}/admins`,
+    resetPassword: (id, userId) => `/tenants/${id}/admins/${userId}/reset-password`,
+  },
+  platform: { overview: '/platform/overview' },
   health: { live: '/health', ready: '/ready' },
 };

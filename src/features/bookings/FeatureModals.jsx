@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { X, ChevronRight } from 'lucide-react';
-import { projects, agents } from '../../data/seedData';
+import { projects as seedProjects, agents } from '../../data/seedData';
 import { parseAmt, fmtINR, isAdmin } from '../../utils';
 
 function Shell({ kicker, title, sub, close, children }) {
@@ -30,11 +30,11 @@ const Field = ({ label, children, hint, wide }) => (
 );
 
 // ---------------------------------------------------------------- booking
-export function BookingModal({ role, agentName, customers, plots, close, save, preset }) {
+export function BookingModal({ role, agentName, customers, plots, projects = seedProjects, close, save, preset }) {
   const agentMode = role === 'SALES AGENT';
   const myCustomers = customers.filter(c => c.status === 'Approved' && (!agentMode || c.agent === agentName));
   const [customer, setCustomer] = useState(myCustomers[0]?.name || '');
-  const [project, setProject] = useState(preset?.project || projects[0][0]);
+  const [project, setProject] = useState(preset?.project || projects[0]?.[0] || '');
   const free = useMemo(() => plots.filter(p => p[8] === project && p[5] === 'AVAILABLE'), [plots, project]);
   const [plotNo, setPlotNo] = useState(preset?.plot || '');
   const selected = free.find(p => p[0] === plotNo) || free[0];
@@ -174,7 +174,7 @@ export function PaymentModal({ bookings, pays, close, save }) {
 }
 
 // --------------------------------------------------------------- customer
-export function CustomerModal({ agentName, customers, close, save }) {
+export function CustomerModal({ agentName, customers, projects = [], defaultProject = '', close, save }) {
   const [error, setError] = useState('');
   function submit(e) {
     e.preventDefault();
@@ -182,7 +182,8 @@ export function CustomerModal({ agentName, customers, close, save }) {
     const mobile = d.mobile.replace(/\D/g, '').slice(-10);
     if (mobile.length !== 10) return setError('Enter a valid 10-digit mobile number.');
     if (customers.some(c => c.mobile === mobile)) return setError('A customer with this mobile number already exists.');
-    save({ name: d.name.trim(), mobile, email: d.email.trim(), address: d.address.trim(), agent: agentName });
+    if (projects.length && !d.project) return setError('Choose the project this customer is for.');
+    save({ name: d.name.trim(), mobile, email: d.email.trim(), address: d.address.trim(), agent: agentName, project: d.project || '' });
   }
   return (
     <Shell kicker="Lalita ERP · CUSTOMERS" title="Add New Customer" sub="Only sales agents add customers. The admin approves every new customer." close={close}>
@@ -190,8 +191,16 @@ export function CustomerModal({ agentName, customers, close, save }) {
         <div className="form-grid">
           <Field label="Full name"><input name="name" required placeholder="Neha Kapoor" /></Field>
           <Field label="Mobile (WhatsApp)"><input name="mobile" required inputMode="tel" placeholder="98765 43210" /></Field>
-          <Field label="Email"><input name="email" type="email" placeholder="name@email.com" /></Field>
+          <Field label="Email"><input name="email" type="email" required placeholder="name@email.com" /></Field>
           <Field label="Sales agent"><input value={agentName} readOnly /></Field>
+          {projects.length > 0 && (
+            <Field label="Project">
+              <select name="project" defaultValue={defaultProject}>
+                <option value="">Select project…</option>
+                {projects.map((p) => <option key={p[0]} value={p[0]}>{p[0]}</option>)}
+              </select>
+            </Field>
+          )}
           <Field label="Address" wide><input name="address" placeholder="Area, City" /></Field>
         </div>
         {error && <p className="form-error">{error}</p>}

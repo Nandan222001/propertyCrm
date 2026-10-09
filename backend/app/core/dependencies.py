@@ -32,6 +32,8 @@ from app.core.logging import get_logger, request_id_var, user_id_var
 from app.core.permissions import ensure_permission
 from app.core.security import decode_token
 from app.db.session import get_db
+from app.db.tenancy import set_scope
+from app.models.tenant import Tenant
 from app.models.user import User
 from app.repositories.user_repository import UserRepository
 from app.services.rbac_service import RBACService
@@ -73,6 +75,26 @@ def get_current_user(
     if user.is_locked:
         raise AuthenticationError("Account temporarily locked")
 
+    # Tenant gate: platform accounts have no tenant; everyone else must belong to
+    # an ACTIVE one. Checked on every request, so suspending a tenant locks its
+    # users out immediately — not only at their next sign-in.
+    tenant: Tenant | None = None
+    if user.role == Role.SUPER_ADMIN.value:
+        scope_tenant_id = None
+    elif user.tenant_id is None:
+        raise AuthenticationError("Account is not linked to an organisation")
+    else:
+        tenant = db.get(Tenant, user.tenant_id)
+        if tenant is None or not tenant.is_active:
+            raise PermissionDeniedError(
+                "Your organisation's access is suspended. Contact the platform administrator."
+            )
+        scope_tenant_id = tenant.id
+
+    # From here on every query on this request is filtered to the caller's tenant.
+    set_scope(db, scope_tenant_id)
+    request.state.tenant = tenant
+
     # Correlation: logs and audit rows carry the authenticated actor.
     user_id_var.set(str(user.id))
     return user
@@ -93,6 +115,8 @@ def get_actor(request: Request, db: DbDep, user: CurrentUserDep) -> ActorContext
         role=user.role,
         customer_id=user.customer_id,
         agent_id=rbac.agent_id_for(user),
+        tenant_id=None if user.role == Role.SUPER_ADMIN.value else user.tenant_id,
+        tenant_name=getattr(getattr(request.state, "tenant", None), "name", None),
         extra_permissions=granted,
         revoked_permissions=revoked,
         ip_address=client_ip(request),

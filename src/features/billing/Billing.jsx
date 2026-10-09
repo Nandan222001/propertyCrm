@@ -31,7 +31,7 @@ const STATUS_TONE = {
 
 export function Billing({
   invoices, bookings, customers, summary, project, search, filter, F, notify, role,
-  onCreate, onEdit, onIssue, onCancel, onPay, onPdf, onShare, onWhatsApp,
+  onCreate, onEdit, onIssue, onCancel, onStatus, onPay, onPdf, onShare, onWhatsApp,
 }) {
   const canBill = canCreateInvoice(role);
   const canShare = canManageBills(role);
@@ -53,7 +53,26 @@ export function Billing({
 
   const customerFor = (name) => customers.find((c) => c.name === name);
 
+  /** Next statuses a user may pick; PAID is reached only through Collect, CANCELLED needs a reason. */
+  const statusChoices = (inv) => {
+    const unpaid = Number(inv.amount_paid) === 0;
+    const reopened = unpaid ? 'ISSUED' : 'PARTIALLY_PAID';
+    const next = [];
+    if (inv.status === 'DRAFT' && canIssueInvoice(role)) next.push('ISSUED');
+    if (['ISSUED', 'PARTIALLY_PAID'].includes(inv.status) && canBill) next.push('OVERDUE');
+    if (inv.status === 'OVERDUE' && canBill) next.push(reopened);
+    if (['DRAFT', 'ISSUED', 'OVERDUE'].includes(inv.status) && unpaid && canCancelInvoice(role)) next.push('CANCELLED');
+    return next;
+  };
+
+  const changeStatus = (inv, status) => {
+    if (status === 'ISSUED' && inv.status === 'DRAFT') onIssue(inv);
+    else if (status === 'CANCELLED') setCancelling(inv);
+    else onStatus(inv, status);
+  };
+
   const rowActions = (inv) => {
+    const choices = statusChoices(inv);
     const payable = isPayableInvoice(inv);
     const draft = inv.status === 'DRAFT';
     return (
@@ -71,6 +90,15 @@ export function Billing({
           >
             <MessageCircle size={14} />
           </button>
+        )}
+        {choices.length > 0 && onStatus && (
+          <select
+            className="select-mini" value={inv.status} aria-label={`Change status of ${inv.invoice_number}`}
+            onChange={(e) => changeStatus(inv, e.target.value)}
+          >
+            <option value={inv.status}>{INVOICE_STATUS_LABEL[inv.status] || inv.status}</option>
+            {choices.map((s) => <option key={s} value={s}>{INVOICE_STATUS_LABEL[s] || s}</option>)}
+          </select>
         )}
         {draft && canBill && (
           <button className="icon-action" onClick={() => setEditing(inv)} title="Edit draft">

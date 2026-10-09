@@ -11,13 +11,18 @@ import { amountInWords, fmtINR, parseAmt } from '../utils/money';
 import { todayLabel } from '../utils/date';
 import { BOOKING_STATUS, PAYMENT_STATUS, PLOT_STATUS } from '../utils/status';
 import { nextReference, newId } from '../utils/id';
+import { getSettings } from '../utils/settings';
+import { loadTenants } from './tenantThunks';
+import { projectApiPayload, projectFromApi, projectRowFromForm } from '../utils/projects';
+import { adaptWorkspace, adaptCustomer } from '../utils/liveAdapters';
+import { notificationsLoaded, notificationPatched } from './slices/notificationsSlice';
 import { clientAudit } from '../utils/security';
 import {
-  sessionFailed, sessionLoaded, signedIn, signedOut, rolePreviewed, userSaved, userRemoved, authError,
+  sessionFailed, sessionLoaded, signedIn, signedOut, userSaved, userRemoved, authError,
 } from './slices/authSlice';
 import {
-  crudRowRemoved, crudRowUpserted, followUpSet, registryStatusSet, rowPatched, rowRemoved, rowUpserted,
-  workspaceDemo, workspaceHydrated, workspaceLoading,
+  crudRowRemoved, crudRowUpserted, followUpSet, registryStatusSet, paymentStatusSet, projectSaved, rowPatched, rowRemoved, rowUpserted,
+  workspaceDemo, workspaceFailed, workspaceHydrated, workspaceLoading,
 } from './slices/domainSlice';
 import {
   computeTotals, itemsPayload, nextInvoiceNumber,
@@ -66,38 +71,72 @@ export const signOut = () => async (dispatch, getState) => {
   dispatch(toastPushed('Logged out of workspace session.'));
 };
 
-export const previewRole = (role) => (dispatch) => {
-  dispatch(rolePreviewed(role));
-  dispatch(toastPushed(`Switched perspective to ${role}`));
+/** Hydrate every collection the UI needs; silently stays in demo mode. */
+export const hydrateWorkspace = ({ silent = false } = {}) => async (dispatch, getState) => {
+  // The platform owner has no business data: their workspace is the tenant list.
+  if (getState().auth.role === ROLES.SUPER_ADMIN) {
+    await dispatch(loadTenants());
+    return;
+  }
+  if (!silent) dispatch(workspaceLoading());
+  try {
+    // A role may not be allowed to read every collection (e.g. agents cannot list invoices):
+    // a 403 simply means "none for you", never a reason to abandon the whole workspace.
+    const [projects, plots, bookings, customers, ledger, receipts, invoices, agents] = await Promise.all([
+      listAll(api.projects), listAll(api.plots), listAll(api.bookings), listAll(api.customers),
+      listAll(api.ledger), listAll(api.receipts), listAll(api.invoices), listAll(api.agents),
+    ]);
+    dispatch(workspaceHydrated(adaptWorkspace({ projects, plots, bookings, customers, ledger, receipts, invoices, agents })));
+  } catch (error) {
+    if (error instanceof ApiUnavailableError) {
+      dispatch(workspaceDemo(''));            // offline preview: keep the demo dataset
+    } else {
+      // Signed in to a real tenant but the data failed to load: show nothing (never demo
+      // records belonging to nobody) and say why.
+      dispatch(workspaceFailed(error.message));
+      dispatch(toastPushed(`Could not load your workspace: ${error.message}`));
+    }
+  }
 };
 
-/** Hydrate every collection the UI needs; silently stays in demo mode. */
-export const hydrateWorkspace = () => async (dispatch) => {
-  dispatch(workspaceLoading());
+/** Every page of a collection (the API caps page_size at 200); 403 -> empty for this role. */
+const listAll = async (resource) => {
+  const rows = [];
   try {
-    const [projects, plots, bookings, customers, payments, receipts, invoices] = await Promise.all([
-      api.projects.list({ page_size: 200 }),
-      api.plots.list({ page_size: 500 }),
-      api.bookings.list({ page_size: 500 }),
-      api.customers.list({ page_size: 500 }),
-      api.payments.list({ page_size: 500 }),
-      api.receipts.list({ page_size: 500 }),
-      api.invoices.list({ page_size: 500 }),
-    ]);
-    dispatch(workspaceHydrated({
-      projects: projects.data, plots: plots.data, bookings: bookings.data,
-      customers: customers.data, payments: payments.data, receipts: receipts.data,
-      invoices: invoices.data,
-    }));
+    for (let page = 1; page <= 50; page += 1) {
+      const response = await resource.list({ page, page_size: 200 });
+      rows.push(...(response.data || []));
+      if (!response.meta?.has_next) break;
+    }
   } catch (error) {
-    dispatch(workspaceDemo(error instanceof ApiUnavailableError ? '' : error.message));
+    if (error?.status === 403) return [];
+    throw error;
+  }
+  return rows;
+};
+
+// --------------------------------------------------------------- projects
+/** Add a project, or update `editing` (the existing row). Saved locally first, then synced when live. */
+export const saveProject = (form, editing = null) => async (dispatch, getState) => {
+  const row = projectRowFromForm(form, editing);
+  dispatch(projectSaved({ previousName: editing ? editing[0] : null, row }));
+  dispatch(toastPushed(editing ? `Project ${row[0]} updated` : `Project ${row[0]} added`));
+  clientAudit(editing ? 'project.updated' : 'project.created', { name: row[0] });
+  if (getState().auth.mode !== 'live') return;
+  try {
+    const response = editing && typeof editing[6] === 'number'
+      ? await api.projects.update(editing[6], projectApiPayload(form))
+      : await api.projects.create(projectApiPayload(form));
+    if (response?.data) dispatch(projectSaved({ previousName: row[0], row: projectFromApi(response.data) }));
+  } catch (error) {
+    dispatch(toastPushed(`Saved locally — sync failed: ${error.message}`));
   }
 };
 
 // --------------------------------------------------------------- bookings
 export const createBooking = (form) => (dispatch, getState) => {
   const { auth, domain } = getState();
-  const approved = [ROLES.ADMIN, ROLES.SUPER_ADMIN].includes(auth.role);
+  const approved = auth.role === ROLES.ADMIN;
   const reference = nextReference('BK', domain.bookings.map((b) => b[0]));
   const row = [
     reference, form.customer, form.project, form.plot, todayLabel(),
@@ -142,7 +181,7 @@ export const confirmLedger = (booking) => (dispatch, getState) => {
     dispatch(rowUpserted({
       key: 'receipts',
       row: {
-        no: nextReference('RCT', receipts.map((r) => r.no)).replace(/-0*(\d+)$/, (m, n) => `-${String(Math.max(201, Number(n))).padStart(4, '0')}`),
+        no: nextReference(getSettings().tax.receiptPrefix || 'RCT', receipts.map((r) => r.no)).replace(/-0*(\d+)$/, (m, n) => `-${String(Math.max(201, Number(n))).padStart(4, '0')}`),
         date: todayLabel(), shared: false, reference: '', mode: 'Token advance',
         customer: booking[1], plot: booking[3], project: booking[2],
         finalPrice: booking[5], amount: booking[6], balance: fmtINR(due), agent: booking[8],
@@ -174,13 +213,38 @@ export const decideBooking = (booking, decision) => (dispatch, getState) => {
     : `Booking ${booking[0]} rejected · Plot ${booking[3]} released`));
   clientAudit(approved ? 'booking.approved' : 'booking.rejected', { reference: booking[0] });
   if (getState().auth.mode === 'live') {
-    (approved ? actions.approveBooking : actions.rejectBooking)(booking[0], { reason: 'Saved from the ERP console' })
-      .catch(() => dispatch(toastPushed('Saved locally — sync failed')));
+    // The API addresses a booking by its numeric id (last-but-one tuple slot), not the BK- number.
+    const apiId = typeof booking[10] === 'number' ? booking[10] : booking[0];
+    (approved ? actions.approveBooking : actions.rejectBooking)(apiId, { reason: 'Saved from the ERP console' })
+      .catch((error) => {
+        dispatch(toastPushed(`Could not save the decision: ${error.message}`));
+        dispatch(hydrateWorkspace({ silent: true }));   // show what the server really holds
+      });
   }
 };
 
 // --------------------------------------------------------------- customers
-export const createCustomer = (form) => (dispatch, getState) => {
+export const createCustomer = (form) => async (dispatch, getState) => {
+  const live = getState().auth.mode === 'live';
+  if (live) {
+    // The server's row (real id, real approval status) is the one the admin sees in Approvals.
+    try {
+      // A sales agent's own agent profile is applied by the server; only send a code we can resolve.
+      const agentCode = (getState().domain.agents || []).find((a) => a[0] === form.agent)?.[1];
+      const projectId = getState().domain.projects.find((p) => p[0] === form.project)?.[6];
+      const response = await api.customers.create({
+        name: form.name, phone: form.mobile, email: form.email, address: form.address,
+        ...(agentCode ? { agent_code: agentCode } : {}),
+        ...(projectId ? { project_id: projectId } : {}),
+      });
+      dispatch(rowUpserted({ key: 'customers', row: adaptCustomer(response.data) }));
+      dispatch(modalClosed());
+      dispatch(toastPushed(`Customer ${form.name} sent to admin for approval`));
+    } catch (error) {
+      dispatch(toastPushed(`Could not add customer: ${error.message}`));
+    }
+    return;
+  }
   const { customers } = getState().domain;
   const id = nextReference('CUS', customers.map((c) => c.id));
   dispatch(rowUpserted({
@@ -189,12 +253,6 @@ export const createCustomer = (form) => (dispatch, getState) => {
   }));
   dispatch(modalClosed());
   dispatch(toastPushed(`Customer ${form.name} sent to admin for approval`));
-  if (getState().auth.mode === 'live') {
-    api.customers.create({
-      name: form.name, mobile: form.mobile, email: form.email, address: form.address,
-      agent_code: form.agent,
-    }).catch(() => dispatch(toastPushed('Saved locally — sync failed')));
-  }
 };
 
 export const decideCustomer = (customer, status) => (dispatch, getState) => {
@@ -202,8 +260,11 @@ export const decideCustomer = (customer, status) => (dispatch, getState) => {
   dispatch(toastPushed(`Customer ${customer.name} ${String(status).toLowerCase()}`));
   clientAudit('customer.decision', { id: customer.id, status });
   if (getState().auth.mode === 'live') {
-    actions.decideCustomer(customer.id, { decision: status.toLowerCase(), reason: 'Reviewed in console' })
-      .catch(() => dispatch(toastPushed('Saved locally — sync failed')));
+    actions.decideCustomer(customer.id, { status: String(status).toUpperCase(), reason: 'Reviewed in console' })
+      .catch((error) => {
+        dispatch(toastPushed(`Could not save the decision: ${error.message}`));
+        dispatch(hydrateWorkspace({ silent: true }));
+      });
   }
 };
 
@@ -244,7 +305,7 @@ export const recordPayment = ({ booking, finalPrice, amount, mode, reference, du
   if (balance <= 0) dispatch(rowPatched({ key: 'plots', id: booking[3], changes: { 5: PLOT_STATUS.SOLD } }));
 
   const receipt = {
-    no: nextReference('RCT', receipts.map((r) => r.no)),
+    no: nextReference(getSettings().tax.receiptPrefix || 'RCT', receipts.map((r) => r.no)),
     date: todayLabel(), shared: false, mode, reference: reference || '',
     customer: booking[1], plot: booking[3], project: booking[2],
     finalPrice: fmtINR(finalPrice), amount: fmtINR(amount), balance: fmtINR(Math.max(balance, 0)), agent: booking[8],
@@ -259,6 +320,13 @@ export const recordPayment = ({ booking, finalPrice, amount, mode, reference, du
     }).catch(() => dispatch(toastPushed('Saved locally — sync failed')));
   }
   return receipt;
+};
+
+/** Manual ledger status (e.g. flag a due instalment as overdue). Settling to PAID goes through Record Payment. */
+export const setPaymentStatus = (payment, status) => (dispatch) => {
+  dispatch(paymentStatusSet({ customer: payment[0], plot: payment[1], status }));
+  dispatch(toastPushed(`${payment[0]} · Plot ${payment[1]} marked ${status.toLowerCase()}`));
+  clientAudit('payment.status_changed', { customer: payment[0], plot: payment[1], status });
 };
 
 export const markReceiptShared = (receipt) => (dispatch) => {
@@ -370,7 +438,7 @@ export const issueInvoice = (invoice) => async (dispatch, getState) => {
       return;
     }
   }
-  const due = new Date(Date.now() + 15 * 86400000)
+  const due = new Date(Date.now() + (Number(getSettings().tax.dueDays) || 15) * 86400000)
     .toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
   dispatch(rowPatched({
     key: 'invoices',
@@ -384,6 +452,27 @@ export const issueInvoice = (invoice) => async (dispatch, getState) => {
   }));
   dispatch(toastPushed(`Invoice ${invoice.invoice_number} issued · due ${invoice.due_date || due}`));
   clientAudit('invoice.issued', { number: invoice.invoice_number });
+};
+
+/**
+ * Manual invoice status change for transitions the API has no endpoint for
+ * (flag overdue / reopen). Issue and cancel keep their own audited flows.
+ */
+export const setInvoiceStatus = (invoice, status) => (dispatch, getState) => {
+  const { auth } = getState();
+  dispatch(rowPatched({
+    key: 'invoices',
+    id: invoice.id,
+    changes: {
+      status,
+      history: invoiceHistoryEntry(invoice, status, `Status changed to ${status.replace('_', ' ').toLowerCase()}`,
+        auth.currentUser?.name || 'Billing desk'),
+    },
+  }));
+  dispatch(toastPushed(auth.mode === 'live'
+    ? `Invoice ${invoice.invoice_number} marked ${status.replace('_', ' ').toLowerCase()} (saved in this browser only)`
+    : `Invoice ${invoice.invoice_number} marked ${status.replace('_', ' ').toLowerCase()}`));
+  clientAudit('invoice.status_changed', { number: invoice.invoice_number, status });
 };
 
 /** Cancel an unpaid invoice with a reason (audited). */
@@ -571,3 +660,24 @@ export const registerCustomerAccount = (account) => (dispatch) => {
 };
 
 export { sessionFailed };
+
+// ----------------------------------------------------------- notifications
+/** Refresh my queue (live only; the API returns just what is addressed to me). */
+export const loadNotifications = () => async (dispatch, getState) => {
+  if (getState().auth.mode !== 'live') return;
+  try {
+    const response = await actions.notificationQueue();
+    dispatch(notificationsLoaded(response.data || []));
+  } catch (error) {
+    if (error?.status === 403) dispatch(notificationsLoaded([]));   // this role has no queue
+  }
+};
+
+/** "Take action": log it on the server, then the page navigates to where the work is. */
+export const actionNotification = (item) => async (dispatch, getState) => {
+  dispatch(notificationPatched({ id: item.id, changes: { is_read: true, actioned_at: new Date().toISOString() } }));
+  if (getState().auth.mode === 'live' && typeof item.id === 'number') {
+    try { await actions.notificationAction(item.id); } catch { /* the queue reloads from the server next */ }
+    dispatch(loadNotifications());
+  }
+};

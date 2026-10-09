@@ -27,9 +27,23 @@ class Role(StrEnum):
     CUSTOMER = "CUSTOMER"
 
 
+class TenantStatus(StrEnum):
+    ACTIVE = "ACTIVE"
+    SUSPENDED = "SUSPENDED"
+
+
+class TenantPlan(StrEnum):
+    TRIAL = "TRIAL"
+    STANDARD = "STANDARD"
+    ENTERPRISE = "ENTERPRISE"
+
+
 class Permission(StrEnum):
     """Fine-grained capabilities. Routes never check roles directly."""
 
+    # platform (multi-tenant control plane)
+    TENANT_VIEW = "tenant:view"
+    TENANT_MANAGE = "tenant:manage"
     # property / inventory
     PROJECT_VIEW = "project:view"
     PROJECT_WRITE = "project:write"
@@ -88,7 +102,14 @@ class Permission(StrEnum):
 #: Role → permission matrix. This is the only place privileges are declared;
 #: ``core.permissions.require`` and the /me endpoint both consume it.
 ROLE_PERMISSIONS: dict[Role, frozenset[Permission]] = {
-    Role.SUPER_ADMIN: frozenset(Permission),
+    # Platform owner: manages tenants, sees platform audit — and nothing inside a
+    # tenant's business data (no projects, bookings, customers, payments, …).
+    Role.SUPER_ADMIN: frozenset(
+        {
+            Permission.TENANT_VIEW, Permission.TENANT_MANAGE,
+            Permission.DASHBOARD_VIEW, Permission.AUDIT_VIEW,
+        }
+    ),
     Role.ADMIN: frozenset(
         {
             Permission.PROJECT_VIEW, Permission.PROJECT_WRITE,
@@ -105,6 +126,9 @@ ROLE_PERMISSIONS: dict[Role, frozenset[Permission]] = {
             Permission.DOCUMENT_VIEW, Permission.DOCUMENT_UPLOAD,
             Permission.NOTIFICATION_VIEW, Permission.NOTIFICATION_MANAGE,
             Permission.USER_VIEW, Permission.USER_MANAGE, Permission.PII_REVEAL,
+            # Organisation-level governance (previously super-admin only).
+            Permission.ROLE_MANAGE, Permission.AUDIT_VIEW, Permission.SETTINGS_MANAGE,
+            Permission.DATA_EXPORT, Permission.DATA_ERASURE,
         }
     ),
     Role.SALES_MANAGER: frozenset(
@@ -245,6 +269,11 @@ class AuditAction(StrEnum):
     INVOICE_CANCELLED = "billing.invoice_cancelled"
     INVOICE_SHARED = "billing.invoice_shared"
     INVOICE_PDF = "billing.invoice_pdf"
+    TENANT_CREATED = "platform.tenant_created"
+    TENANT_UPDATED = "platform.tenant_updated"
+    TENANT_SUSPENDED = "platform.tenant_suspended"
+    TENANT_ACTIVATED = "platform.tenant_activated"
+    TENANT_ADMIN_ADDED = "platform.tenant_admin_added"
 
 
 class DocumentKind(StrEnum):

@@ -10,7 +10,6 @@ export function LoginScreen({ onLogin, onRegister, customers = [], users = [] })
   const [tab, setTab] = useState('login'); // 'login' | 'register'
   const [selectedImage, setSelectedImage] = useState(0); // 0, 1, 2
   const [showPassword, setShowPassword] = useState(false);
-  const [role, setRole] = useState('ADMIN');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -49,7 +48,7 @@ export function LoginScreen({ onLogin, onRegister, customers = [], users = [] })
   ];
 
   const quickRoles = [
-    { role: 'SUPER ADMIN', label: 'Super Admin', icon: Shield, desc: 'Root Governance & System Health', color: '#7b39ed', bg: '#f3e8ff' },
+    { role: 'SUPER ADMIN', label: 'Super Admin', icon: Shield, desc: 'Platform owner · Tenants, plans & access', color: '#7b39ed', bg: '#f3e8ff' },
     { role: 'ADMIN', label: 'Admin', icon: Building2, desc: 'Operations Command & Project Inventory', color: '#4f5fce', bg: '#eef0ff' },
     { role: 'SALES MANAGER', label: 'Sales Manager', icon: Target, desc: 'Team Pipeline & Quota Realization', color: '#0891b2', bg: '#e0f2fe' },
     { role: 'SALES AGENT', label: 'Sales Agent', icon: Users, desc: 'My Sales Desk, Deals & Commissions', color: '#16a34a', bg: '#dcfce7' },
@@ -70,20 +69,19 @@ export function LoginScreen({ onLogin, onRegister, customers = [], users = [] })
       return;
     }
     const typed = email.trim().toLowerCase();
-    let user = roleConfigs[role]?.defaultUser || { name: 'Workspace User', email, role };
+    // The server decides the role on sign-in; this only picks the offline demo identity.
+    const role = users.find((x) => (x.email || '').toLowerCase() === typed)?.role || 'ADMIN';
+    let user = { ...(roleConfigs[role]?.defaultUser || { name: 'Workspace User', role }), email: typed };
     if (role === 'CUSTOMER') {
+      // Offline demo only; with the live API the server decides who may sign in.
       const c = customers.find((x) => (x.email || '').toLowerCase() === typed);
-      if (!c) {
-        setError('No registered customer account found with this email address.');
-        return;
-      }
-      user = { name: c.name, email: c.email, role, customerName: c.name };
+      if (c) user = { ...user, name: c.name, customerName: c.name };
     } else if (role === 'SALES AGENT') {
       const u = users.find((x) => x.role === 'SALES AGENT' && x.email.toLowerCase() === typed);
-      if (u) user = u;
+      if (u) user = { ...u, email: typed };
     }
     setError('');
-    onLogin(role, user);
+    onLogin(role, user, { email: typed, password });
   };
 
   const handleRegisterSubmit = (e) => {
@@ -123,7 +121,7 @@ export function LoginScreen({ onLogin, onRegister, customers = [], users = [] })
     }
   };
 
-  const currentRoleConfig = roleConfigs[tab === 'login' ? role : regData.role] || roleConfigs['ADMIN'];
+  const currentRoleConfig = roleConfigs[regData.role] || roleConfigs['ADMIN'];
 
   return (
     <main className="login-screen interactive-auth">
@@ -271,32 +269,8 @@ export function LoginScreen({ onLogin, onRegister, customers = [], users = [] })
                 </label>
               </div>
 
-              <div className="form-group">
-                <label>
-                  Select Role View
-                  <select value={role} onChange={(e) => { setRole(e.target.value); }}>
-                    {quickRoles.map((r) => (
-                      <option key={r.role} value={r.role}>{r.label} ({r.role})</option>
-                    ))}
-                  </select>
-                </label>
-              </div>
-
-              {/* Live Role Capabilities Preview Box */}
-              <div className="role-preview-box" style={{ borderLeftColor: currentRoleConfig.color }}>
-                <div className="preview-top">
-                  <span className="preview-badge" style={{ background: currentRoleConfig.bg, color: currentRoleConfig.color }}>
-                    <Shield size={11} /> {role} PERMISSIONS
-                  </span>
-                </div>
-                <p className="preview-desc">{currentRoleConfig.subtitle}</p>
-                <div className="preview-modules">
-                  <span>Modules:</span> {currentRoleConfig.workspaceNav.slice(0, 4).join(', ')}...
-                </div>
-              </div>
-
               <button type="submit" className="button button-primary login-submit">
-                <span>Sign In to {role} Workspace</span>
+                <span>Sign In</span>
                 <ArrowRight size={15} />
               </button>
             </form>

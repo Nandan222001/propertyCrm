@@ -16,13 +16,21 @@ from sqlalchemy import (
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.constants import BookingStatus
-from app.db.base import Base, PkMixin, PublicIdMixin, SoftDeleteMixin, TimestampMixin, UTCDateTime
+from app.db.base import (
+    Base,
+    PkMixin,
+    PublicIdMixin,
+    SoftDeleteMixin,
+    TenantMixin,
+    TimestampMixin,
+    UTCDateTime,
+)
 
 
-class Booking(Base, PkMixin, PublicIdMixin, TimestampMixin, SoftDeleteMixin):
+class Booking(Base, PkMixin, PublicIdMixin, TenantMixin, TimestampMixin, SoftDeleteMixin):
     __tablename__ = "bookings"
 
-    booking_number: Mapped[str] = mapped_column(String(24), nullable=False, unique=True, index=True)
+    booking_number: Mapped[str] = mapped_column(String(24), nullable=False, index=True)
     customer_id: Mapped[int] = mapped_column(
         ForeignKey("customers.id", ondelete="RESTRICT"), nullable=False, index=True
     )
@@ -71,6 +79,7 @@ class Booking(Base, PkMixin, PublicIdMixin, TimestampMixin, SoftDeleteMixin):
     __table_args__ = (
         # A plot can hold at most one live booking.
         UniqueConstraint("plot_id", "status", name="uq_booking_plot_status"),
+        UniqueConstraint("tenant_id", "booking_number", name="uq_bookings_tenant_booking_number"),
     )
 
 

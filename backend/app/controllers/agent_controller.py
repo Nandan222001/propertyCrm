@@ -80,13 +80,23 @@ class AgentService(BaseService):
             self.agents.model(**{**payload.model_dump(), "code": payload.code.upper()})
         )
         self._audit(AuditAction.CREATE, agent, summary=f"Agent {agent.code} onboarded")
+        self.db.commit()  # the UI reloads the list right away; don't wait for the request-end commit
         return self.serialise(agent)
 
     def update_agent(self, agent_id: int, payload: AgentUpdate) -> dict:
         self._authorise("update")
         agent = self.agents.get_or_404(agent_id)
-        self.agents.update(agent, payload.model_dump(exclude_unset=True, exclude_none=True))
+        values = payload.model_dump(exclude_unset=True, exclude_none=True)
+        if "code" in values:
+            from app.core.exceptions import ConflictError
+
+            values["code"] = values["code"].upper()
+            clash = self.agents.get_by_code(values["code"])
+            if clash is not None and clash.id != agent.id:
+                raise ConflictError(f"Agent code {values['code']} already exists")
+        self.agents.update(agent, values)
         self._audit(AuditAction.UPDATE, agent, summary="Agent updated")
+        self.db.commit()
         return self.serialise(agent)
 
 

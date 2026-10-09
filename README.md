@@ -45,8 +45,9 @@ docker compose up --build
 
 | Role | E-mail | Password |
 | --- | --- | --- |
-| Super admin | `superadmin@nmtsolution.demo` | `Demo@12345` |
-| Admin | `admin@nmtsolution.demo` | `Demo@12345` |
+| Super admin (platform owner — no tenant) | `superadmin@nmtsolution.demo` | `Demo@12345` |
+| Admin — *Lalita Realestate Infra* tenant | `admin@nmtsolution.demo` | `Demo@12345` |
+| Admin — *Skyline Realty* tenant | `admin@skyline.demo` | `Demo@12345` |
 | Sales manager | `manager@nmtsolution.demo` | `Demo@12345` |
 | Sales agent | `agent@nmtsolution.demo` | `Demo@12345` |
 | Accounts | `accounts@nmtsolution.demo` | `Demo@12345` |
@@ -55,6 +56,33 @@ docker compose up --build
 
 The customer portal is read-only: it exposes only that customer's bookings,
 invoices (bills), receipts, dues, registry status and documents.
+
+---
+
+## Multi-tenancy
+
+The platform hosts many organisations ("tenants"); each one is fully isolated.
+
+* **Super admin = platform owner.** Has no tenant and a separate **Platform
+  Console** (Overview + Tenants): create an organisation together with its first
+  administrator (a one-time password is shown once), edit plan and seat limit,
+  suspend / reactivate (every user of the tenant is locked out on their very next
+  request), add admins, reset an admin's password. The super admin can **not**
+  read any tenant's projects, bookings, customers or payments (`403`).
+* **Everyone else belongs to exactly one tenant** and only ever sees that
+  tenant's rows. The tenant's `ADMIN` runs the organisation (users, roles, audit
+  trail, settings, data export/erasure).
+* **Enforced once, in the data layer** — `app/db/tenancy.py`: a session-level
+  filter adds `tenant_id = …` to every SELECT/UPDATE/DELETE on tenant-owned
+  tables (joins, aggregates and lazy loads included), new rows are stamped
+  automatically, and a write that crosses tenants — or a foreign key pointing at
+  another tenant's row — is refused. Cross-tenant ids are indistinguishable from
+  "not found". Business numbers (`BK-…`, `INV-…`, receipts, agent codes, project
+  names) are unique **per tenant**; an e-mail identifies one account platform-wide.
+* **Upgrading an existing database:** `alembic upgrade head` (revision
+  `d4e8a1c2f3b5`) creates the default tenant `lalita`, moves all existing rows
+  into it and turns existing `SUPER_ADMIN` accounts into platform accounts. Take
+  a backup first. Self-registration now requires the organisation's `tenant` slug.
 
 ---
 
@@ -113,7 +141,8 @@ The 16 required control areas are implemented, tested and documented in the
 * **Content unavailable to customers until approved** — agents' records are
   `PENDING_APPROVAL` and plots are held, not sold, until an approver confirms.
 
-Verification: **110 backend tests**, a **render smoke test for all 7 roles**,
+Verification: **147 backend tests** (incl. tenant-isolation tests), a **render smoke
+test for all 7 roles**, a **platform-console interaction test**,
 plus SAST/dependency/IaC gates in CI — `make verify` runs everything locally.
 
 ---

@@ -20,6 +20,7 @@ const initialState = {
   customerSelected: null,
   billNo: '',
   bookingPrint: null,
+  bookingDocKind: 'Booking',
   agentInfo: null,
   bookingPreset: null,
   crudPage: PAGES.OVERVIEW,
@@ -84,7 +85,11 @@ const uiSlice = createSlice({
       state.billNo = action.payload || '';
     },
     bookingPrintSet(state, action) {
-      state.bookingPrint = action.payload || null;
+      // Accepts a booking id (booking form) or { id, kind } for allotment / agreement.
+      const payload = action.payload;
+      const id = payload && typeof payload === 'object' ? payload.id : payload;
+      state.bookingPrint = id || null;
+      state.bookingDocKind = (payload && payload.kind) || 'Booking';
     },
     agentInfoSet(state, action) {
       state.agentInfo = action.payload || null;

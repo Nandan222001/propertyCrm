@@ -21,6 +21,7 @@ from app.routes.notification_routes import router as notification_router
 from app.routes.payment_routes import router as payment_router
 from app.routes.property_routes import router as property_router
 from app.routes.report_routes import router as report_router
+from app.routes.tenant_routes import router as tenant_router
 from app.routes.user_routes import router as user_router
 
 #: Endpoints that intentionally do not require a token.
@@ -40,6 +41,7 @@ api_router.include_router(auth_router)
 
 # Everything below requires a valid access token (route-level dependencies).
 for router in (
+    tenant_router,
     user_router,
     property_router,
     customer_router,
