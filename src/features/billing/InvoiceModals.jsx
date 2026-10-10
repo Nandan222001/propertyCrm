@@ -56,7 +56,7 @@ export const bookingOptions = (bookings) => bookings
     return !['Pending Approval', 'Rejected', 'CANCELLED', 'REJECTED', 'PENDING_APPROVAL'].includes(status);
   })
   .map((b) => (Array.isArray(b)
-    ? { id: null, number: b[0], customer: b[1], project: b[2], plot: b[3], agent: b[8], balance: parseAmt(b[5]) - parseAmt(b[6]) }
+    ? { id: typeof b[10] === 'number' ? b[10] : null, number: b[0], customer: b[1], project: b[2], plot: b[3], agent: b[8], balance: parseAmt(b[5]) - parseAmt(b[6]) }
     : {
       id: b.id, number: b.booking_number, customer: b.customer_name, project: b.project_name,
       plot: b.plot_number, agent: b.agent_name,
@@ -109,7 +109,7 @@ export function InvoiceFormModal({ bookings, editing, close, save }) {
 
   return (
     <Shell
-      kicker="Lalita ERP · BILLING"
+      kicker="ERP · BILLING"
       title={editing ? `Edit draft ${editing.invoice_number}` : 'Raise Tax Invoice'}
       sub="Line items, GST and discounts are computed by the server when the draft is saved."
       close={close}
@@ -219,7 +219,7 @@ export function InvoicePayModal({ invoice, close, save }) {
 
   return (
     <Shell
-      kicker="Lalita ERP · BILLING"
+      kicker="ERP · BILLING"
       title={`Collect against ${invoice.invoice_number}`}
       sub={`${invoice.customer_name} · total ₹${fmtINR(invoice.total_amount)} · the collection also updates the booking ledger and issues a receipt.`}
       close={close}
@@ -260,7 +260,7 @@ export function InvoiceCancelModal({ invoice, close, save }) {
 
   return (
     <Shell
-      kicker="Lalita ERP · BILLING"
+      kicker="ERP · BILLING"
       title={`Cancel ${invoice.invoice_number}`}
       sub="Only unpaid invoices can be cancelled. The reason is printed on the bill and kept in the timeline."
       close={close}

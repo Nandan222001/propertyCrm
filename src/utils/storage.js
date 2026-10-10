@@ -42,12 +42,36 @@ export function writeText(key, value) {
   }
 }
 
+/**
+ * Tab-scoped storage for credentials: gone when the tab closes, never shared with other tabs or
+ * left on disk (unlike localStorage), which limits what a stray script or a shared PC can reach.
+ */
+export function readSession(key, fallback = '') {
+  try {
+    return window.sessionStorage.getItem(storageKey(key)) ?? fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+export function writeSession(key, value) {
+  try {
+    if (!value) window.sessionStorage.removeItem(storageKey(key));
+    else window.sessionStorage.setItem(storageKey(key), String(value));
+  } catch {
+    /* storage disabled */
+  }
+}
+
 /** Remove every key this app owns (used on sign-out and by tests). */
 export function clearStorage() {
   try {
     Object.keys(window.localStorage)
       .filter((k) => k.startsWith(PREFIX))
       .forEach((k) => window.localStorage.removeItem(k));
+    Object.keys(window.sessionStorage)
+      .filter((k) => k.startsWith(PREFIX))
+      .forEach((k) => window.sessionStorage.removeItem(k));
   } catch {
     /* storage disabled */
   }

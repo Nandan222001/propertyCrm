@@ -52,14 +52,21 @@ export const selectAllowedPages = createSelector([selectNavigation], ({ workspac
  * customers only their own; everyone else sees the book.
  */
 export const selectScopedData = createSelector(
-  [selectRole, selectCurrentUser, selectDomain],
-  (role, currentUser, domain) => {
+  [selectRole, selectCurrentUser, selectDomain, (state) => state.auth.mode],
+  (role, currentUser, domain, mode) => {
     const isAgentRole = role === ROLES.SALES_AGENT;
     const isCustomerRole = role === ROLES.CUSTOMER;
-    const key = agentKey(currentUser?.name || '');
+    const live = mode === 'live';
+    // Offline preview matches the sample roster by name ("Sanjay Patel" -> "S. Patel"). Against the
+    // real API the server has already limited every list to this person, so nothing is re-filtered
+    // here (a login name never has to equal the agent record's name).
+    const liveAgentName = (domain.bookings.find((b) => b[8] && b[8] !== '—')?.[8])
+      || (domain.customers.find((c) => c.agent)?.agent) || '';
+    const key = live && isAgentRole ? (liveAgentName || currentUser?.name || '') : agentKey(currentUser?.name || '');
     const name = currentUser?.customerName || currentUser?.name || '';
 
     const inScope = (row, agentIndex, customerIndex) => {
+      if (live) return true;
       if (isAgentRole) return row[agentIndex] === key;
       if (isCustomerRole) return row[customerIndex] === name;
       return true;
@@ -67,19 +74,21 @@ export const selectScopedData = createSelector(
 
     const bookings = domain.bookings.filter((b) => inScope(b, 8, 1));
     const payments = domain.payments.filter((p) => inScope(p, 8, 0));
-    const customers = isAgentRole
+    const customers = live ? domain.customers : isAgentRole
       ? domain.customers.filter((c) => c.agent === key)
       : isCustomerRole
         ? domain.customers.filter((c) => c.name === name)
         : domain.customers;
-    const receipts = isAgentRole
-      ? domain.receipts.filter((r) => r.agent === key)
-      : isCustomerRole
-        ? domain.receipts.filter((r) => r.customer === name && r.shared)
-        : domain.receipts;
-    const invoices = isCustomerRole
-      ? domain.invoices.filter((inv) => inv.customer_name === name)
-      : domain.invoices;
+    const receipts = live
+      ? (isCustomerRole ? domain.receipts.filter((r) => r.shared) : domain.receipts)
+      : isAgentRole
+        ? domain.receipts.filter((r) => r.agent === key)
+        : isCustomerRole
+          ? domain.receipts.filter((r) => r.customer === name && r.shared)
+          : domain.receipts;
+    const invoices = live || !isCustomerRole
+      ? domain.invoices
+      : domain.invoices.filter((inv) => inv.customer_name === name);
 
     const myCustomer = domain.customers.find((c) => c.name === name)
       || { id: 'CUS-NEW', name, mobile: '', email: currentUser?.email || '', address: '', agent: '' };

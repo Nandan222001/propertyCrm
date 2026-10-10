@@ -6,7 +6,7 @@ query strings, so Request/Response and dependency types are always spelled out.
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Request, Response, status
+from fastapi import APIRouter, BackgroundTasks, Request, Response, status
 
 from app.controllers import auth_controller as controller
 from app.core.dependencies import ActorDep, CurrentUserDep, DbDep
@@ -77,9 +77,10 @@ def change_password(
 @router.post("/password/forgot", summary="Request a password-reset link",
              responses={429: {"description": "Rate limited"}})
 def forgot_password(
-    payload: ForgotPasswordRequest, request: Request, service: controller.AuthServiceDep
+    payload: ForgotPasswordRequest, request: Request, service: controller.AuthServiceDep,
+    background: BackgroundTasks,
 ) -> dict:
-    return controller.forgot_password(payload, request, service)
+    return controller.forgot_password(payload, request, service, background)
 
 
 @router.post("/password/reset", summary="Complete a password reset")

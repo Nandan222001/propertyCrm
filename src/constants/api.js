@@ -23,7 +23,7 @@ export const STORAGE_KEYS = {
 
 /** Resource name -> REST path. `resources.js` turns this into a typed client. */
 export const ENDPOINTS = {
-  auth: { login: '/auth/login', refresh: '/auth/refresh', logout: '/auth/logout', me: '/auth/me', register: '/auth/register', changePassword: '/auth/change-password' },
+  auth: { login: '/auth/login', refresh: '/auth/refresh', logout: '/auth/logout', me: '/auth/me', register: '/auth/register', changePassword: '/auth/password/change' },
   users: { list: '/users', item: (id) => `/users/${id}` },
   projects: { list: '/projects', item: (id) => `/projects/${id}` },
   plots: { list: '/plots', item: (id) => `/plots/${id}` },

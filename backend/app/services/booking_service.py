@@ -38,7 +38,7 @@ from app.schemas.booking import (
     BookingUpdate,
 )
 from app.services.base_service import BaseService
-from app.services.notification_service import emit
+from app.services.notification_service import agent_user_id, emit
 
 #: Plot state implied by each booking state.
 PLOT_STATUS_FOR_BOOKING = {
@@ -137,6 +137,7 @@ class BookingService(BaseService[Booking]):
             payment_plan=booking.payment_plan,
             approved_at=booking.approved_at,
             rejection_reason=booking.rejection_reason,
+            registry_stage=booking.registry_stage or "NOT_STARTED",
             created_at=booking.created_at,
             updated_at=booking.updated_at,
         )
@@ -303,9 +304,10 @@ class BookingService(BaseService[Booking]):
     def _tell_agent(self, booking: Booking, outcome: str, severity: str) -> None:
         """The booking's own agent hears the decision; no other agent does."""
         agent = self.agents.get(booking.agent_id) if booking.agent_id else None
-        if agent is not None and agent.user_id:
+        agent_user = agent_user_id(self.db, agent)
+        if agent_user is not None:
             emit(self.db, title=f"Booking {outcome}", body=f"{booking.booking_number} was {outcome} by {self.actor.name}.",
-                 category="APPROVAL", severity=severity, user_id=agent.user_id, booking_id=booking.id)
+                 category="APPROVAL", severity=severity, user_id=agent_user, booking_id=booking.id)
 
     def reject(self, booking_id: int, payload: BookingDecision) -> Booking:
         self._authorise("approve")
@@ -353,6 +355,30 @@ class BookingService(BaseService[Booking]):
                             reason=payload.reason, ip_address=self.actor.ip_address)
         self._audit("workflow.status", booking, before={"status": previous}, after={"status": payload.status},
                     summary=f"Status {previous} → {payload.status}")
+        return booking
+
+    def set_registry_stage(self, booking_id: int, stage: str, reason: str | None = None) -> Booking:
+        """Registration progress. Reaching the agreement / registered stages also moves the booking itself."""
+        if not self.actor.can(Permission.BOOKING_APPROVE):
+            raise PermissionDeniedError("Only an approver can change the registry stage")
+        booking = self.bookings.get_or_404(booking_id)
+        if booking.status not in (BookingStatus.CONFIRMED.value, BookingStatus.AGREEMENT.value,
+                                  BookingStatus.REGISTERED.value):
+            raise BusinessRuleError("Registry work starts once the booking is confirmed")
+        if booking.status == BookingStatus.REGISTERED.value and stage != "REGISTERED":
+            raise BusinessRuleError("A registered booking cannot go back")
+        # Lifecycle in step with the stage (CONFIRMED -> AGREEMENT -> REGISTERED).
+        if stage in ("AGREEMENT_SIGNED", "SUB_REGISTRAR_APPOINTMENT", "REGISTERED") \
+                and booking.status == BookingStatus.CONFIRMED.value:
+            self.change_status(booking_id, BookingStatusUpdate(status=BookingStatus.AGREEMENT.value, reason=reason))
+        if stage == "REGISTERED" and booking.status != BookingStatus.REGISTERED.value:
+            self.change_status(booking_id, BookingStatusUpdate(status=BookingStatus.REGISTERED.value, reason=reason))
+        booking = self.bookings.get_or_404(booking_id)
+        previous = booking.registry_stage
+        booking.registry_stage = stage
+        self.db.flush()
+        self._audit("workflow.registry", booking, before={"registry_stage": previous},
+                    after={"registry_stage": stage}, summary=f"Registry stage {previous} → {stage}")
         return booking
 
     def release_expired_holds(self, *, grace_days: int = 7) -> int:

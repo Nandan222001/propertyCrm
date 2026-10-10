@@ -13,13 +13,16 @@
  */
 import { API_BASE_URL, API_TIMEOUT_MS } from '../constants/api';
 import { newId } from '../utils/id';
-import { clearStorage, readText, writeText } from '../utils/storage';
+import { clearStorage, readSession, writeSession, writeText } from '../utils/storage';
 
 const ACCESS_KEY = 'access_token';
 const REFRESH_KEY = 'refresh_token';
 
-let accessToken = readText(ACCESS_KEY, '');
-let refreshToken = readText(REFRESH_KEY, '');
+// Credentials live in sessionStorage (this tab only). Drop any copy an older build left in localStorage.
+writeText(ACCESS_KEY, '');
+writeText(REFRESH_KEY, '');
+let accessToken = readSession(ACCESS_KEY, '');
+let refreshToken = readSession(REFRESH_KEY, '');
 let refreshInFlight = null;
 
 export class ApiError extends Error {
@@ -44,8 +47,8 @@ export class ApiUnavailableError extends ApiError {
 export const setTokens = ({ access_token: access, refresh_token: refresh } = {}) => {
   accessToken = access || '';
   refreshToken = refresh || '';
-  writeText(ACCESS_KEY, accessToken);
-  writeText(REFRESH_KEY, refreshToken);
+  writeSession(ACCESS_KEY, accessToken);
+  writeSession(REFRESH_KEY, refreshToken);
 };
 
 export const clearTokens = () => {

@@ -91,6 +91,12 @@ class UserService(BaseService[User]):
             agent_code=payload.agent_code,
         )
         self.users.create(user)
+        if payload.agent_code and user.role == Role.SALES_AGENT.value:
+            # Tie the agent record to this login (when it isn't already someone else's).
+            agent = self.agents.get_by_code(payload.agent_code)
+            if agent is not None and agent.user_id is None:
+                agent.user_id = user.id
+                self.db.flush()
         self._audit(AuditAction.CREATE, user, after={"role": user.role, "status": user.status},
                     summary=f"Provisioned {user.role} account")
         return user

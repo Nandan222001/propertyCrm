@@ -275,3 +275,12 @@
 .view-plot-counts span{background:#f6f7fd;border-radius:8px;padding:10px;text-align:center}
 .view-plot-counts b{display:block;font:700 18px Manrope;color:#2b3a93}
 .view-plot-counts small{font-size:10px;letter-spacing:.5px;color:#8892a4}
+
+/* management dashboard: matrix fits its panel; chart values sit under the bars */
+.management-dash .table-scroll{margin:15px 0 0}
+.management-dash .data-table{margin:0}
+.management-dash td:first-child,.management-dash th:first-child{padding-left:14px}
+.management-dash .trajectory-chart{min-height:230px;align-items:flex-end}
+.management-dash .traj-bar-wrap{display:flex;flex-direction:column;justify-content:flex-end;align-items:center;height:210px}
+.management-dash .traj-bar{width:56%;min-height:3px}
+.traj-val{font:700 12px Manrope;color:#3b4559;margin-top:6px}

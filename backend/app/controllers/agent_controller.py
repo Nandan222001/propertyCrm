@@ -8,6 +8,7 @@ from fastapi import Depends, Query
 
 from app.core.constants import AuditAction, Permission
 from app.core.dependencies import ActorDep, DbDep, PaginationDep, require
+from app.core.exceptions import PermissionDeniedError
 from app.core.responses import success
 from app.repositories.booking_repository import BookingRepository
 from app.repositories.customer_repository import CustomerRepository
@@ -36,6 +37,30 @@ class AgentService(BaseService):
         self.customers = CustomerRepository(db)
         self.plots = PlotRepository(db)
 
+    # ------------------------------------------------------------ row scope
+    @property
+    def _sees_all_agents(self) -> bool:
+        """Managers / accounts / admin / management see the whole team; an agent only themself."""
+        return self.actor.can(Permission.BOOKING_VIEW_ALL)
+
+    def _allowed_agent_ids(self) -> set[int]:
+        if self._sees_all_agents:
+            return set()  # unused
+        return {self.actor.agent_id} if self.actor.agent_id else set()
+
+    def scope_clause(self):
+        from sqlalchemy import false
+
+        if self._sees_all_agents:
+            return None
+        return self.agents.model.id == self.actor.agent_id if self.actor.agent_id else false()
+
+    def visible_agent_rows(self, rows: list[dict]) -> list[dict]:
+        if self._sees_all_agents:
+            return rows
+        allowed = self._allowed_agent_ids()
+        return [r for r in rows if r["id"] in allowed]
+
     def serialise(self, agent) -> dict:
         return {
             "id": agent.id,
@@ -50,8 +75,10 @@ class AgentService(BaseService):
         }
 
     def performance(self, agent_id: int) -> AgentPerformance:
-        """Admin lookup: deals, sales, collection, commission for one agent."""
+        """Deals, sales, collection, commission for one agent (an agent may only ask about themself)."""
         agent = self.agents.get_or_404(agent_id)
+        if not self._sees_all_agents and agent.id not in self._allowed_agent_ids():
+            raise PermissionDeniedError("You can only view your own performance")
         scope = self.bookings.scope_clause_for(agent_id=agent.id, customer_id=None)
         totals = self.bookings.totals(scope)
         commission = self.commissions.totals(CommissionRepository(self.db).model.agent_id == agent.id)
@@ -108,13 +135,13 @@ AgentServiceDep = Annotated[AgentService, Depends(get_agent_service)]
 
 
 def list_agents(page: PaginationDep, service: AgentServiceDep) -> dict:
-    result = service.list(page)
+    result = service.list(page, scope_clause=service.scope_clause())
     return success([service.serialise(a) for a in result.items], meta=result.meta.model_dump())
 
 
 def leaderboard(service: AgentServiceDep) -> dict:
     service._authorise("view")
-    return success(service.agents.leaderboard(limit=50), "Agent leaderboard")
+    return success(service.visible_agent_rows(service.agents.leaderboard(limit=50)), "Agent leaderboard")
 
 
 def agent_performance(
@@ -147,4 +174,7 @@ def lookup_agent(
         .where(or_(Agent.name.like(f"%{q}%"), Agent.code.like(f"%{q.upper()}%")))
         .limit(10)
     ).scalars().all()
+    if not service._sees_all_agents:
+        allowed = service._allowed_agent_ids()
+        matches = [a for a in matches if a.id in allowed]
     return success([service.serialise(agent) for agent in matches], "Agent matches")

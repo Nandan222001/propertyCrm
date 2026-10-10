@@ -1,6 +1,6 @@
 import React from 'react';
 import { Eye, Printer, MessageCircle, Download, FileText, Check, X as XIcon, Plus } from 'lucide-react';
-import { REGISTRY_STEPS } from '../../data/seedData';
+import { COMPANY, REGISTRY_STEPS } from '../../data/seedData';
 import { parseAmt, fmtINR, openWhatsApp, isAdmin, canCreateCustomer, canApprove } from '../../utils';
 
 const statusClass = (s) => {
@@ -106,7 +106,7 @@ export function CustomerProfile({
         </div>
         {portal && <span className="view-only-tag">VIEW ONLY</span>}
         {!portal && (
-          <button className="button whatsapp-btn" onClick={() => openWhatsApp(customer.mobile, `Hello ${customer.name}, this is Lalita Realestate Infra regarding your plot booking.`)}>
+          <button className="button whatsapp-btn" onClick={() => openWhatsApp(customer.mobile, `Hello ${customer.name}, this is ${COMPANY.name} regarding your plot booking.`)}>
             <MessageCircle size={14} /> WhatsApp
           </button>
         )}

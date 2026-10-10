@@ -28,10 +28,10 @@ def commission_rate_for(deals_closed: int, override: Decimal | None = None) -> D
     return Decimal(str(COMMISSION_SLABS[-1][1]))
 
 
-def split_commission(deal_value: Decimal, rate: Decimal) -> tuple[Decimal, Decimal, Decimal]:
+def split_commission(deal_value: Decimal, rate: Decimal, tds_rate: float | Decimal = TDS_RATE) -> tuple[Decimal, Decimal, Decimal]:
     """Return ``(gross, tds, net)`` rounded to paise using half-up rounding."""
     gross = (Decimal(deal_value) * Decimal(rate)).quantize(MONEY, rounding=ROUND_HALF_UP)
-    tds = (gross * Decimal(str(TDS_RATE))).quantize(MONEY, rounding=ROUND_HALF_UP)
+    tds = (gross * Decimal(str(tds_rate))).quantize(MONEY, rounding=ROUND_HALF_UP)
     return gross, tds, (gross - tds).quantize(MONEY, rounding=ROUND_HALF_UP)
 
 
@@ -52,9 +52,21 @@ class CommissionService(BaseService[Commission]):
 
     # --------------------------------------------------------------- scoping
     def scope_clause(self):
-        if self.actor.can(Permission.COMMISSION_APPROVE) or self.actor.can(Permission.COMMISSION_PAYOUT):
+        # Approvers, payers and read-only oversight roles see every commission; an agent only their own.
+        if (self.actor.can(Permission.COMMISSION_APPROVE) or self.actor.can(Permission.COMMISSION_PAYOUT)
+                or self.actor.can(Permission.BOOKING_VIEW_ALL)):
             return None
         return Commission.agent_id == (self.actor.agent_id or -1)
+
+    def _tds_rate(self) -> Decimal:
+        """TDS withheld on commission: the organisation's own setting (percent), else the default."""
+        from app.services.org_settings import get_value
+
+        try:
+            percent = Decimal(get_value(self.db, "tax.tdsRate", str(Decimal(str(TDS_RATE)) * 100)))
+        except Exception:
+            return Decimal(str(TDS_RATE))
+        return percent / 100 if 0 <= percent <= 30 else Decimal(str(TDS_RATE))
 
     # ----------------------------------------------------------------- read
     def paginate(self, page: PaginationContext) -> Paginated[Commission]:
@@ -102,7 +114,7 @@ class CommissionService(BaseService[Commission]):
         deals = self.agents.leaderboard(limit=100)  # includes computed deal counts
         deals_closed = next((row["deals"] for row in deals if row["id"] == agent.id), 0)
         rate = commission_rate_for(deals_closed, Decimal(agent.commission_rate))
-        gross, tds, net = split_commission(Decimal(booking.final_price), rate)
+        gross, tds, net = split_commission(Decimal(booking.final_price), rate, self._tds_rate())
 
         commission = Commission(
             agent_id=agent.id,
@@ -126,7 +138,7 @@ class CommissionService(BaseService[Commission]):
         agent = self.agents.get_or_404(payload.agent_id)
         if payload.booking_id and self.commissions.get_by(booking_id=payload.booking_id):
             raise BusinessRuleError("A commission already exists for this booking")
-        gross, tds, net = split_commission(payload.deal_value, payload.rate)
+        gross, tds, net = split_commission(payload.deal_value, payload.rate, self._tds_rate())
         commission = Commission(
             agent_id=agent.id,
             booking_id=payload.booking_id,

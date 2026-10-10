@@ -4,7 +4,23 @@
  * print sheets) so a saved change takes effect immediately.
  */
 import { COMPANY } from '../data/seedData';
+
+const COMPANY_SAMPLE = { ...COMPANY };
 import { readJson, writeJson } from './storage';
+
+/** Which organisation the signed-in user belongs to (null offline / for the sample company). */
+let tenant = null;
+export function setSettingsTenant(next) {
+  const same = (next?.slug || null) === (tenant?.slug || null) && (next?.name || null) === (tenant?.name || null);
+  tenant = next && next.slug ? { slug: next.slug, name: next.name || next.slug } : null;
+  if (!same) applyCompany();
+}
+
+// Only the seeded sample company ('lalita') keeps the sample letterhead; any other organisation
+// starts from its own name with blank address / GSTIN / phone / email until it fills them in.
+const isSample = () => !tenant || tenant.slug === 'lalita';
+const defaultCompany = () => (isSample() ? { ...COMPANY_SAMPLE } : { name: tenant.name, address: '', gstin: '', phone: '', email: '' });
+const settingsKey = () => (tenant && !isSample() ? `admin_settings:${tenant.slug}` : 'admin_settings');
 
 export const DEFAULT_SETTINGS = {
   company: { ...COMPANY },
@@ -12,10 +28,22 @@ export const DEFAULT_SETTINGS = {
   bank: { bankName: '', accountName: '', accountNumber: '', ifsc: '', upi: '' },
 };
 
+/**
+ * Against the real API the organisation's settings live on the server (the same letterhead,
+ * bank details and tax rules for every user and device). `remote` holds the loaded copy;
+ * null means offline preview, which keeps using this browser's local copy.
+ */
+let remote = null;
+export const usesRemoteSettings = () => remote !== null;
+export function setRemoteSettings(data) {
+  remote = data ? { company: data.company || {}, tax: data.tax || {}, bank: data.bank || {} } : null;
+  applyCompany();
+}
+
 export function getSettings() {
-  const saved = readJson('admin_settings', {}) || {};
+  const saved = remote !== null ? remote : (readJson(settingsKey(), {}) || {});
   return {
-    company: { ...DEFAULT_SETTINGS.company, ...(saved.company || {}) },
+    company: { ...defaultCompany(), ...(saved.company || {}) },
     tax: { ...DEFAULT_SETTINGS.tax, ...(saved.tax || {}) },
     bank: { ...DEFAULT_SETTINGS.bank, ...(saved.bank || {}) },
   };
@@ -28,13 +56,13 @@ export function applyCompany(company = getSettings().company) {
 
 export function saveSettingsSection(section, values) {
   const next = { ...getSettings(), [section]: values };
-  writeJson('admin_settings', next);
+  writeJson(settingsKey(), next);
   if (section === 'company') applyCompany(values);
   return next;
 }
 
 export function resetSettingsSection(section) {
-  return saveSettingsSection(section, { ...DEFAULT_SETTINGS[section] });
+  return saveSettingsSection(section, section === 'company' ? defaultCompany() : { ...DEFAULT_SETTINGS[section] });
 }
 
 applyCompany();

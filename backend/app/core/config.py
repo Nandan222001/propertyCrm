@@ -96,6 +96,16 @@ class Settings(BaseSettings):
 
     # -------------------------------------------------------------- security
     FORCE_HTTPS: bool = False
+
+    # --- outgoing e-mail (password reset links). Unset SMTP_HOST = e-mail disabled (links are only logged / returned in dev).
+    SMTP_HOST: str | None = None
+    SMTP_PORT: int = 587
+    SMTP_USER: str | None = None
+    SMTP_PASSWORD: str | None = None
+    SMTP_FROM: str = "no-reply@localhost"
+    SMTP_STARTTLS: bool = True
+    #: Public URL of the web app, used to build links inside e-mails.
+    APP_BASE_URL: str = "http://localhost:5173"
     SECURITY_HEADERS_ENABLED: bool = True
     CSP_POLICY: str = "default-src 'none'; frame-ancestors 'none'; base-uri 'none'"
     LOG_LEVEL: str = "INFO"

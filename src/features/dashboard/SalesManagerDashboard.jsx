@@ -1,201 +1,186 @@
-import React, { useState } from 'react';
-import { Target, Users, TrendingUp, CheckCircle, Clock, ChevronRight, AlertCircle, Award, ArrowUpRight, Plus, PhoneCall } from 'lucide-react';
+import React, { useCallback, useEffect, useState } from 'react';
+import { Target, Users, Plus, AlertCircle } from 'lucide-react';
+import { api, actions, hasSession } from '../../api';
+import { parseAmt, fmtINR } from '../../utils';
+import { compactINR } from '../../utils/dashboardStats';
 
-export function SalesManagerDashboard({ go, D, notify, agents = [] }) {
-  const [approvals, setApprovals] = useState([
-    { id: 'APP-101', title: 'Plot Hold Extension (48h)', customer: 'Sneha Mehta · Plot B-033', agent: 'M. Kumar', amount: '₹14,00,000', type: 'HOLD_REQUEST' },
-    { id: 'APP-102', title: 'Early Bird Discount (2%)', customer: 'Priya Nair · Plot A-101', agent: 'R. Gupta', amount: '₹9,60,000', type: 'DISCOUNT_REQUEST' },
-    { id: 'APP-103', title: 'Commission Sign-off (2.0%)', customer: 'Rajesh Sharma · Plot A-012', agent: 'M. Kumar', amount: '₹36,800', type: 'COMMISSION_APPROVAL' }
-  ]);
+const money = (n) => { const c = compactINR(n); return `${c.val}${c.unit ? ` ${c.unit}` : ''}`; };
+const LIVE = (b) => !['Pending Approval', 'Rejected', 'Cancelled'].includes(b[7]);
+const monthKey = (label) => { const d = new Date(String(label || '')); return Number.isNaN(d.getTime()) ? '' : `${d.getFullYear()}-${d.getMonth()}`; };
 
-  const handleApprove = (id, title) => {
-    setApprovals(approvals.filter(a => a.id !== id));
-    notify(`Approved: ${title}`);
+/**
+ * Team view for the sales manager. Every number comes from the tenant's own rows:
+ * bookings / customers (props), the agent leaderboard and the commissions awaiting
+ * sign-off (API). Nothing is hard-coded.
+ */
+export function SalesManagerDashboard({ go, D, notify, bookings = [], customers = [] }) {
+  const live = hasSession();
+  const [team, setTeam] = useState([]);
+  const [commissions, setCommissions] = useState([]);
+
+  const load = useCallback(async () => {
+    if (!live) return;
+    try {
+      const [list, board, comm] = await Promise.all([
+        api.agents.list({ page_size: 200 }), actions.agentLeaderboard(), api.commissions.list({ page_size: 200 }),
+      ]);
+      const rates = new Map((list.data || []).map((a) => [a.id, Number(a.commission_rate)]));
+      const rows = (board.data || []).map((r) => ({
+        id: r.id, name: r.name, code: r.code, deals: Number(r.deals) || 0,
+        sales: Number(r.sales) || 0, collected: Number(r.collected) || 0, rate: rates.get(r.id),
+      })).sort((a, b) => b.sales - a.sales);
+      setTeam(rows);
+      setCommissions(comm.data || []);
+    } catch (error) {
+      notify(`Could not load team data: ${error.message}`);
+    }
+  }, [live, notify]);
+
+  useEffect(() => { load(); }, [load, bookings.length]);
+
+  const counted = bookings.filter(LIVE);
+  const sales = counted.reduce((t, b) => t + parseAmt(b[5]), 0);
+  const collected = counted.reduce((t, b) => t + parseAmt(b[6]), 0);
+  const pct = sales ? Math.round((collected / sales) * 100) : 0;
+  const thisMonth = monthKey(new Date().toDateString());
+  const newThisMonth = counted.filter((b) => monthKey(b[4]) === thisMonth).length;
+  const activeAgents = team.filter((a) => a.deals > 0).length;
+  const submitted = bookings.length;
+  const confirmed = bookings.filter((b) => ['Confirmed', 'Processing', 'Agreement', 'Registered'].includes(b[7])).length;
+  const approvedCustomers = customers.filter((c) => c.status === 'Approved').length;
+  const agreements = bookings.filter((b) => ['Agreement', 'Registered'].includes(b[7])).length;
+  const approvalRate = submitted ? Math.round((confirmed / submitted) * 100) : 0;
+
+  const bookingById = new Map(bookings.filter((b) => typeof b[10] === 'number').map((b) => [b[10], b]));
+  const queue = commissions.filter((c) => ['PAYABLE', 'PROCESSING', 'ON_HOLD'].includes(c.status));
+  const topSales = team[0]?.sales || 0;
+  const decide = async (commission, status) => {
+    try {
+      await actions.commissionDecision(commission.id, { status });
+      notify(`Commission for ${commission.agent_name}: ${status.replace('_', ' ').toLowerCase()}`);
+      load();
+    } catch (error) {
+      notify(`Could not save: ${error.message}`);
+    }
   };
-
-  const handleReject = (id, title) => {
-    setApprovals(approvals.filter(a => a.id !== id));
-    notify(`Rejected request: ${title}`);
-  };
-
-  const agentLeaderboard = [
-    { name: 'M. Kumar', code: 'AG-014', deals: 9, target: '₹1.20 Cr', achieved: '₹1.12 Cr', pct: 93, conv: '28.4%', status: 'Top Performer' },
-    { name: 'S. Patel', code: 'AG-008', deals: 7, target: '₹1.00 Cr', achieved: '₹86.0 L', pct: 86, conv: '24.1%', status: 'On Track' },
-    { name: 'R. Gupta', code: 'AG-021', deals: 4, target: '₹75.0 L', achieved: '₹52.5 L', pct: 70, conv: '19.5%', status: 'Nearing Target' },
-    { name: 'A. Khan', code: 'AG-003', deals: 3, target: '₹60.0 L', achieved: '₹38.4 L', pct: 64, conv: '16.8%', status: 'Requires Push' },
-    { name: 'N. Bose', code: 'AG-017', deals: 2, target: '₹50.0 L', achieved: '₹24.0 L', pct: 48, conv: '12.5%', status: 'Follow-up Due' }
-  ];
+  const tag = (i, r) => (r.deals === 0 ? 'No deals yet' : i === 0 ? 'Top performer' : r.collected / (r.sales || 1) >= 0.5 ? 'On track' : 'Collections lag');
 
   return (
     <div className="role-dashboard sales-manager-dash">
       <div className="role-welcome manager-welcome">
         <div>
           <span className="eyebrow"><i className="live-dot" /> SALES LEADERSHIP COMMAND</span>
-          <h2>Team Sales Velocity & Quota Performance</h2>
-          <p>Real-time deal flow, agent leaderboard rankings, conversion funnel velocity, and manager approvals.</p>
+          <h2>Team Sales Velocity &amp; Collections</h2>
+          <p>Live deal flow, agent leaderboard, pipeline and commission sign-offs for your team.</p>
         </div>
         <div className="welcome-actions">
-          <button className="button button-white" onClick={() => go('Agents')}>
-            <Users size={14} /> View All Agents
-          </button>
-          <button className="button button-primary" onClick={() => D('booking')}>
-            <Plus size={14} /> Add Team Booking
-          </button>
+          <button className="button button-white" onClick={() => go('Agents')}><Users size={14} /> View All Agents</button>
+          <button className="button button-primary" onClick={() => D('booking')}><Plus size={14} /> Add Team Booking</button>
         </div>
       </div>
 
-      {/* Target Realization Meter */}
       <div className="team-quota-panel">
         <div className="quota-header">
           <div>
-            <span className="quota-tag"><Target size={14} /> SEPTEMBER 2026 TEAM QUOTA</span>
-            <h3>₹3.84 Cr Achieved <span>of ₹5.00 Cr Target</span></h3>
+            <span className="quota-tag"><Target size={14} /> TEAM COLLECTIONS</span>
+            <h3>{money(collected)} Collected <span>of {money(sales)} booked</span></h3>
           </div>
           <div className="quota-right">
-            <b>76.8% Met</b>
-            <small>₹1.16 Cr remaining · 13 days to month end</small>
+            <b>{pct}% Collected</b>
+            <small>{money(Math.max(sales - collected, 0))} still to collect</small>
           </div>
         </div>
         <div className="quota-progress-track">
-          <div className="quota-fill" style={{ width: '76.8%' }}>
-            <span className="quota-needle" />
-          </div>
+          <div className="quota-fill" style={{ width: `${pct}%` }}><span className="quota-needle" /></div>
         </div>
       </div>
 
-      {/* Sales Manager KPIs */}
       <div className="mini-stats four">
         <div className="mini-stat">
           <small>ACTIVE TEAM BOOKINGS</small>
-          <b className="indigo-text">176 Deals</b>
-          <span className="stat-sub">+23 this current month</span>
+          <b className="indigo-text">{counted.length} Deal{counted.length === 1 ? '' : 's'}</b>
+          <span className="stat-sub">+{newThisMonth} this month</span>
         </div>
         <div className="mini-stat">
           <small>ACTIVE SALES FORCE</small>
-          <b className="green-text">14 / 18 Agents</b>
-          <span className="stat-sub">5 agents on target pace</span>
+          <b className="green-text">{activeAgents} / {team.length} Agents</b>
+          <span className="stat-sub">with at least one deal</span>
         </div>
         <div className="mini-stat">
           <small>AVERAGE TICKET SIZE</small>
-          <b>₹18.4 Lakhs</b>
-          <span className="stat-sub">Across 4 developments</span>
+          <b>{counted.length ? money(sales / counted.length) : '—'}</b>
+          <span className="stat-sub">per confirmed deal</span>
         </div>
         <div className="mini-stat">
-          <small>CLOSING CONVERSION RATE</small>
-          <b className="amber-text">24.6%</b>
-          <span className="stat-sub">Visits to confirmed bookings</span>
+          <small>BOOKING APPROVAL RATE</small>
+          <b className="amber-text">{approvalRate}%</b>
+          <span className="stat-sub">{confirmed} of {submitted} submitted</span>
         </div>
       </div>
 
-      {/* Sales Funnel Velocity */}
       <section className="panel funnel-panel">
         <div className="panel-head">
           <div>
-            <h2>Deal Conversion Pipeline Velocity</h2>
-            <p>From initial lead qualification to final registered agreement</p>
+            <h2>Deal Conversion Pipeline</h2>
+            <p>From customers added to agreements executed</p>
           </div>
-          <span className="badge-pill indigo">Live September Flow</span>
         </div>
-
         <div className="sales-funnel-steps">
-          <div className="funnel-step">
-            <span className="step-num">01</span>
-            <span className="step-count">142</span>
-            <b>New Enquiries</b>
-            <small>Portal & Walk-ins</small>
-          </div>
-          <div className="funnel-arrow">→</div>
-          <div className="funnel-step">
-            <span className="step-num">02</span>
-            <span className="step-count">58</span>
-            <b>Site Visits</b>
-            <small>40.8% Visit Ratio</small>
-          </div>
-          <div className="funnel-arrow">→</div>
-          <div className="funnel-step highlight">
-            <span className="step-num">03</span>
-            <span className="step-count">18</span>
-            <b>Plots on Hold</b>
-            <small>Token Received</small>
-          </div>
-          <div className="funnel-arrow">→</div>
-          <div className="funnel-step highlight-green">
-            <span className="step-num">04</span>
-            <span className="step-count">23</span>
-            <b>Bookings Confirmed</b>
-            <small>Advance Reconciled</small>
-          </div>
-          <div className="funnel-arrow">→</div>
-          <div className="funnel-step">
-            <span className="step-num">05</span>
-            <span className="step-count">19</span>
-            <b>Agreements Executed</b>
-            <small>Allotment Issued</small>
-          </div>
+          {[
+            ['Customers Added', customers.length, 'All agents', ''],
+            ['Customers Approved', approvedCustomers, customers.length ? `${Math.round((approvedCustomers / customers.length) * 100)}% of added` : '—', ''],
+            ['Bookings Submitted', submitted, 'Incl. awaiting approval', 'highlight'],
+            ['Bookings Confirmed', confirmed, `${approvalRate}% approval rate`, 'highlight-green'],
+            ['Agreements Executed', agreements, 'Allotment issued', ''],
+          ].map(([label, count, sub, cls], i, all) => (
+            <React.Fragment key={label}>
+              <div className={`funnel-step ${cls}`}>
+                <span className="step-num">0{i + 1}</span>
+                <span className="step-count">{count}</span>
+                <b>{label}</b>
+                <small>{sub}</small>
+              </div>
+              {i < all.length - 1 && <div className="funnel-arrow">→</div>}
+            </React.Fragment>
+          ))}
         </div>
       </section>
 
       <div className="role-dash-grid">
-        {/* Agent Performance Leaderboard */}
         <section className="panel">
           <div className="panel-head">
             <div>
               <h2>Agent Performance Leaderboard</h2>
-              <p>Ranked by revenue realized against monthly target</p>
+              <p>Ranked by booked sales value</p>
             </div>
-            <button className="text-button" onClick={() => go('Agents')}>
-              View Full League Table →
-            </button>
+            <button className="text-button" onClick={() => go('Agents')}>View Full League Table →</button>
           </div>
-
           <div className="table-scroll">
             <table className="data-table">
               <thead>
                 <tr>
-                  <th>RANK & AGENT</th>
-                  <th>DEALS</th>
-                  <th>ACHIEVED / TARGET</th>
-                  <th>PROGRESS</th>
-                  <th>CONVERSION</th>
-                  <th>STATUS</th>
-                  <th>ACTION</th>
+                  <th>RANK &amp; AGENT</th><th>DEALS</th><th>SALES VALUE</th><th>PROGRESS</th><th>COLLECTED</th><th>STATUS</th><th>ACTION</th>
                 </tr>
               </thead>
               <tbody>
-                {agentLeaderboard.map((a, idx) => (
-                  <tr key={a.code}>
+                {team.length === 0 && <tr><td colSpan={7} className="empty-cell">No agents yet.</td></tr>}
+                {team.map((a, i) => (
+                  <tr key={a.id}>
                     <td>
                       <div className="customer-cell">
-                        <span className={`rank-badge ${idx === 0 ? 'rank-1' : idx === 1 ? 'rank-2' : ''}`}>
-                          #{idx + 1}
-                        </span>
-                        <div>
-                          <b>{a.name}</b>
-                          <small>{a.code}</small>
-                        </div>
+                        <span className={`rank-badge ${i === 0 ? 'rank-1' : i === 1 ? 'rank-2' : ''}`}>#{i + 1}</span>
+                        <div><b>{a.name}</b><small>{a.code}</small></div>
                       </div>
                     </td>
                     <td><b>{a.deals}</b></td>
-                    <td>
-                      <div><b>{a.achieved}</b> <span className="muted-text">/ {a.target}</span></div>
+                    <td><b>{money(a.sales)}</b></td>
+                    <td style={{ minWidth: 110 }}>
+                      <div className="inline-progress"><div className="inline-bar" style={{ width: `${topSales ? Math.round((a.sales / topSales) * 100) : 0}%` }} /></div>
+                      <small className="muted-text">{topSales ? Math.round((a.sales / topSales) * 100) : 0}% of top</small>
                     </td>
-                    <td style={{ minWidth: 100 }}>
-                      <div className="inline-progress">
-                        <div className="inline-bar" style={{ width: `${a.pct}%` }} />
-                      </div>
-                      <small className="muted-text">{a.pct}%</small>
-                    </td>
-                    <td><b className="green-text">{a.conv}</b></td>
-                    <td>
-                      <span className={`badge-pill ${idx < 2 ? 'green' : idx === 2 ? 'indigo' : 'amber'}`}>
-                        {a.status}
-                      </span>
-                    </td>
-                    <td>
-                      <button className="button button-white table-btn" onClick={() => notify(`Lead assigned to ${a.name}`)}>
-                        Assign Lead
-                      </button>
-                    </td>
+                    <td><b className="green-text">{money(a.collected)}</b></td>
+                    <td><span className="badge-pill indigo">{tag(i, a)}</span></td>
+                    <td><button className="button button-white table-btn" onClick={() => go('Agents')}>View</button></td>
                   </tr>
                 ))}
               </tbody>
@@ -203,42 +188,35 @@ export function SalesManagerDashboard({ go, D, notify, agents = [] }) {
           </div>
         </section>
 
-        {/* Manager Approvals Queue */}
         <section className="panel manager-approvals-panel">
           <div className="panel-head">
             <div>
-              <h2>Pending Approvals Queue</h2>
-              <p>{approvals.length} operational actions need manager sign-off</p>
+              <h2>Commission Sign-off Queue</h2>
+              <p>{queue.length} commission{queue.length === 1 ? '' : 's'} need manager approval</p>
             </div>
           </div>
-
-          {approvals.length === 0 ? (
-            <div className="empty-state-box">
-              <CheckCircle size={28} className="green-text" />
-              <b>All approvals cleared!</b>
-              <p>Your team's pipeline has no pending approvals right now.</p>
-            </div>
+          {queue.length === 0 ? (
+            <div className="empty-state-box"><AlertCircle size={26} className="green-text" /><b>All caught up</b><p>No commissions are waiting for your sign-off.</p></div>
           ) : (
             <div className="approvals-list">
-              {approvals.map((item) => (
-                <div className="approval-card" key={item.id}>
-                  <div className="app-top">
-                    <span className="app-type-tag">{item.type.replace('_', ' ')}</span>
-                    <b className="app-val">{item.amount}</b>
+              {queue.map((c) => {
+                const bk = bookingById.get(c.booking_id);
+                return (
+                  <div className="approval-card" key={c.id}>
+                    <div className="app-top">
+                      <span className="app-type-tag">COMMISSION</span>
+                      <b className="app-val">₹{fmtINR(c.gross_amount)}</b>
+                    </div>
+                    <h4>Commission sign-off ({Number((Number(c.rate) * 100).toFixed(2))}%){c.status === 'ON_HOLD' ? ' · on hold' : ''}</h4>
+                    <p className="app-meta">Client: <b>{bk ? `${bk[1]} · Plot ${bk[3]}` : '—'}</b></p>
+                    <p className="app-agent">Agent: <span>{c.agent_name}</span></p>
+                    <div className="app-buttons">
+                      {c.status !== 'ON_HOLD' && <button className="button button-white small-btn" onClick={() => decide(c, 'ON_HOLD')}>Hold</button>}
+                      <button className="button button-primary small-btn" onClick={() => decide(c, 'APPROVED')}>Approve</button>
+                    </div>
                   </div>
-                  <h4>{item.title}</h4>
-                  <p className="app-meta">Client: <b>{item.customer}</b></p>
-                  <p className="app-agent">Agent: <span>{item.agent}</span></p>
-                  <div className="app-buttons">
-                    <button className="button button-white small-btn" onClick={() => handleReject(item.id, item.title)}>
-                      Decline
-                    </button>
-                    <button className="button button-primary small-btn" onClick={() => handleApprove(item.id, item.title)}>
-                      Approve
-                    </button>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </section>

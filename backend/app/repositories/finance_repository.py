@@ -162,12 +162,15 @@ class ReceiptRepository(BaseRepository[Receipt]):
     default_sort = "issued_on"
 
     def next_number(self, *, year: int) -> str:
-        like = f"RCT-{year}-%"
+        from app.services.org_settings import get_value
+
+        prefix = get_value(self.db, "tax.receiptPrefix", "RCT").upper()
+        like = f"{prefix}-{year}-%"
         current = self.db.execute(
             select(func.max(Receipt.receipt_number)).where(Receipt.receipt_number.like(like))
         ).scalar_one()
         sequence = int(str(current).rsplit("-", 1)[-1]) if current else 200
-        return f"RCT-{year}-{sequence + 1:04d}"
+        return f"{prefix}-{year}-{sequence + 1:04d}"
 
     def mark_shared(self, receipt: Receipt) -> Receipt:
         from app.db.base import utcnow

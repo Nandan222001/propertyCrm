@@ -13,7 +13,8 @@ import { projects, agents, seedUsers } from '../../data/seedData';
 
 import { RoleContextBanner } from '../../components/layout/RoleContextBanner';
 import { PAGES } from '../../constants/navigation';
-import { getSettings, saveSettingsSection, resetSettingsSection } from '../../utils/settings';
+import { getSettings, saveSettingsSection, resetSettingsSection, setRemoteSettings, usesRemoteSettings } from '../../utils/settings';
+import { actions } from '../../api';
 import { clientAudit } from '../../utils/security';
 
 const GST_CHOICES = [['0', 'Exempt (0%)'], ['0.05', 'GST 5%'], ['0.12', 'GST 12%'], ['0.18', 'GST 18%']];
@@ -71,7 +72,17 @@ function SettingsModal({ module, close, onSaved }) {
   const [values, setValues] = useState(() => ({ ...getSettings()[module.key] }));
   const [errors, setErrors] = useState({});
 
-  const submit = (e) => {
+  const [saving, setSaving] = useState(false);
+  const [failure, setFailure] = useState('');
+
+  /** Live: save on the server (shared by every user); offline: this browser only. */
+  const persist = async (section, next) => {
+    if (!usesRemoteSettings()) { saveSettingsSection(section, next); return; }
+    const response = await actions.saveOrgSettings(section, next);
+    setRemoteSettings({ ...getSettings(), [section]: response.data });
+  };
+
+  const submit = async (e) => {
     e.preventDefault();
     const found = {};
     module.fields.forEach(([key, , , , validate]) => {
@@ -84,14 +95,33 @@ function SettingsModal({ module, close, onSaved }) {
     if (cleaned.ifsc) cleaned.ifsc = cleaned.ifsc.toUpperCase();
     if (cleaned.gstin) cleaned.gstin = cleaned.gstin.toUpperCase();
     if (cleaned.receiptPrefix) cleaned.receiptPrefix = cleaned.receiptPrefix.toUpperCase();
-    saveSettingsSection(module.key, cleaned);
+    setSaving(true); setFailure('');
+    try {
+      await persist(module.key, cleaned);
+    } catch (error) {
+      setSaving(false); setFailure(error.message || 'Could not save the settings.');
+      return;
+    }
     clientAudit('settings.updated', { section: module.key });
     onSaved(`${module.title} saved`);
     close();
   };
 
-  const reset = () => {
-    resetSettingsSection(module.key);
+  const reset = async () => {
+    setSaving(true); setFailure('');
+    try {
+      if (usesRemoteSettings()) {
+        const defaults = module.key === 'company' ? { name: getSettings().company.name, address: '', gstin: '', phone: '', email: '' }
+          : module.key === 'tax' ? { receiptPrefix: 'RCT', defaultGst: '0.18', tdsRate: '5', dueDays: '15' }
+            : { bankName: '', accountName: '', accountNumber: '', ifsc: '', upi: '' };
+        await persist(module.key, defaults);
+      } else {
+        resetSettingsSection(module.key);
+      }
+    } catch (error) {
+      setSaving(false); setFailure(error.message || 'Could not reset the settings.');
+      return;
+    }
     clientAudit('settings.reset', { section: module.key });
     onSaved(`${module.title} reset to defaults`);
     close();
@@ -126,10 +156,11 @@ function SettingsModal({ module, close, onSaved }) {
             </label>
           ))}
         </div>
+        {failure && <p className="form-error" role="alert" style={{ color: '#d92d20', margin: '8px 0 0' }}>{failure}</p>}
         <div className="modal-actions">
-          <button type="button" className="button button-white" onClick={reset}>Reset to defaults</button>
+          <button type="button" className="button button-white" onClick={reset} disabled={saving}>Reset to defaults</button>
           <button type="button" className="button button-white" onClick={close}>Cancel</button>
-          <button type="submit" className="button button-primary"><Check size={13} /> Save changes</button>
+          <button type="submit" className="button button-primary" disabled={saving}><Check size={13} /> Save changes</button>
         </div>
       </form>
     </div>

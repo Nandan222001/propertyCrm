@@ -26,7 +26,7 @@ from app.schemas.customer import (
     DataSubjectRequestCreate,
 )
 from app.services.base_service import BaseService
-from app.services.notification_service import emit
+from app.services.notification_service import agent_user_id, emit
 
 
 class CustomerService(BaseService[Customer]):
@@ -223,11 +223,12 @@ class CustomerService(BaseService[Customer]):
         )
         # The agent who added this customer hears the outcome (nobody else does).
         agent = self.agents.get(customer.agent_id) if customer.agent_id else None
-        if agent is not None and agent.user_id:
+        agent_user = agent_user_id(self.db, agent)
+        if agent_user is not None:
             outcome = "approved" if payload.status == ApprovalStatus.APPROVED else "rejected"
             emit(self.db, title=f"Customer {outcome}", body=f"{customer.name} was {outcome} by {self.actor.name}.",
                  category="APPROVAL", severity="info" if outcome == "approved" else "warning",
-                 user_id=agent.user_id)
+                 user_id=agent_user)
         return customer
 
     # --------------------------------------------------------------- privacy

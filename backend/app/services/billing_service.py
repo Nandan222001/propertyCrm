@@ -21,7 +21,6 @@ from decimal import ROUND_HALF_UP, Decimal
 from sqlalchemy.orm import Session
 
 from app.core.constants import (
-    COMPANY,
     INVOICE_PAYMENT_TERM_DAYS,
     AuditAction,
     InvoiceStatus,
@@ -48,6 +47,7 @@ from app.schemas.billing import (
 )
 from app.schemas.finance import PaymentCreate
 from app.services.base_service import BaseService
+from app.services.company_profile import company_profile
 from app.services.payment_service import PaymentService
 from app.utils.money import amount_in_words
 
@@ -467,7 +467,7 @@ class BillingService(BaseService[Invoice]):
                 }
                 for payment in self.payments_against(invoice)
             ],
-            "company": COMPANY,
+            "company": company_profile(self.db, self.actor.tenant_id),
             "amount_in_words": amount_in_words(invoice.total_amount),
         }
 

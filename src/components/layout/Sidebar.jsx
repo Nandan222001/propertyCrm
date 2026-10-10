@@ -1,13 +1,15 @@
 import React, { useState } from 'react';
-import { ChevronDown, LayoutDashboard, LogOut, X } from 'lucide-react';
+import { ChevronDown, KeyRound, LayoutDashboard, LogOut, X } from 'lucide-react';
 import { PAGE_ICON } from '../../constants/navigation';
 
 /** Left navigation rail: brand, workspace chip, role-aware nav, identity footer. */
 export function Sidebar({
   role, roleConfig, user, nav, badgeFor, page, mobileOpen, projects, project, tenantName, showWorkspace = true,
-  session, onNavigate, onClose, onProjectChange, onLogout,
+  session, onNavigate, onClose, onProjectChange, onLogout, onChangePassword,
 }) {
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [brandFirst, ...brandWords] = (tenantName || 'Lalita Realestate Infra').split(' ');
+  const brandRest = brandWords.join(' ');
   const pick = (value) => { onProjectChange(value); setPickerOpen(false); };
   const renderItems = (items) => items.map((name) => {
     const Icon = PAGE_ICON[name] || LayoutDashboard;
@@ -24,10 +26,10 @@ export function Sidebar({
   return (
     <aside className={`sidebar ${mobileOpen ? 'open' : ''}`}>
       <div className="brand">
-        <div className="brand-mark">L</div>
+        <div className="brand-mark">{(tenantName || 'L').trim().charAt(0).toUpperCase()}</div>
         <div>
-          <b>Lalita <span>Realestate Infra</span></b>
-          <small>{tenantName || 'ENTERPRISE REAL ESTATE'}</small>
+          <b>{brandFirst} <span>{brandRest}</span></b>
+          <small>ENTERPRISE REAL ESTATE</small>
         </div>
         <button className="sidebar-close" onClick={onClose} aria-label="Close navigation">
           <X size={18} />
@@ -98,6 +100,11 @@ export function Sidebar({
             <small>{role}</small>
           </div>
 
+          {onChangePassword && (
+            <button className="logout-button" onClick={onChangePassword} title="Change password" aria-label="Change password">
+              <KeyRound size={14} />
+            </button>
+          )}
           <button className="logout-button" onClick={onLogout} title="Sign out of workspace">
             <LogOut size={14} />
           </button>

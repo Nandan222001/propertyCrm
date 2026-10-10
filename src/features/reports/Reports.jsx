@@ -13,7 +13,8 @@ import { projects, agents, seedUsers } from '../../data/seedData';
 import { buildReport, REPORT_PERIODS } from '../../utils/reports';
 import { getSettings } from '../../utils/settings';
 import { downloadCsv } from '../../utils/csv';
-import { COMMISSION_ROWS } from '../commissions/Commissions';
+import { COMMISSION_ROWS, toRow } from '../commissions/Commissions';
+import { api, hasSession } from '../../api';
 
 import { RoleContextBanner } from '../../components/layout/RoleContextBanner';
 
@@ -28,7 +29,21 @@ export function Reports({ notify, role, bookings = [], payments = [], plots = []
   const [dateRange, setDateRange] = useState('All time');
   const [reportProject, setReportProject] = useState('All projects');
 
-  const data = useMemo(() => ({ bookings, payments, plots, commissions: COMMISSION_ROWS }), [bookings, payments, plots]);
+  // Live: the commissions this role may see (from the server). Offline preview: the sample register.
+  const [liveCommissions, setLiveCommissions] = useState(hasSession() ? [] : null);
+  useEffect(() => {
+    if (!hasSession()) return;
+    api.commissions.list({ page_size: 200 })
+      .then((response) => {
+        const byId = new Map(bookings.filter((b) => typeof b[10] === 'number').map((b) => [b[10], b]));
+        setLiveCommissions((response.data || []).map((c) => toRow(c, byId)));
+      })
+      .catch(() => setLiveCommissions([]));
+  }, [bookings]);
+  const data = useMemo(
+    () => ({ bookings, payments, plots, commissions: liveCommissions ?? COMMISSION_ROWS }),
+    [bookings, payments, plots, liveCommissions],
+  );
   const reports = useMemo(() => {
     const tdsRate = getSettings().tax.tdsRate;
     return Object.fromEntries(REPORTS.map(([, , key]) => [

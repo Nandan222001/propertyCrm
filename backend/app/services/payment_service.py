@@ -35,6 +35,7 @@ from app.schemas.finance import (
     ReceiptResponse,
 )
 from app.services.base_service import BaseService
+from app.services.company_profile import company_profile
 from app.utils.money import amount_in_words
 
 PAYMENT_STATUS_FOR = {
@@ -230,6 +231,27 @@ class PaymentService(BaseService[Payment]):
         self._maybe_create_commission(booking)
         return payment
 
+    def set_next_due(self, booking_number: str, due: date) -> dict:
+        """Move the next instalment's due date. The ledger status (pending / overdue) follows from it."""
+        self._authorise("create")
+        from app.repositories.booking_repository import BookingRepository
+
+        booking = BookingRepository(self.db).get_by(booking_number=booking_number)
+        if booking is None:
+            raise BusinessRuleError("Unknown booking")
+        if booking.balance <= 0:
+            raise BusinessRuleError("This booking is fully paid — there is no next instalment")
+        latest = self.payments.list(filters={"booking_id": booking.id}, sort="received_on:desc", limit=1)
+        if not latest:
+            raise BusinessRuleError("Record a payment first — the due date belongs to the instalment schedule")
+        previous = latest[0].due_date
+        latest[0].due_date = due
+        self.db.flush()
+        self._audit(AuditAction.UPDATE, latest[0], before={"due_date": str(previous)}, after={"due_date": str(due)},
+                    summary=f"Next due date for {booking.booking_number} set to {due}")
+        return {"booking_number": booking.booking_number, "due_date": str(due),
+                "status": self._ledger_status(booking, due)}
+
     def mark_overdue(self) -> dict:
         """Scheduled job — normally invoked by cron, not by an HTTP caller."""
         if not self.actor.is_authenticated or not self.actor.can(Permission.PAYMENT_APPROVE):
@@ -248,7 +270,6 @@ class PaymentService(BaseService[Payment]):
 
     def receipt_copy(self, receipt_id: int) -> ReceiptCopy:
         """Printable payload with the amount in words (Indian numbering)."""
-        from app.core.constants import COMPANY
         from app.repositories.booking_repository import BookingRepository
 
         receipt = self.get_receipt(receipt_id)
@@ -271,7 +292,7 @@ class PaymentService(BaseService[Payment]):
                 "final_price": str(booking.final_price),
                 "paid_amount": str(booking.paid_amount),
             },
-            company=COMPANY,
+            company=company_profile(self.db, self.actor.tenant_id),
             amount_in_words=amount_in_words(receipt.amount),
         )
 

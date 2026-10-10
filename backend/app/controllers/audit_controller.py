@@ -110,3 +110,20 @@ def retention_sweep(
     service.log(action=AuditAction.BACKUP, resource="audit", summary=f"Retention sweep: {result}",
                 actor=actor)
     return success(result, "Retention sweep completed")
+
+
+def organisation_settings(db: DbDep, actor: ActorDep) -> dict:
+    from app.core.exceptions import PermissionDeniedError
+    from app.services import org_settings
+
+    if actor.tenant_id is None:
+        raise PermissionDeniedError("Organisation settings belong to a tenant")
+    return success(org_settings.read_all(db, actor.tenant_id), "Organisation settings")
+
+
+def save_organisation_settings(section: str, payload: dict, db: DbDep, actor: ActorDep) -> dict:
+    from app.services import org_settings
+
+    values = payload.get("values") if isinstance(payload.get("values"), dict) else payload
+    saved = org_settings.write_section(db, actor, section, values)
+    return success(saved, f"{section.title()} settings saved")

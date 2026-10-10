@@ -4,7 +4,7 @@
  * endpoint table in `constants/api.js` (DRY across a dozen collections).
  */
 import { ENDPOINTS } from '../constants/api';
-import { authedRequest, request } from './client';
+import { authedRequest, request, requestBlob } from './client';
 
 const COLLECTION_PATHS = {
   users: ENDPOINTS.users,
@@ -77,3 +77,19 @@ actions.agentLeaderboard = () => authedRequest(`${ENDPOINTS.agents.list}/leaderb
 /** The caller's own notification queue (the server scopes it by role / person). */
 actions.notificationQueue = () => authedRequest(ENDPOINTS.notifications.list);
 actions.notificationAction = (id) => authedRequest(`${ENDPOINTS.notifications.item(id)}/action`, { method: 'POST', body: {} });
+
+actions.commissionDecision = (id, body) => authedRequest(`${ENDPOINTS.commissions.item(id)}/decision`, { method: 'POST', body });
+
+actions.shareReceipt = (id) => authedRequest(`${ENDPOINTS.receipts.item(id)}/share`, { method: 'POST', body: {} });
+
+/** Password reset (no session needed). */
+actions.forgotPassword = (email) => request('/auth/password/forgot', { method: 'POST', body: { email }, auth: false });
+actions.resetPassword = (token, newPassword) => request('/auth/password/reset', { method: 'POST', body: { token, new_password: newPassword }, auth: false });
+
+/** Organisation settings (company / bank / tax) shared by every user of the organisation. */
+actions.orgSettings = () => authedRequest('/organisation/settings');
+actions.saveOrgSettings = (section, values) => authedRequest(`/organisation/settings/${section}`, { method: 'PUT', body: { values } });
+
+actions.setRegistryStage = (bookingId, body) => authedRequest(`${ENDPOINTS.bookings.item(bookingId)}/registry`, { method: 'POST', body });
+
+actions.setDueDate = (bookingNumber, dueDate) => authedRequest(`/ledger/${encodeURIComponent(bookingNumber)}/due-date`, { method: 'POST', body: { due_date: dueDate } });

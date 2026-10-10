@@ -119,6 +119,22 @@ class NotificationService(BaseService[Notification]):
         return created
 
 
+def agent_user_id(db: Session, agent) -> int | None:
+    """The login behind an agent record: linked directly, or by the agent code on the user."""
+    if agent is None:
+        return None
+    if agent.user_id:
+        return agent.user_id
+    from sqlalchemy import select
+
+    from app.core.constants import Role
+    from app.models.user import User
+
+    return db.execute(
+        select(User.id).where(User.role == Role.SALES_AGENT.value, User.agent_code == agent.code)
+    ).scalars().first()
+
+
 def emit(
     db: Session, *, title: str, body: str | None = None, category: str = "FOLLOW_UP",
     severity: str = "info", audience_role: str | None = None, user_id: int | None = None,

@@ -43,7 +43,9 @@ logger = get_logger(__name__)
 #: ``auto_error=False`` so we can raise our own 401 with the standard envelope.
 bearer_scheme = HTTPBearer(auto_error=False, description="JWT access token")
 
-DbDep = Annotated[Session, Depends(get_db)]
+# scope="function": commit/rollback run when the endpoint returns, *before* the response is sent,
+# so a client's very next request always sees what the previous one wrote.
+DbDep = Annotated[Session, Depends(get_db, scope="function")]
 
 
 def client_ip(request: Request) -> str:
@@ -72,6 +74,8 @@ def get_current_user(
         raise AuthenticationError("Account no longer exists")
     if user.status == UserStatus.SUSPENDED.value:
         raise PermissionDeniedError("This account is suspended")
+    if user.status == UserStatus.PENDING.value:
+        raise AuthenticationError("This account is waiting for administrator activation")
     if user.is_locked:
         raise AuthenticationError("Account temporarily locked")
 

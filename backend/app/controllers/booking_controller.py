@@ -14,6 +14,7 @@ from app.schemas.booking import (
     BookingDecision,
     BookingStatusUpdate,
     BookingUpdate,
+    RegistryStageUpdate,
 )
 from app.services.booking_service import BookingService
 from app.services.customer_service import CustomerService
@@ -59,6 +60,11 @@ def approve_booking(booking_id: int, payload: BookingDecision, service: BookingS
 def reject_booking(booking_id: int, payload: BookingDecision, service: BookingServiceDep) -> dict:
     booking = service.reject(booking_id, payload)
     return success(service.serialise(booking).model_dump(), f"Booking {booking.booking_number} rejected")
+
+
+def set_registry_stage(booking_id: int, payload: RegistryStageUpdate, service: BookingServiceDep) -> dict:
+    booking = service.set_registry_stage(booking_id, payload.stage, payload.reason)
+    return success(service.serialise(booking).model_dump(), f"Registry stage set to {payload.stage}")
 
 
 def change_status(booking_id: int, payload: BookingStatusUpdate, service: BookingServiceDep) -> dict:

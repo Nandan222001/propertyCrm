@@ -328,3 +328,18 @@ def test_orm_filter_scopes_selects_aggregates_joins_and_blocks_foreign_writes():
         with pytest.raises(TenantIsolationError):
             db.flush()
         db.rollback()
+
+
+def test_invoice_letterhead_is_the_tenants_own(client, platform_headers):
+    """A new organisation's PDF/receipt payloads carry its own name — never the sample company's."""
+    from app.db.session import session_scope
+    from app.services.company_profile import company_profile
+
+    with session_scope() as db:
+        sample = db.execute(select(Tenant).where(Tenant.slug == "lalita")).scalar_one()
+        sky = db.execute(select(Tenant).where(Tenant.slug == "skyline")).scalar_one()
+        assert company_profile(db, sample.id)["name"] == "Lalita Realestate Infra"
+        assert company_profile(db, sample.id)["gstin"]
+        other = company_profile(db, sky.id)
+        assert other["name"] == sky.name and "Lalita" not in other["name"]
+        assert other["gstin"] == ""   # nothing is borrowed from the sample letterhead

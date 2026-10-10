@@ -1,9 +1,10 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Search, X, MessageCircle } from 'lucide-react';
-import { agents } from '../../data/seedData';
+import { COMPANY, agents } from '../../data/seedData';
+import { api, hasSession } from '../../api';
 import { parseAmt, fmtINR, openWhatsApp } from '../../utils';
 
-export function agentStats(name, bookings, customers, receipts) {
+export function agentStats(name, bookings, customers, receipts, rate = 0.02) {
   const mine = bookings.filter(b => b[8] === name);
   const live = mine.filter(b => b[7] !== 'Pending Approval' && b[7] !== 'Rejected');
   const sales = live.reduce((s, b) => s + parseAmt(b[5]), 0);
@@ -15,7 +16,7 @@ export function agentStats(name, bookings, customers, receipts) {
     sales,
     collected,
     outstanding: sales - collected,
-    commission: Math.round(sales * 0.02),
+    commission: Math.round(sales * rate),
     customers: customers.filter(c => c.agent === name),
     receipts: receipts.filter(r => r.agent === name).length
   };
@@ -23,11 +24,28 @@ export function agentStats(name, bookings, customers, receipts) {
 
 export function AgentLookup({ onPick }) {
   const [q, setQ] = useState('');
+  const [found, setFound] = useState([]);
+  const live = hasSession();
+  // Live: search this organisation's real agents (the server only returns agents the caller may see).
+  useEffect(() => {
+    const t = q.trim();
+    if (!live || t.length < 2) { setFound([]); return undefined; }
+    let cancelled = false;
+    const timer = setTimeout(() => {
+      api.agents.list({ search: t, page_size: 10 })
+        .then((response) => {
+          if (!cancelled) setFound((response.data || []).map((a) => [a.name, a.code, '', '', '', '', '', a.phone || '', Number(a.commission_rate)]));
+        })
+        .catch(() => { if (!cancelled) setFound([]); });
+    }, 250);
+    return () => { cancelled = true; clearTimeout(timer); };
+  }, [q, live]);
   const matches = useMemo(() => {
     const t = q.trim().toLowerCase();
     if (!t) return [];
+    if (live) return found;
     return agents.filter(a => a[0].toLowerCase().includes(t) || a[1].toLowerCase().includes(t));
-  }, [q]);
+  }, [q, live, found]);
   return (
     <div className="agent-lookup">
       <Search size={14} />
@@ -49,10 +67,11 @@ export function AgentLookup({ onPick }) {
 }
 
 export function AgentInfoModal({ agent, bookings, customers, receipts, close }) {
-  const s = agentStats(agent[0], bookings, customers, receipts);
+  const rate = typeof agent[8] === 'number' ? agent[8] : 0.02;
+  const s = agentStats(agent[0], bookings, customers, receipts, rate);
   const tiles = [
     ['Deals closed', s.deals], ['Sales value', `₹${fmtINR(s.sales)}`], ['Collected', `₹${fmtINR(s.collected)}`],
-    ['Outstanding', `₹${fmtINR(s.outstanding)}`], ['Commission (2%)', `₹${fmtINR(s.commission)}`], ['Awaiting approval', s.pending]
+    ['Outstanding', `₹${fmtINR(s.outstanding)}`], [`Commission (${Number((rate * 100).toFixed(2))}%)`, `₹${fmtINR(s.commission)}`], ['Awaiting approval', s.pending]
   ];
   return (
     <div className="modal-backdrop" onMouseDown={e => e.target === e.currentTarget && close()}>
@@ -81,7 +100,7 @@ export function AgentInfoModal({ agent, bookings, customers, receipts, close }) 
           </table>
         </div>
         <div className="modal-actions">
-          <button className="button whatsapp-btn" onClick={() => openWhatsApp(agent[7], `Hi ${agent[0]}, this is the Lalita ERP admin desk.`)}>
+          <button className="button whatsapp-btn" onClick={() => openWhatsApp(agent[7], `Hi ${agent[0]}, this is the ${COMPANY.name} admin desk.`)}>
             <MessageCircle size={14} /> WhatsApp agent
           </button>
           <button className="button button-white" onClick={close}>Close</button>

@@ -280,3 +280,36 @@ def test_customer_remembers_the_project_it_was_added_for(client, agent_headers, 
         json={"name": "Nowhere", "email": "nowhere-" + unique_email, "phone": "9" + unique_phone[1:][::-1], "project_id": 999999},
     )
     assert unknown.status_code == 409, unknown.text
+
+
+def test_registry_stage_moves_the_booking_and_is_admin_only(client, admin_headers, agent_headers):
+    bookings = client.get("/api/v1/bookings?page_size=50", headers=admin_headers).json()["data"]
+    booking = next(b for b in bookings if b["status"] == "CONFIRMED")
+    assert booking["registry_stage"] == "NOT_STARTED"
+    url = f"/api/v1/bookings/{booking['id']}/registry"
+    assert client.post(url, headers=agent_headers, json={"stage": "DOCUMENTS_PENDING"}).status_code in (403, 404)
+    assert client.post(url, headers=admin_headers, json={"stage": "NONSENSE"}).status_code == 422
+
+    docs = client.post(url, headers=admin_headers, json={"stage": "DOCUMENTS_PENDING"})
+    assert docs.status_code == 200, docs.text
+    assert docs.json()["data"]["registry_stage"] == "DOCUMENTS_PENDING" and docs.json()["data"]["status"] == "CONFIRMED"
+
+    signed = client.post(url, headers=admin_headers, json={"stage": "AGREEMENT_SIGNED"})
+    assert signed.json()["data"]["status"] == "AGREEMENT"          # the booking itself moved on
+
+    done = client.post(url, headers=admin_headers, json={"stage": "REGISTERED"})
+    assert done.json()["data"]["status"] == "REGISTERED"
+    back = client.post(url, headers=admin_headers, json={"stage": "DOCUMENTS_PENDING"})
+    assert back.status_code in (400, 409, 422)                     # registered bookings never go back
+
+
+def test_next_due_date_drives_the_ledger_status(client, accounts_headers, agent_headers):
+    rows = client.get("/api/v1/ledger?page_size=50", headers=accounts_headers).json()["data"]
+    row = next(r for r in rows if float(r["balance"]) > 0 and r["due_date"])
+    path = f"/api/v1/ledger/{row['booking_number']}/due-date"
+    assert client.post(path, headers=agent_headers, json={"due_date": "2030-01-01"}).status_code == 403
+    assert client.post(path, headers=accounts_headers, json={"due_date": "not-a-date"}).status_code == 422
+    past = client.post(path, headers=accounts_headers, json={"due_date": "2020-01-01"})
+    assert past.status_code == 200 and past.json()["data"]["status"] == "OVERDUE"
+    future = client.post(path, headers=accounts_headers, json={"due_date": "2031-01-01"})
+    assert future.json()["data"]["status"] in ("PENDING", "PARTIALLY_PAID")

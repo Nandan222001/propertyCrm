@@ -1,6 +1,7 @@
 /** WhatsApp click-to-chat deep links (no Business API, no third-party scripts). */
 
 export function waLink(phone, text) {
+  if (String(phone || '').includes('*')) return '';   // masked for this role: never build a link from partial digits
   let digits = String(phone || '').replace(/\D/g, '');
   if (digits.length === 10) digits = `91${digits}`; // default to India
   if (!digits) return '';

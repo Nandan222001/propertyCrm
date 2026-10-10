@@ -47,3 +47,13 @@ def retention_sweep(db: DbDep, actor: ActorDep,
                     days: int = Query(default=3650, ge=365, le=7300),
                     _: SETTINGS = None):
     return controller.retention_sweep(db, actor, days, None)
+
+
+@router.get("/organisation/settings", summary="Company profile, bank details and tax rules for printing")
+def organisation_settings(db: DbDep, actor: ActorDep):
+    return controller.organisation_settings(db, actor)
+
+
+@router.put("/organisation/settings/{section}", summary="Save one settings section (company | bank | tax)")
+def save_organisation_settings(section: str, payload: dict, db: DbDep, actor: ActorDep, _: SETTINGS = None):
+    return controller.save_organisation_settings(section, payload, db, actor)

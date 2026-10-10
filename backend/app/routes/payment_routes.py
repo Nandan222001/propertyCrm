@@ -45,6 +45,11 @@ def overdue(service: controller.PaymentServiceDep, _: VIEW_ALL = None):
     return controller.overdue(service)
 
 
+@router.post("/ledger/{booking_number}/due-date", summary="Set the next instalment due date (status follows)")
+def set_due_date(booking_number: str, payload: dict, service: controller.PaymentServiceDep, _: CREATE = None):
+    return controller.set_due_date(booking_number, payload, service)
+
+
 @router.post("/ledger/overdue-sweep", summary="Run the overdue-marking job")
 def run_overdue_job(service: controller.PaymentServiceDep, _: APPROVE = None):
     return controller.run_overdue_job(service, None)

@@ -23,8 +23,10 @@ export function RecordModal({ kind, close, save, context, initial, role }) {
     ['name', 'Full Name', 'text', 'Enter full name'],
     ['email', 'Email Address', 'email', 'name@company.com'],
     ['phone', 'Mobile Number', 'tel', '+91 98765 43210'],
+    ['title', 'Job title (optional)', 'text', 'e.g. Senior Property Consultant'],
     ['role', 'Role', 'select', ['ADMIN', 'SALES MANAGER', 'SALES AGENT', 'ACCOUNTS', 'MANAGEMENT']],
-    ['status', 'Account Status', 'select', ['Active', 'Invited', 'Suspended']]
+    ['agent_code', 'Agent code (sales agents)', 'text', 'e.g. AG-031 — links the login to an agent record'],
+    ['status', 'Account Status', 'select', ['Active', 'Pending', 'Invited', 'Suspended']]
   ] : record ? [
     ['name', 'Name / Title', 'text', 'e.g. Master record or phase'],
     ['reference', 'Reference Code', 'text', 'e.g. REF-2026-01'],
@@ -48,7 +50,7 @@ export function RecordModal({ kind, close, save, context, initial, role }) {
       <div className="modal">
         <div className="modal-head">
           <div>
-            <span className="modal-kicker">Lalita ERP · {context || 'WORKSPACE'}</span>
+            <span className="modal-kicker">ERP · {context || 'WORKSPACE'}</span>
             <h2>{title}</h2>
             <p>Enter the details below to update live workspace records.</p>
           </div>

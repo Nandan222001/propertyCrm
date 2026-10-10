@@ -203,3 +203,82 @@ def test_me_endpoint_exposes_permissions_not_secrets(client, admin_headers):
     assert "booking:approve" in payload["user"]["permissions"]
     assert "password_hash" not in response.text and "\"password\":" not in response.text
     assert "secret" not in response.text.lower()
+
+
+def test_self_registered_account_waits_for_administrator_activation(client, admin_headers, unique_email):
+    body = {"name": "Walk In", "email": unique_email, "password": "Strong@12345",
+            "confirm_password": "Strong@12345", "role": "SALES_AGENT", "consent": True, "tenant": "lalita"}
+    created = client.post("/api/v1/auth/register", json=body)
+    assert created.status_code == 201, created.text
+    data = created.json()["data"]
+    assert data["tokens"] is None and data["pending_activation"] is True
+    assert data["user"]["status"] == "PENDING"
+
+    # cannot sign in yet
+    attempt = client.post("/api/v1/auth/login", json={"email": unique_email, "password": "Strong@12345"})
+    assert attempt.status_code in (401, 403)
+    assert "activate" in attempt.text.lower()
+
+    # that organisation's admin is told, and only an admin can activate
+    queue = client.get("/api/v1/notifications", headers=admin_headers).json()["data"]
+    assert any("awaiting activation" in n["title"].lower() for n in queue)
+    activated = client.patch(f"/api/v1/users/{data['user']['id']}", headers=admin_headers, json={"status": "ACTIVE"})
+    assert activated.status_code == 200, activated.text
+    ok = client.post("/api/v1/auth/login", json={"email": unique_email, "password": "Strong@12345"})
+    assert ok.status_code == 200, ok.text
+
+
+def test_invited_user_can_keep_their_session_and_activates_by_choosing_a_password(client, admin_headers, unique_email):
+    """Admin-created users sign in with a temporary password: refresh must work, and changing it activates them."""
+    temp = "Temp#Pass2026"
+    created = client.post("/api/v1/users", headers=admin_headers, json={
+        "name": "Invited Person", "email": unique_email, "role": "ACCOUNTS", "temporary_password": temp,
+    })
+    assert created.status_code in (200, 201), created.text
+    assert created.json()["data"]["status"] == "INVITED"
+    login = client.post("/api/v1/auth/login", json={"email": unique_email, "password": temp})
+    assert login.status_code == 200, login.text
+    tokens = login.json()["data"]["tokens"]
+    refreshed = client.post("/api/v1/auth/refresh", json={"refresh_token": tokens["refresh_token"]})
+    assert refreshed.status_code == 200, refreshed.text
+
+    headers = {"Authorization": f"Bearer {refreshed.json()['data']['tokens']['access_token']}"}
+    changed = client.post("/api/v1/auth/password/change", headers=headers, json={
+        "current_password": temp, "new_password": "Brand#New2026x", "confirm_password": "Brand#New2026x",
+    })
+    assert changed.status_code == 200, changed.text
+    again = client.post("/api/v1/auth/login", json={"email": unique_email, "password": "Brand#New2026x"})
+    assert again.status_code == 200
+    me = client.get("/api/v1/auth/me", headers={"Authorization": f"Bearer {again.json()['data']['tokens']['access_token']}"})
+    assert me.json()["data"]["user"]["status"] == "ACTIVE"
+
+
+def test_password_reset_email_is_sent_and_link_works(client, admin_headers, unique_email, monkeypatch):
+    from app.services import mailer
+
+    sent: list[tuple[str, str, str]] = []
+    monkeypatch.setattr("app.controllers.auth_controller.send_mail", lambda to, subject, body: sent.append((to, subject, body)))
+    client.post("/api/v1/users", headers=admin_headers, json={
+        "name": "Forgetful", "email": unique_email, "role": "ACCOUNTS", "temporary_password": "Temp#Pass2026",
+    })
+    # activate by choosing a password first (invited -> active)
+    login = client.post("/api/v1/auth/login", json={"email": unique_email, "password": "Temp#Pass2026"}).json()["data"]["tokens"]
+    client.post("/api/v1/auth/password/change", headers={"Authorization": f"Bearer {login['access_token']}"},
+                json={"current_password": "Temp#Pass2026", "new_password": "Original#Pass26", "confirm_password": "Original#Pass26"})
+
+    response = client.post("/api/v1/auth/password/forgot", json={"email": unique_email})
+    assert response.status_code == 200
+    assert sent and sent[0][0] == unique_email
+    token = sent[0][2].split("token=")[1].split()[0]
+    assert token == response.json()["data"].get("debug_token")
+
+    # unknown address: identical answer, nothing sent
+    sent.clear()
+    unknown = client.post("/api/v1/auth/password/forgot", json={"email": f"nobody-{unique_email}"})
+    assert unknown.status_code == 200 and unknown.json()["message"] == response.json()["message"] and not sent
+
+    reset = client.post("/api/v1/auth/password/reset", json={"token": token, "new_password": "Reset#Pass2026a"})
+    assert reset.status_code == 200, reset.text
+    assert client.post("/api/v1/auth/login", json={"email": unique_email, "password": "Reset#Pass2026a"}).status_code == 200
+    assert client.post("/api/v1/auth/password/reset", json={"token": token, "new_password": "Another#Pass2026b"}).status_code in (400, 401, 422)
+    assert mailer.reset_link("abc").endswith("/reset-password?token=abc")

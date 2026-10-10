@@ -5,14 +5,24 @@ import {
   Briefcase, Wallet, Users, Target, Check, RefreshCw
 } from 'lucide-react';
 import { roleConfigs } from '../../data/seedData';
+import { ForgotPasswordForm, ResetPasswordForm } from './PasswordResetForms';
 
-export function LoginScreen({ onLogin, onRegister, customers = [], users = [] }) {
+export function LoginScreen({ onLogin, onRegister, customers = [], users = [], notice: initialNotice = '' }) {
   const [tab, setTab] = useState('login'); // 'login' | 'register'
   const [selectedImage, setSelectedImage] = useState(0); // 0, 1, 2
   const [showPassword, setShowPassword] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [notice, setNotice] = useState(initialNotice);
+  const [busy, setBusy] = useState(false);
+  // 'forgot' = request a reset link; a /reset-password?token=… URL opens the reset form directly.
+  const [resetView, setResetView] = useState(() => (typeof window !== 'undefined' && window.location.pathname === '/reset-password' ? 'reset' : ''));
+  const [resetToken, setResetToken] = useState(() => (typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('token') || '' : ''));
+  const finishReset = (message) => {
+    setNotice(message); setResetView(''); setResetToken(''); setTab('login');
+    window.history.replaceState({}, '', '/');
+  };
 
   // Registration state
   const [regData, setRegData] = useState({
@@ -58,7 +68,7 @@ export function LoginScreen({ onLogin, onRegister, customers = [], users = [] })
   ];
   const registerRoles = quickRoles.filter((r) => r.role === 'SALES AGENT' || r.role === 'CUSTOMER');
 
-  const handleLoginSubmit = (e) => {
+  const handleLoginSubmit = async (e) => {
     e.preventDefault();
     if (!email.includes('@')) {
       setError('Please enter a valid work email.');
@@ -81,10 +91,19 @@ export function LoginScreen({ onLogin, onRegister, customers = [], users = [] })
       if (u) user = { ...u, email: typed };
     }
     setError('');
-    onLogin(role, user, { email: typed, password });
+    setNotice('');
+    setBusy(true);
+    try {
+      await onLogin(role, user, { email: typed, password });
+    } catch (failure) {
+      // Wrong password, a locked / suspended / not-yet-activated account, a suspended organisation…
+      setError(failure?.message || 'Sign-in failed. Please try again.');
+    } finally {
+      setBusy(false);
+    }
   };
 
-  const handleRegisterSubmit = (e) => {
+  const handleRegisterSubmit = async (e) => {
     e.preventDefault();
     if (!regData.name.trim()) {
       setError('Please enter your full name.');
@@ -115,7 +134,15 @@ export function LoginScreen({ onLogin, onRegister, customers = [], users = [] })
     };
 
     if (onRegister) {
-      onRegister(newUser);
+      const result = await onRegister({
+        ...newUser, password: regData.password, confirmPassword: regData.confirmPassword, org: regData.org,
+      });
+      if (result?.error) { setError(result.error); return; }
+      if (result?.pending) {
+        setNotice(result.message || 'Request received — an administrator must activate your account before you can sign in.');
+        setTab('login');
+        setEmail(regData.email);
+      }
     } else {
       onLogin(regData.role, newUser);
     }
@@ -226,9 +253,27 @@ export function LoginScreen({ onLogin, onRegister, customers = [], users = [] })
               <span>{error}</span>
             </div>
           )}
+          {notice && !error && (
+            <div className="login-error-banner login-notice-banner" role="status">
+              <span>{notice}</span>
+            </div>
+          )}
+
+          {resetView === 'reset' && <ResetPasswordForm token={resetToken} onDone={finishReset} />}
+          {resetView === 'forgot' && (
+            <ForgotPasswordForm
+              onBack={() => setResetView('')}
+              onDevToken={(token) => { setResetToken(token); }}
+            />
+          )}
+          {resetView === 'forgot' && resetToken && (
+            <p className="login-dev-hint">
+              Development mode: <button type="button" className="text-button" onClick={() => setResetView('reset')}>open the reset form with this token</button>
+            </p>
+          )}
 
           {/* SIGN IN FORM */}
-          {tab === 'login' && (
+          {!resetView && tab === 'login' && (
             <form className="login-card" onSubmit={handleLoginSubmit}>
               <div className="form-group">
                 <label>
@@ -269,15 +314,18 @@ export function LoginScreen({ onLogin, onRegister, customers = [], users = [] })
                 </label>
               </div>
 
-              <button type="submit" className="button button-primary login-submit">
+              <button type="submit" className="button button-primary login-submit" disabled={busy}>
                 <span>Sign In</span>
                 <ArrowRight size={15} />
+              </button>
+              <button type="button" className="text-button login-forgot" onClick={() => { setError(''); setNotice(''); setResetView('forgot'); }}>
+                Forgot password?
               </button>
             </form>
           )}
 
           {/* REGISTRATION FORM */}
-          {tab === 'register' && (
+          {!resetView && tab === 'register' && (
             <form className="login-card register-card" onSubmit={handleRegisterSubmit}>
               <div className="form-grid-2">
                 <label>
@@ -324,12 +372,12 @@ export function LoginScreen({ onLogin, onRegister, customers = [], users = [] })
                 </label>
 
                 <label>
-                  Organization / Agency
+                  Organisation code
                   <div className="input-with-icon">
                     <Building2 size={15} />
                     <input
                       type="text"
-                      placeholder="Developer or Agency name"
+                      placeholder="e.g. lalita (ask your administrator)"
                       value={regData.org}
                       onChange={(e) => setRegData({ ...regData, org: e.target.value })}
                     />

@@ -16,7 +16,8 @@ import { Badge } from '../../components/common/Badge';
 import { Mini } from '../../components/common/StatTile';
 import { RoleContextBanner } from '../../components/layout/RoleContextBanner';
 
-export function Payments({ pays, receipts, project, search, filter, F, D, notify, role, onOpenBill, onShare, onRemind, onStatus }) {
+export function Payments({ pays, receipts, project, search, filter, F, D, notify, role, onOpenBill, onShare, onRemind, onStatus, onDueDate }) {
+  const [dueFor, setDueFor] = useState(null);
   const [view, setView] = useState('ledger');
   const canBill = canManageBills(role);
   const customerView = role === 'CUSTOMER';
@@ -77,7 +78,12 @@ export function Payments({ pays, receipts, project, search, filter, F, D, notify
                 <Badge>{p[7]}</Badge>,
                 customerView ? p[8] : (
                   <div className="row-actions" key={`${p[0]}-${p[1]}`}>
-                    {canRecordPayment(role) && p[5] !== '0' && onStatus && (
+                    {canRecordPayment(role) && p[5] !== '0' && onDueDate && (
+                      <button className="icon-action" title="Set next due date" onClick={() => setDueFor(p)}>
+                        <CalendarDays size={14} />
+                      </button>
+                    )}
+                    {canRecordPayment(role) && p[5] !== '0' && onStatus && !onDueDate && (
                       <select
                         className="select-mini" value={p[7]} aria-label={`Change status for ${p[0]}`}
                         onChange={(e) => onStatus(p, e.target.value)}
@@ -130,6 +136,41 @@ export function Payments({ pays, receipts, project, search, filter, F, D, notify
           </>
         )}
       </div>
+      {dueFor && <DueDateModal payment={dueFor} close={() => setDueFor(null)} save={onDueDate} />}
     </>
+  );
+}
+
+/** Pick the next instalment's due date; the ledger status (pending / overdue) follows from it. */
+function DueDateModal({ payment, close, save }) {
+  const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
+  const [error, setError] = useState('');
+  const submit = async (e) => {
+    e.preventDefault();
+    if (!date) { setError('Choose a date.'); return; }
+    const problem = await save(payment, date);
+    if (problem) setError(problem); else close();
+  };
+  return (
+    <div className="modal-backdrop" onMouseDown={(e) => e.target === e.currentTarget && close()}>
+      <form className="modal view-modal" onSubmit={submit} noValidate>
+        <div className="modal-head">
+          <div>
+            <span className="modal-kicker">PAYMENT SCHEDULE</span>
+            <h2>Next due date</h2>
+            <p>{payment[0]} · Plot {payment[1]} · balance ₹{payment[5]}. A past date makes the instalment overdue.</p>
+          </div>
+          <button type="button" className="modal-close" onClick={close} aria-label="Close"><X size={16} /></button>
+        </div>
+        <div className="form-grid">
+          <label>Due date<input type="date" value={date} onChange={(e) => setDate(e.target.value)} autoFocus /></label>
+        </div>
+        {error && <p className="form-error" role="alert">{error}</p>}
+        <div className="modal-actions">
+          <button type="button" className="button button-white" onClick={close}>Cancel</button>
+          <button type="submit" className="button button-primary">Save due date</button>
+        </div>
+      </form>
+    </div>
   );
 }

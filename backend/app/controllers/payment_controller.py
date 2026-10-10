@@ -76,3 +76,15 @@ def run_overdue_job(
 ) -> dict:
     """Scheduler hook (also callable by finance admins) — marks overdue rows."""
     return success(service.mark_overdue(), "Overdue sweep completed")
+
+
+def set_due_date(booking_number: str, payload: dict, service: PaymentServiceDep) -> dict:
+    from datetime import date
+
+    from app.core.exceptions import ValidationError
+
+    try:
+        due = date.fromisoformat(str(payload.get("due_date", "")))
+    except ValueError as exc:
+        raise ValidationError("due_date must be YYYY-MM-DD", code="invalid_date") from exc
+    return success(service.set_next_due(booking_number, due), "Next due date updated")

@@ -191,6 +191,7 @@ STAFF_ROLES = frozenset(
 
 class UserStatus(StrEnum):
     ACTIVE = "ACTIVE"
+    PENDING = "PENDING"   # self-registered: cannot sign in until an administrator activates the account
     INVITED = "INVITED"
     SUSPENDED = "SUSPENDED"
     LOCKED = "LOCKED"

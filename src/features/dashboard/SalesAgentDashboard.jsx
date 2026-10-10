@@ -1,33 +1,53 @@
-import React, { useState } from 'react';
-import { Target, CheckCircle2, Circle, Plus, Phone, Calendar, Clock, MapPin, IndianRupee, ArrowUpRight, Award, FileText, Send } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { Target, Plus, Phone, MapPin, Award, AlertCircle } from 'lucide-react';
+import { api, hasSession } from '../../api';
+import { parseAmt, fmtINR } from '../../utils';
 
-export function SalesAgentDashboard({ go, D, notify, bookings = [], plots = [] }) {
-  const [tasks, setTasks] = useState([
-    { id: 1, time: '10:30 AM', text: 'Call Rajesh Sharma regarding registration for Plot A-012', done: true, priority: 'High' },
-    { id: 2, time: '02:00 PM', text: 'Conduct on-site property tour with Anita Verma at Silver Oaks Plot B-104', done: false, priority: 'Urgent' },
-    { id: 3, time: '04:30 PM', text: 'Collect booking agreement signature & token draft from Deepak Iyer', done: false, priority: 'Medium' },
-    { id: 4, time: '06:00 PM', text: 'Follow up with Sneha Mehta regarding pending 2nd installment', done: false, priority: 'Normal' }
-  ]);
+const crLakh = (n) => (n >= 10000000 ? `₹${(n / 10000000).toFixed(2)} Cr` : n >= 100000 ? `₹${(n / 100000).toFixed(2)} L` : `₹${fmtINR(n)}`);
+const OPEN = (b) => b[7] !== 'Rejected' && b[7] !== 'Cancelled';
 
-  const toggleTask = (id) => {
-    setTasks(tasks.map(t => t.id === id ? { ...t, done: !t.done } : t));
-    const t = tasks.find(x => x.id === id);
-    if (!t.done) notify(`Task completed: ${t.text}`);
+/**
+ * The agent's own desk. Everything here derives from `bookings` (already limited to this
+ * agent by the API), the commissions this agent may see, and shared plot inventory —
+ * never from other agents' deals.
+ */
+export function SalesAgentDashboard({ go, D, notify, agentName = '', bookings = [], plots = [] }) {
+  const live = hasSession();
+  const [commissions, setCommissions] = useState([]);
+
+  useEffect(() => {
+    if (!live) return;
+    api.commissions.list({ page_size: 200 })
+      .then((response) => setCommissions(response.data || []))
+      .catch(() => setCommissions([]));
+  }, [live, bookings.length]);
+
+  const mine = bookings.filter(OPEN);
+  const confirmed = mine.filter((b) => b[7] !== 'Pending Approval');
+  const sales = confirmed.reduce((t, b) => t + parseAmt(b[5]), 0);
+  const collected = confirmed.reduce((t, b) => t + parseAmt(b[6]), 0);
+  const pct = sales ? Math.min(100, Math.round((collected / sales) * 100)) : 0;
+  const pending = mine.filter((b) => b[7] === 'Pending Approval');
+
+  const commissionByBooking = new Map(commissions.map((c) => [c.booking_id, c]));
+  const total = commissions.reduce((t, c) => t + Number(c.gross_amount || 0), 0);
+  const paid = commissions.filter((c) => c.status === 'PAID').reduce((t, c) => t + Number(c.gross_amount || 0), 0);
+  const approved = commissions.filter((c) => c.status === 'APPROVED').reduce((t, c) => t + Number(c.gross_amount || 0), 0);
+  const commissionFor = (b) => {
+    const c = commissionByBooking.get(b[10]);
+    return c ? `₹${fmtINR(c.gross_amount)}` : '—';
   };
 
-  const myDeals = [
-    { id: 'BK-2026-0148', client: 'Rajesh Sharma', project: 'Green Meadows', plot: 'A-012', value: '₹18,40,000', paid: '₹14,72,000', progress: 80, stage: 'Agreement Executed', comm: '₹36,800' },
-    { id: 'BK-2026-0147', client: 'Anita Verma', project: 'Silver Oaks', plot: 'B-104', value: '₹12,60,000', paid: '₹6,30,000', progress: 50, stage: 'Token Paid', comm: '₹25,200' },
-    { id: 'BK-2026-0146', client: 'Deepak Iyer', project: 'Park View', plot: 'C-078', value: '₹25,20,000', paid: '₹25,20,000', progress: 100, stage: 'Fully Reconciled', comm: '₹50,400' }
-  ];
+  const dues = confirmed.filter((b) => parseAmt(b[5]) - parseAmt(b[6]) > 0);
+  const available = plots.filter((p) => p[5] === 'AVAILABLE').slice(0, 4);
 
   return (
     <div className="role-dashboard sales-agent-dash">
       <div className="role-welcome agent-welcome">
         <div>
-          <span className="eyebrow"><i className="live-dot" /> FIELD AGENT WORKSPACE · SANJAY PATEL</span>
-          <h2>My Sales Desk & Deal Flow</h2>
-          <p>Your personal revenue performance, assigned customer appointments, commission slips, and deal tracking.</p>
+          <span className="eyebrow"><i className="live-dot" /> FIELD AGENT WORKSPACE{agentName ? ` · ${agentName.toUpperCase()}` : ''}</span>
+          <h2>My Sales Desk &amp; Deal Flow</h2>
+          <p>Your own deals, customers and commissions — nothing from other agents appears here.</p>
         </div>
         <div className="welcome-actions">
           <button className="button button-white" onClick={() => go('Projects & plots')}>
@@ -39,23 +59,20 @@ export function SalesAgentDashboard({ go, D, notify, bookings = [], plots = [] }
         </div>
       </div>
 
-      {/* Target Progress & Commission Highlight */}
       <div className="agent-spotlight-grid">
         <div className="panel spotlight-card target-spotlight">
           <div className="spotlight-top">
-            <span className="eyebrow"><Target size={13} /> MY MONTHLY SALES QUOTA</span>
-            <span className="badge-pill green">73.6% Achieved</span>
+            <span className="eyebrow"><Target size={13} /> MY SALES</span>
+            <span className="badge-pill green">{pct}% collected</span>
           </div>
           <div className="spotlight-vals">
-            <h3>₹36.80 L <small>/ ₹50.00 L</small></h3>
-            <p>₹13.20 L remaining to achieve your September milestone</p>
+            <h3>{crLakh(sales)} <small>booked value</small></h3>
+            <p>{crLakh(collected)} collected · {crLakh(Math.max(sales - collected, 0))} still to collect</p>
           </div>
-          <div className="spotlight-track">
-            <div className="spotlight-fill" style={{ width: '73.6%' }} />
-          </div>
+          <div className="spotlight-track"><div className="spotlight-fill" style={{ width: `${pct}%` }} /></div>
           <div className="spotlight-foot">
-            <span>Quota tier: <b>Gold Agent (2.0%)</b></span>
-            <span>Next tier at ₹60L (2.5%)</span>
+            <span><b>{confirmed.length}</b> confirmed deal{confirmed.length === 1 ? '' : 's'}</span>
+            <span><b>{pending.length}</b> awaiting admin approval</span>
           </div>
         </div>
 
@@ -65,151 +82,112 @@ export function SalesAgentDashboard({ go, D, notify, bookings = [], plots = [] }
             <button className="text-button" onClick={() => go('Commissions')}>View Slips →</button>
           </div>
           <div className="spotlight-vals">
-            <h3 className="green-text">₹2,24,000</h3>
-            <p>Accrued this financial quarter (July – Sept 2026)</p>
+            <h3 className="green-text">{live ? `₹${fmtINR(total)}` : '—'}</h3>
+            <p>Accrued on your confirmed deals</p>
           </div>
           <div className="commission-meta-pills">
-            <div className="meta-pill">
-              <small>Disbursed to Bank</small>
-              <b>₹1,87,200</b>
-            </div>
-            <div className="meta-pill highlight">
-              <small>Approved / Due this Friday</small>
-              <b>₹36,800</b>
-            </div>
+            <div className="meta-pill"><small>Disbursed to bank</small><b>{live ? `₹${fmtINR(paid)}` : '—'}</b></div>
+            <div className="meta-pill highlight"><small>Approved / due</small><b>{live ? `₹${fmtINR(approved)}` : '—'}</b></div>
           </div>
         </div>
       </div>
 
-      {/* Daily Tasks & Schedule */}
       <div className="role-dash-grid">
         <section className="panel agent-schedule-panel">
           <div className="panel-head">
             <div>
-              <h2>Today's Appointments & Customer Follow-ups</h2>
-              <p>{tasks.filter(t => !t.done).length} actions pending today</p>
+              <h2>Needs your attention</h2>
+              <p>{pending.length + dues.length} item{pending.length + dues.length === 1 ? '' : 's'} on your deals</p>
             </div>
-            <button className="button button-white small-btn" onClick={() => notify('New appointment scheduled')}>
-              <Plus size={12} /> Add Task
-            </button>
           </div>
-
           <div className="task-checklist">
-            {tasks.map((task) => (
-              <div className={`task-row ${task.done ? 'completed' : ''}`} key={task.id} onClick={() => toggleTask(task.id)}>
-                <button className="check-btn" type="button">
-                  {task.done ? <CheckCircle2 size={18} className="green-text" /> : <Circle size={18} className="muted-text" />}
-                </button>
+            {pending.length + dues.length === 0 && <p className="empty-note">Nothing pending — all your deals are up to date.</p>}
+            {pending.map((b) => (
+              <div className="task-row" key={`p-${b[0]}`} onClick={() => go('Bookings')}>
+                <AlertCircle size={18} className="muted-text" />
                 <div className="task-info">
-                  <span className="task-time"><Clock size={11} /> {task.time}</span>
-                  <p className="task-text">{task.text}</p>
+                  <span className="task-time">Awaiting admin approval</span>
+                  <p className="task-text">{b[0]} · {b[1]} · Plot {b[3]} ({b[2]})</p>
                 </div>
-                <span className={`task-priority ${task.priority.toLowerCase()}`}>
-                  {task.priority}
-                </span>
+                <span className="task-priority medium">Pending</span>
+              </div>
+            ))}
+            {dues.map((b) => (
+              <div className="task-row" key={`d-${b[0]}`} onClick={() => go('Bookings')}>
+                <AlertCircle size={18} className="muted-text" />
+                <div className="task-info">
+                  <span className="task-time">Balance ₹{fmtINR(parseAmt(b[5]) - parseAmt(b[6]))} to collect</span>
+                  <p className="task-text">{b[0]} · {b[1]} · Plot {b[3]} ({b[2]})</p>
+                </div>
+                <span className="task-priority normal">Follow up</span>
               </div>
             ))}
           </div>
         </section>
 
-        {/* Quick Plot Reserve Wizard */}
         <section className="panel agent-quick-reserve">
           <div className="panel-head">
-            <div>
-              <h2>Quick Plot Availability</h2>
-              <p>Top inquiries right now</p>
-            </div>
+            <div><h2>Quick Plot Availability</h2><p>Open inventory you can book</p></div>
           </div>
-
           <div className="mini-inventory-list">
-            <div className="mini-inv-item">
-              <div>
-                <b>Plot B-104</b>
-                <small>Silver Oaks · 1,800 sqft · West</small>
+            {available.length === 0 && <p className="empty-note">No plots are available right now.</p>}
+            {available.map((p) => (
+              <div className="mini-inv-item" key={`${p[8]}-${p[0]}`}>
+                <div><b>Plot {p[0]}</b><small>{p[8]} · {p[2]} sqft · {p[3]}</small></div>
+                <span className="badge-pill green">Available</span>
+                <button className="button button-primary table-btn" onClick={() => D('booking', { project: p[8], plot: p[0] })}>Book</button>
               </div>
-              <span className="badge-pill green">Available</span>
-              <button className="button button-primary table-btn" onClick={() => D('booking')}>Book</button>
-            </div>
-            <div className="mini-inv-item">
-              <div>
-                <b>Plot B-022</b>
-                <small>Silver Oaks · 2,000 sqft · South</small>
-              </div>
-              <span className="badge-pill green">Available</span>
-              <button className="button button-primary table-btn" onClick={() => D('booking')}>Book</button>
-            </div>
-            <div className="mini-inv-item">
-              <div>
-                <b>Plot C-031</b>
-                <small>Park View · 3,000 sqft · North</small>
-              </div>
-              <span className="badge-pill amber">Hold (24h)</span>
-              <button className="button button-white table-btn" onClick={() => notify('Plot is currently on hold by S. Patel')}>Details</button>
-            </div>
+            ))}
           </div>
-
-          <button className="full-width-btn" onClick={() => go('Projects & plots')}>
-            Open Master Plot Map & Rate Card →
-          </button>
+          <button className="full-width-btn" onClick={() => go('Projects & plots')}>Open Master Plot Map &amp; Rate Card →</button>
         </section>
       </div>
 
-      {/* My Deals Table */}
       <section className="panel section-panel">
         <div className="panel-head">
           <div>
-            <h2>My Active Customer Deals</h2>
-            <p>Real-time payment milestone and commission progress for your deals</p>
+            <h2>My Customer Deals</h2>
+            <p>Payment progress and commission on your own bookings</p>
           </div>
-          <button className="text-button" onClick={() => go('Bookings')}>
-            View All My Bookings →
-          </button>
+          <button className="text-button" onClick={() => go('Bookings')}>View All My Bookings →</button>
         </div>
-
         <div className="table-scroll">
           <table className="data-table">
             <thead>
               <tr>
-                <th>CLIENT NAME</th>
-                <th>PROJECT & PLOT</th>
-                <th>DEAL VALUE</th>
-                <th>PAID AMOUNT</th>
-                <th>PAYMENT MILESTONE</th>
-                <th>STAGE</th>
-                <th>MY COMM.</th>
-                <th>ACTIONS</th>
+                <th>CLIENT NAME</th><th>PROJECT &amp; PLOT</th><th>DEAL VALUE</th><th>PAID AMOUNT</th>
+                <th>PAYMENT MILESTONE</th><th>STAGE</th><th>MY COMM.</th><th>ACTIONS</th>
               </tr>
             </thead>
             <tbody>
-              {myDeals.map((d) => (
-                <tr key={d.id}>
-                  <td>
-                    <div className="customer-cell">
-                      <div className="avatar avatar-mint">{d.client.substring(0, 2)}</div>
-                      <div>
-                        <b>{d.client}</b>
-                        <small>{d.id}</small>
+              {mine.length === 0 && <tr><td colSpan={8} className="empty-cell">No deals yet — book a plot for one of your customers.</td></tr>}
+              {mine.map((b) => {
+                const progress = parseAmt(b[5]) ? Math.min(100, Math.round((parseAmt(b[6]) / parseAmt(b[5])) * 100)) : 0;
+                return (
+                  <tr key={b[0]}>
+                    <td>
+                      <div className="customer-cell">
+                        <div className="avatar avatar-mint">{b[1].substring(0, 2)}</div>
+                        <div><b>{b[1]}</b><small>{b[0]}</small></div>
                       </div>
-                    </div>
-                  </td>
-                  <td><b>{d.project}</b> <span className="muted-text">({d.plot})</span></td>
-                  <td><b>{d.value}</b></td>
-                  <td><span className="green-text font-bold">{d.paid}</span></td>
-                  <td style={{ minWidth: 120 }}>
-                    <div className="inline-progress">
-                      <div className="inline-bar green" style={{ width: `${d.progress}%` }} />
-                    </div>
-                    <small className="muted-text">{d.progress}% collected</small>
-                  </td>
-                  <td><span className="badge-pill indigo">{d.stage}</span></td>
-                  <td><b className="green-text">{d.comm}</b></td>
-                  <td>
-                    <button className="button button-white table-btn" onClick={() => notify(`Opening WhatsApp chat with ${d.client}`)}>
-                      <Phone size={11} /> Contact
-                    </button>
-                  </td>
-                </tr>
-              ))}
+                    </td>
+                    <td><b>{b[2]}</b> <span className="muted-text">({b[3]})</span></td>
+                    <td><b>₹{b[5]}</b></td>
+                    <td><span className="green-text font-bold">₹{b[6]}</span></td>
+                    <td style={{ minWidth: 120 }}>
+                      <div className="inline-progress"><div className="inline-bar green" style={{ width: `${progress}%` }} /></div>
+                      <small className="muted-text">{progress}% collected</small>
+                    </td>
+                    <td><span className="badge-pill indigo">{b[7]}</span></td>
+                    <td><b className="green-text">{commissionFor(b)}</b></td>
+                    <td>
+                      <button className="button button-white table-btn" onClick={() => notify(`Open Customers to contact ${b[1]}`)}>
+                        <Phone size={11} /> Contact
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>

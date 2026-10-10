@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import Depends, Request, Response
+from fastapi import BackgroundTasks, Depends, Request, Response
 
 from app.core.config import settings
 from app.core.dependencies import ActorDep, CurrentUserDep, DbDep
@@ -19,6 +19,7 @@ from app.schemas.auth import (
     ResetPasswordRequest,
 )
 from app.services.auth_service import AuthService
+from app.services.mailer import reset_link, send_mail
 from app.services.rbac_service import RBACService
 
 COMMON_ERROR_RESPONSES = {
@@ -57,7 +58,7 @@ def logout(request: Request, actor: ActorDep, service: AuthServiceDep,
 
 def register(payload: RegisterRequest, request: Request, service: AuthServiceDep) -> dict:
     result = service.register(payload, ip=client_ip(request), user_agent=request.headers.get("user-agent"))
-    return success(result, "Account created")
+    return success(result, "Account request received — an administrator must activate it before you can sign in")
 
 
 def me(user: CurrentUserDep, db: DbDep) -> dict:
@@ -85,10 +86,19 @@ def change_password(payload: ChangePasswordRequest, actor: ActorDep, service: Au
     return success(None, "Password changed. Please sign in again on other devices.")
 
 
-def forgot_password(payload: ForgotPasswordRequest, request: Request, service: AuthServiceDep) -> dict:
+def forgot_password(payload: ForgotPasswordRequest, request: Request, service: AuthServiceDep,
+                    background: BackgroundTasks) -> dict:
     token = service.request_password_reset(payload.email, ip=client_ip(request))
+    if token:
+        # Sent after the response so timing never reveals whether the address exists.
+        background.add_task(
+            send_mail, payload.email, "Reset your password",
+            "We received a request to reset your password.\n\n"
+            f"Open this link within 30 minutes to choose a new one:\n{reset_link(token)}\n\n"
+            "If you did not ask for this, you can ignore this message.",
+        )
     # Never reveal whether the address exists. In non-production the token is
-    # returned to make local testing possible; production sends it by e-mail.
+    # also returned to make local testing possible.
     body: dict = {"delivery": "email"}
     if token and not settings.is_production:
         body["debug_token"] = token

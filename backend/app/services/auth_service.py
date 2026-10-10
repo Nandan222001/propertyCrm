@@ -105,6 +105,10 @@ class AuthService:
             self._record_attempt(user, email, False, "suspended", ip, user_agent)
             raise AuthenticationError("This account is suspended. Contact your administrator.")
 
+        if user.status == UserStatus.PENDING.value:
+            self._record_attempt(user, email, False, "pending_activation", ip, user_agent)
+            raise AuthenticationError("Your account is waiting for an administrator to activate it.")
+
         if not self._tenant_is_active(user):
             self._record_attempt(user, email, False, "tenant_suspended", ip, user_agent)
             raise AuthenticationError(TENANT_SUSPENDED)
@@ -154,7 +158,9 @@ class AuthService:
             raise AuthenticationError("Session expired. Please sign in again.")
 
         user = self.users.get_or_404(stored.user_id)
-        if not user.is_active or user.is_deleted:
+        # Invited users (created by an admin) sign in with a temporary password, so they must be able to
+        # keep their session too; only suspended / pending / locked accounts are refused.
+        if user.status not in (UserStatus.ACTIVE.value, UserStatus.INVITED.value) or user.is_deleted:
             raise AuthenticationError("Account is not active")
         if not self._tenant_is_active(user):
             raise AuthenticationError(TENANT_SUSPENDED)
@@ -202,14 +208,15 @@ class AuthService:
             phone=payload.phone,
             role=payload.role.value,
             title=payload.title,
-            status=UserStatus.ACTIVE.value,
+            # Anyone who knows the organisation code can ask for an account; nobody gets in until
+            # an administrator of that organisation activates it.
+            status=UserStatus.PENDING.value,
             password_hash=hash_password(payload.password),
             password_changed_at=utcnow(),
             consent_given_at=utcnow() if payload.consent else None,
             tenant_id=tenant.id,
         )
         self.users.create(user)
-        tokens = self._issue_tokens(user, ip=ip, user_agent=user_agent)
         self.audit.security_event(
             "auth.register",
             f"New {payload.role.value} account created",
@@ -220,7 +227,17 @@ class AuthService:
         self.audit.log(action=AuditAction.CREATE, resource="user", resource_id=user.public_id,
                        summary="Self-registration", actor=ActorContext(user_id=user.id, tenant_id=user.tenant_id, name=user.name,
                                                                        email=email, role=user.role))
-        return {"user": self.session_user(user), "tokens": tokens}
+        # Tell that organisation's admins (and only them) that a request is waiting.
+        from app.models.audit import Notification
+
+        self.db.add(Notification(
+            title="Account awaiting activation",
+            body=f"{payload.name} ({payload.role.value.replace('_', ' ').title()}) asked to join. "
+                 "Activate or remove them under User & role management.",
+            category="APPROVAL", severity="info", audience_role=Role.ADMIN.value, tenant_id=tenant.id,
+        ))
+        self.db.flush()
+        return {"user": self.session_user(user), "tokens": None, "pending_activation": True}
 
     # ----------------------------------------------------------- password ops
     def change_password(self, actor: ActorContext, payload: ChangePasswordRequest) -> None:
@@ -238,6 +255,8 @@ class AuthService:
         user.password_hash = hash_password(payload.new_password)
         user.password_changed_at = utcnow()
         user.must_change_password = 0
+        if user.status == UserStatus.INVITED.value:
+            user.status = UserStatus.ACTIVE.value   # choosing their own password completes the invitation
         self.tokens.revoke_all_for_user(user.id)  # invalidate every existing session
         self.db.flush()
         self.audit.log(action=AuditAction.PASSWORD_CHANGE, resource="user", resource_id=user.public_id,

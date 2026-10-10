@@ -5,7 +5,7 @@
  * role-appropriate page and mounts the shared modals. Business rules live in
  * thunks (`store/thunks.js`), so pages stay presentational.
  */
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Download, Plus } from 'lucide-react';
 
@@ -17,20 +17,22 @@ import { useAppDispatch, useAppSelector, useAuth, useNotify } from '../hooks';
 import {
   selectAllowedPages, selectBillReceipt, selectBillingSummary, selectBookingForPrint, selectDomain,
   selectDocuments, selectHeading, selectTenants, selectTenantsMeta, selectNavBadge, selectNavigation, selectPage,
-  selectPendingApprovals, selectPlotForPrint, selectRoleConfig, selectScopedData, selectUi,
+  selectPendingApprovals, selectUsers, selectPlotForPrint, selectRoleConfig, selectScopedData, selectUi,
 } from '../store/selectors';
 import { hasSession } from '../api';
 import {
   createBooking, createCustomer, decideBooking, decideCustomer, deleteRecord, hydrateWorkspace,
-  markReceiptShared, recordPayment, saveProject, setInvoiceStatus, setPaymentStatus, registerCustomerAccount, saveRecord, setFollowUp,
+  markReceiptShared, recordPayment, saveProject, setInvoiceStatus, setPaymentStatus, setNextDueDate, registerAccount, changeMyPassword, saveRecord, setFollowUp,
   setRegistryStatus, actionNotification, loadNotifications, signIn, signOut, saveInvoice, issueInvoice, cancelInvoice, payInvoice,
   shareInvoice, downloadInvoicePdf,
 } from '../store/thunks';
 import {
-  billOpened, bookingPrintSet, agentInfoSet, customerSelected, filterChanged, modalClosed, modalOpened,
+  billOpened, bookingPrintSet, agentInfoSet, userCredentialShown, customerSelected, filterChanged, modalClosed, modalOpened,
   pageChanged, periodChanged, projectChanged, searchChanged, sidebarToggled, tabChanged,
 } from '../store/slices/uiSlice';
 
+import { ChangePasswordDialog } from '../features/auth/ChangePasswordDialog';
+import { UserCredentialDialog } from '../features/users/UserCredentialDialog';
 import { LoginScreen } from '../features/auth/LoginScreen';
 import { ApprovalsPage } from '../features/approvals/ApprovalsPage';
 import { AdminDashboard } from '../features/dashboard/AdminDashboard';
@@ -61,7 +63,6 @@ import {
 import { credentialCleared } from '../store/slices/tenantsSlice';
 import { openWhatsApp } from '../utils/whatsapp';
 import { agentKey } from '../utils/names';
-import { agents as agentRoster } from '../data/seedData';
 import { downloadCsv } from '../utils/csv';
 import { clientAudit } from '../utils/security';
 
@@ -75,6 +76,9 @@ export function App() {
   const ui = useAppSelector(selectUi);
   const domain = useAppSelector(selectDomain);
   const notifications = useAppSelector((state) => state.notifications);
+  const teamUsers = useAppSelector(selectUsers);
+  const loginNotice = useAppSelector((state) => state.auth.loginNotice);
+  const [changingPassword, setChangingPassword] = useState(false);
   const unread = auth.mode === 'live' ? notifications.items.filter((n) => !n.is_read).length : null;
   const scoped = useAppSelector(selectScopedData);
   const nav = useAppSelector(selectNavigation);
@@ -169,11 +173,16 @@ export function App() {
   const customerPhone = (name) => domain.customers.find((c) => c.name === name)?.mobile || '';
   const billText = (receipt) =>
     `Dear ${receipt.customer}, we have received ₹${receipt.amount} for Plot ${receipt.plot} (${receipt.project}). `
-    + `Receipt ${receipt.no} dated ${receipt.date}. Balance: ₹${receipt.balance}. Thank you - Lalita Realestate Infra.`;
+    + `Receipt ${receipt.no} dated ${receipt.date}. Balance: ₹${receipt.balance}. Thank you - ${COMPANY.name}.`;
 
   const shareReceipt = (receipt) => {
     dispatch(markReceiptShared(receipt));
-    openWhatsApp(customerPhone(receipt.customer), billText(receipt));
+    const phone = customerPhone(receipt.customer);
+    if (phone.includes('*')) {
+      notify('The bill is now visible in the customer\'s login. Their number is masked for your role, so WhatsApp was not opened.');
+      return;
+    }
+    openWhatsApp(phone, billText(receipt));
   };
 
   const shareInvoiceBill = (invoice) => {
@@ -183,7 +192,7 @@ export function App() {
       + `₹${invoice.total_amount} (${invoice.project_name || 'your booking'}${invoice.plot_number ? ` · Plot ${invoice.plot_number}` : ''}) `
       + `is ${String(invoice.status).toLowerCase().replace(/_/g, ' ')}`
       + (balance > 0 ? `. Balance due: ₹${balance}${invoice.due_date ? ` by ${invoice.due_date}` : ''}. ` : '. Thank you. ')
-      + 'The PDF bill is attached with this message. - Lalita Realestate Infra';
+      + `The PDF bill is attached with this message. - ${COMPANY.name}`;
     openWhatsApp(customerPhone(invoice.customer_name), text);
   };
 
@@ -200,9 +209,9 @@ export function App() {
     const confirmed = ['Confirmed', 'Agreement', 'Registered'].includes(booking[7]);
     const text = confirmed
       ? `Dear ${booking[1]}, your booking ${booking[0]} for Plot ${booking[3]} (${booking[2]}) is confirmed. `
-        + `Final price ₹${booking[5]}, paid ₹${booking[6]}. - Lalita Realestate Infra`
+        + `Final price ₹${booking[5]}, paid ₹${booking[6]}. - ${COMPANY.name}`
       : `Dear ${booking[1]}, your booking ${booking[0]} for Plot ${booking[3]} (${booking[2]}) is `
-        + `${String(booking[7]).toLowerCase()}. We will update you shortly. - Lalita Realestate Infra`;
+        + `${String(booking[7]).toLowerCase()}. We will update you shortly. - ${COMPANY.name}`;
     openWhatsApp(customerPhone(booking[1]), text);
   };
 
@@ -213,9 +222,10 @@ export function App() {
         onLogin={(selectedRole, user, credentials) => dispatch(signIn({
           email: credentials?.email ?? user?.email, password: credentials?.password ?? user?.password, role: selectedRole, user,
         }))}
-        onRegister={(account) => dispatch(registerCustomerAccount(account))}
+        onRegister={(account) => dispatch(registerAccount(account))}
         customers={domain.customers}
-        users={auth.users}
+        users={teamUsers}
+        notice={loginNotice}
       />
     );
   }
@@ -241,6 +251,7 @@ export function App() {
         onClose={() => dispatch(sidebarToggled(false))}
         onProjectChange={(value) => dispatch(projectChanged(value))}
         onLogout={() => dispatch(signOut())}
+        onChangePassword={auth.mode === 'live' ? () => setChangingPassword(true) : undefined}
       />
 
       <main className="main">
@@ -319,10 +330,10 @@ export function App() {
                 <AdminDashboard bookings={domain.bookings} pays={domain.payments} plots={domain.plots} go={go} D={(kind, preset) => dispatch(modalOpened({ modal: kind, preset }))} notify={notify} />
               )}
               {role === ROLES.SALES_MANAGER && (
-                <SalesManagerDashboard go={go} D={(kind, preset) => dispatch(modalOpened({ modal: kind, preset }))} notify={notify} agents={agentRoster} />
+                <SalesManagerDashboard go={go} D={(kind, preset) => dispatch(modalOpened({ modal: kind, preset }))} notify={notify} bookings={scoped.bookings} customers={scoped.customers || domain.customers} />
               )}
               {role === ROLES.SALES_AGENT && (
-                <SalesAgentDashboard go={go} D={(kind, preset) => dispatch(modalOpened({ modal: kind, preset }))} notify={notify} bookings={scoped.bookings} plots={domain.plots} />
+                <SalesAgentDashboard agentName={auth.user?.name} go={go} D={(kind, preset) => dispatch(modalOpened({ modal: kind, preset }))} notify={notify} bookings={scoped.bookings} plots={domain.plots} />
               )}
               {role === ROLES.CUSTOMER && (
                 <CustomerProfile
@@ -339,9 +350,9 @@ export function App() {
                 />
               )}
               {role === ROLES.ACCOUNTS && (
-                <AccountsDashboard go={go} D={(kind, preset) => dispatch(modalOpened({ modal: kind, preset }))} notify={notify} pays={domain.payments} />
+                <AccountsDashboard go={go} D={(kind, preset) => dispatch(modalOpened({ modal: kind, preset }))} notify={notify} pays={domain.payments} receipts={scoped.receipts} />
               )}
-              {role === ROLES.MANAGEMENT && <ManagementDashboard go={go} notify={notify} projects={domain.projects} />}
+              {role === ROLES.MANAGEMENT && <ManagementDashboard go={go} notify={notify} projects={domain.projects} plots={domain.plots} bookings={scoped.bookings} receipts={scoped.receipts} />}
             </>
           )}
 
@@ -416,10 +427,11 @@ export function App() {
               onOpenBill={(receipt) => dispatch(billOpened(receipt.no))}
               onShare={shareReceipt}
               onStatus={(payment, status) => dispatch(setPaymentStatus(payment, status))}
+              onDueDate={auth.mode === 'live' ? (payment, date) => dispatch(setNextDueDate(payment, date)) : undefined}
               onRemind={(row) => openWhatsApp(
                 customerPhone(row[0]),
                 `Dear ${row[0]}, a payment of ₹${row[5]} for Plot ${row[1]} (${row[2]}) is due `
-                + `${row[6] !== '—' ? `on ${row[6]}` : 'now'}. Please pay at the earliest. - Lalita Realestate Infra`,
+                + `${row[6] !== '—' ? `on ${row[6]}` : 'now'}. Please pay at the earliest. - ${COMPANY.name}`,
               )}
             />
           )}
@@ -462,7 +474,7 @@ export function App() {
               onReject={(customer) => dispatch(decideCustomer(customer, 'Rejected'))}
               onWhatsApp={(customer) => openWhatsApp(
                 customer.mobile,
-                `Hello ${customer.name}, this is Lalita Realestate Infra regarding your plot booking.`,
+                `Hello ${customer.name}, this is ${COMPANY.name} regarding your plot booking.`,
               )}
             />
           )}
@@ -485,7 +497,7 @@ export function App() {
           )}
 
           {page === PAGES.AGENTS && <Agents search={ui.search} notify={notify} role={role} onView={(agent) => dispatch(agentInfoSet(agent))} />}
-          {page === PAGES.COMMISSIONS && <Commissions search={ui.search} notify={notify} role={role} />}
+          {page === PAGES.COMMISSIONS && <Commissions search={ui.search} notify={notify} role={role} bookings={scoped.bookings} />}
           {page === PAGES.REPORTS && (
             <Reports
               notify={notify}
@@ -524,7 +536,7 @@ export function App() {
             <Roles
               role={role}
               notify={notify}
-              users={auth.users}
+              users={teamUsers}
               create={() => dispatch(modalOpened({ modal: 'user' }))}
               edit={(user) => dispatch(modalOpened({ modal: 'user', userEdit: user }))}
               remove={(user) => dispatch(deleteRecord(user))}
@@ -541,7 +553,7 @@ export function App() {
               receipts={scoped.receipts}
               registry={domain.registry}
               role={role}
-              onRegistry={setRegistryStatus}
+              onRegistry={(id, value) => dispatch(setRegistryStatus(id, value))}
               onOpenBill={(receipt) => dispatch(billOpened(receipt.no))}
               onPrintBooking={(booking) => dispatch(bookingPrintSet(booking[0]))}
               notify={notify}
@@ -589,6 +601,21 @@ export function App() {
           context={ui.crudPage}
           initial={ui.editRecord || ui.userEdit}
           role={role}
+        />
+      )}
+
+      {auth.mode === 'live' && (auth.user?.mustChangePassword || changingPassword) && (
+        <ChangePasswordDialog
+          forced={Boolean(auth.user?.mustChangePassword)}
+          onSubmit={(form) => dispatch(changeMyPassword(form))}
+          close={() => setChangingPassword(false)}
+        />
+      )}
+
+      {ui.userCredential && (
+        <UserCredentialDialog
+          credential={ui.userCredential}
+          close={() => dispatch(userCredentialShown(null))}
         />
       )}
 

@@ -1,152 +1,142 @@
-import React, { useState } from 'react';
-import { Wallet, IndianRupee, AlertCircle, Clock, CheckCircle2, Download, Plus, FileText, Send, ArrowUpRight, ShieldCheck, RefreshCw } from 'lucide-react';
+import React, { useCallback, useEffect, useState } from 'react';
+import { Download, Plus, ShieldCheck, RefreshCw } from 'lucide-react';
+import { api, hasSession } from '../../api';
+import { parseAmt, fmtINR } from '../../utils';
+import { compactINR } from '../../utils/dashboardStats';
 
-export function AccountsDashboard({ go, D, notify, pays = [] }) {
-  const [disbursedList, setDisbursedList] = useState([
-    { id: 'PAYOUT-01', agent: 'M. Kumar', deal: 'Plot A-012 · Rajesh Sharma', gross: '₹36,800', tds: '₹1,840', net: '₹34,960', bank: 'HDFC Bank (Ending 4102)', status: 'Pending' },
-    { id: 'PAYOUT-02', agent: 'S. Patel', deal: 'Plot B-104 · Anita Verma', gross: '₹25,200', tds: '₹1,260', net: '₹23,940', bank: 'ICICI Bank (Ending 9018)', status: 'Pending' },
-    { id: 'PAYOUT-03', agent: 'R. Gupta', deal: 'Plot A-101 · Priya Nair', gross: '₹19,200', tds: '₹960', net: '₹18,240', bank: 'SBI Bank (Ending 2241)', status: 'Approved' }
-  ]);
+const money = (n) => { const c = compactINR(n); return `${c.val}${c.unit ? ` ${c.unit}` : ''}`; };
+const DAY = 86400000;
 
-  const [overdues, setOverdues] = useState([
-    { id: 'OD-1', client: 'Sneha Mehta', project: 'Green Meadows', plot: 'B-033', amount: '₹5,60,000', overdueDays: '10 days', lastNotice: '24 Sep 2026', phone: '+91 98201 11223' },
-    { id: 'OD-2', client: 'Vikram Joshi', project: 'Silver Oaks', plot: 'C-015', amount: '₹12,37,500', overdueDays: '18 days', lastNotice: '20 Sep 2026', phone: '+91 98202 33445' }
-  ]);
+/** Days a ledger row is past its next due date (0 when not due yet / no date). */
+const daysOver = (row, now) => {
+  const due = new Date(String(row[6] || ''));
+  if (Number.isNaN(due.getTime())) return 0;
+  return Math.max(Math.floor((now - due) / DAY), 0);
+};
 
-  const handleDisburse = (id, agent, net) => {
-    setDisbursedList(disbursedList.map(item => item.id === id ? { ...item, status: 'Disbursed' } : item));
-    notify(`NEFT Payment of ${net} successfully disbursed to ${agent}`);
+/**
+ * Accounts desk — everything is derived from the tenant's ledger, receipts and commissions.
+ * Ledger row: [customer, plot, project, final, paid, pending, nextDue, status, agent].
+ */
+export function AccountsDashboard({ go, D, notify, pays = [], receipts = [] }) {
+  const live = hasSession();
+  const [commissions, setCommissions] = useState([]);
+  const now = new Date();
+
+  const load = useCallback(async () => {
+    if (!live) return;
+    try {
+      const response = await api.commissions.list({ page_size: 200 });
+      setCommissions(response.data || []);
+    } catch { setCommissions([]); }
+  }, [live]);
+  useEffect(() => { load(); }, [load, pays.length]);
+
+  const collected = pays.reduce((t, r) => t + parseAmt(r[4]), 0);
+  const outstanding = pays.reduce((t, r) => t + parseAmt(r[5]), 0);
+  const sameDay = (label) => {
+    const d = new Date(String(label || '').replace('Sept', 'Sep'));
+    return !Number.isNaN(d.getTime()) && d.toDateString() === now.toDateString();
   };
+  const todays = receipts.filter((r) => sameDay(r.date));
+  const todayAmount = todays.reduce((t, r) => t + parseAmt(r.amount), 0);
 
-  const handleDemandNotice = (client, amount) => {
-    notify(`Formal Legal Demand Notice generated and emailed to ${client} for ${amount}.`);
-  };
+  const open = pays.filter((r) => parseAmt(r[5]) > 0);
+  const bucket = (min, max) => open.filter((r) => { const d = daysOver(r, now); return d >= min && d <= max; });
+  const buckets = [
+    ['bucket-normal', '0 – 30 Days (Current)', bucket(0, 30), 'Normal billing cycle'],
+    ['bucket-warning', '31 – 60 Days (Follow-up)', bucket(31, 60), 'Reminder due'],
+    ['bucket-caution', '61 – 90 Days (Late)', bucket(61, 90), 'Accountant follow-up'],
+    ['bucket-danger', '90+ Days (Defaulters)', bucket(91, Infinity), 'Escalate recovery'],
+  ].map(([cls, label, rows, note]) => ({ cls, label, rows, note, amount: rows.reduce((t, r) => t + parseAmt(r[5]), 0) }));
+  const critical = buckets[2].amount + buckets[3].amount;
+  const overdue = open.filter((r) => daysOver(r, now) > 0).sort((a, b) => daysOver(b, now) - daysOver(a, now));
 
-  const handleReminder = (client, phone) => {
-    notify(`Automated WhatsApp & SMS payment reminder sent to ${client} (${phone}).`);
-  };
+  const approved = commissions.filter((c) => c.status === 'APPROVED');
+  const recentPaid = commissions.filter((c) => c.status === 'PAID').slice(0, 3);
+  const desk = [...approved, ...recentPaid];
 
   return (
     <div className="role-dashboard accounts-dash">
       <div className="role-welcome accounts-welcome">
         <div>
-          <span className="eyebrow"><i className="live-dot" /> TREASURY, BILLING & FINANCIAL RECONCILIATION</span>
-          <h2>Accounts & Collections Command</h2>
-          <p>Real-time cash flow receipts, aging analysis of customer receivables, TDS compliance, and commission disbursements.</p>
+          <span className="eyebrow"><i className="live-dot" /> TREASURY, BILLING &amp; FINANCIAL RECONCILIATION</span>
+          <h2>Accounts &amp; Collections Command</h2>
+          <p>Live receipts, ageing of customer receivables, TDS and commission disbursements.</p>
         </div>
         <div className="welcome-actions">
-          <button className="button button-white" onClick={() => notify('Bank reconciliation statement generated')}>
-            <RefreshCw size={13} /> Reconcile Bank
-          </button>
-          <button className="button button-primary" onClick={() => D('payment')}>
-            <Plus size={14} /> Record Payment
-          </button>
+          <button className="button button-white" onClick={() => go('Payments')}><RefreshCw size={13} /> Open Ledger</button>
+          <button className="button button-primary" onClick={() => D('payment')}><Plus size={14} /> Record Payment</button>
         </div>
       </div>
 
-      {/* Financial Position Metrics */}
       <div className="mini-stats four">
         <div className="mini-stat">
-          <small>TOTAL REALIZED COLLECTIONS</small>
-          <b className="green-text">₹7.90 Cr</b>
-          <span className="stat-sub">Reconciled in primary account</span>
+          <small>TOTAL REALISED COLLECTIONS</small>
+          <b className="green-text">{money(collected)}</b>
+          <span className="stat-sub">Across {pays.length} ledger account{pays.length === 1 ? '' : 's'}</span>
         </div>
         <div className="mini-stat">
-          <small>TODAY'S CASH INFLOW</small>
-          <b className="indigo-text">₹4.20 L</b>
-          <span className="stat-sub">2 NEFT remittances verified</span>
+          <small>TODAY&apos;S CASH INFLOW</small>
+          <b className="indigo-text">{money(todayAmount)}</b>
+          <span className="stat-sub">{todays.length} receipt{todays.length === 1 ? '' : 's'} issued today</span>
         </div>
         <div className="mini-stat">
           <small>OUTSTANDING RECEIVABLES</small>
-          <b>₹4.70 Cr</b>
-          <span className="stat-sub">Across 4 project phases</span>
+          <b>{money(outstanding)}</b>
+          <span className="stat-sub">{open.length} account{open.length === 1 ? '' : 's'} with a balance</span>
         </div>
         <div className="mini-stat">
           <small>CRITICAL OVERDUE (&gt;60 DAYS)</small>
-          <b className="danger-text">₹86.4 L</b>
-          <span className="stat-sub">Requires recovery escalation</span>
+          <b className="danger-text">{money(critical)}</b>
+          <span className="stat-sub">{buckets[2].rows.length + buckets[3].rows.length} account(s) need escalation</span>
         </div>
       </div>
 
-      {/* Accounts Receivable Aging Analysis */}
       <section className="panel aging-panel">
         <div className="panel-head">
           <div>
-            <h2>Accounts Receivable Aging Analysis (Debtors Ledger)</h2>
-            <p>Categorized by payment due date elapsed time</p>
+            <h2>Accounts Receivable Ageing</h2>
+            <p>Outstanding balances by how long past their due date</p>
           </div>
-          <button className="text-button" onClick={() => notify('Aging report downloaded')}>
-            <Download size={13} /> Download Aging Schedule
-          </button>
+          <button className="text-button" onClick={() => go('Payments')}><Download size={13} /> Open Ledger</button>
         </div>
-
         <div className="aging-grid">
-          <div className="aging-bucket bucket-normal">
-            <span className="aging-label">0 – 30 Days (Current)</span>
-            <b className="aging-amount">₹1.20 Cr</b>
-            <div className="aging-progress"><div className="fill" style={{ width: '85%' }} /></div>
-            <small>Normal billing cycle · 28 clients</small>
-          </div>
-
-          <div className="aging-bucket bucket-warning">
-            <span className="aging-label">31 – 60 Days (Follow-up)</span>
-            <b className="aging-amount">₹1.80 Cr</b>
-            <div className="aging-progress"><div className="fill" style={{ width: '60%' }} /></div>
-            <small>Reminder notice issued · 14 clients</small>
-          </div>
-
-          <div className="aging-bucket bucket-caution">
-            <span className="aging-label">61 – 90 Days (Late)</span>
-            <b className="aging-amount">₹1.10 Cr</b>
-            <div className="aging-progress"><div className="fill" style={{ width: '40%' }} /></div>
-            <small>Accountant follow-up · 7 clients</small>
-          </div>
-
-          <div className="aging-bucket bucket-danger">
-            <span className="aging-label">90+ Days (Defaulters)</span>
-            <b className="aging-amount">₹60.0 L</b>
-            <div className="aging-progress"><div className="fill" style={{ width: '25%' }} /></div>
-            <small>Demand notice active · 4 clients</small>
-          </div>
+          {buckets.map((b) => (
+            <div className={`aging-bucket ${b.cls}`} key={b.label}>
+              <span className="aging-label">{b.label}</span>
+              <b className="aging-amount">{money(b.amount)}</b>
+              <div className="aging-progress"><div className="fill" style={{ width: `${outstanding ? Math.round((b.amount / outstanding) * 100) : 0}%` }} /></div>
+              <small>{b.note} · {b.rows.length} account{b.rows.length === 1 ? '' : 's'}</small>
+            </div>
+          ))}
         </div>
       </section>
 
       <div className="role-dash-grid">
-        {/* Critical Overdue Recovery Queue */}
         <section className="panel">
           <div className="panel-head">
             <div>
-              <h2>Overdue Defaulters Recovery Queue</h2>
-              <p>Clients with delayed installment schedules requiring accounts action</p>
+              <h2>Overdue Recovery Queue</h2>
+              <p>Customers past their instalment due date</p>
             </div>
-            <button className="text-button" onClick={() => go('Payments')}>
-              View Full Ledger →
-            </button>
+            <button className="text-button" onClick={() => go('Payments')}>View Full Ledger →</button>
           </div>
-
           <div className="overdue-list">
-            {overdues.map((item) => (
-              <div className="overdue-card" key={item.id}>
+            {overdue.length === 0 && <p className="empty-note">No overdue instalments — collections are on schedule.</p>}
+            {overdue.map((r) => (
+              <div className="overdue-card" key={`${r[0]}-${r[1]}`}>
                 <div className="overdue-top">
-                  <div>
-                    <b>{item.client}</b>
-                    <small>{item.project} · Plot {item.plot}</small>
-                  </div>
+                  <div><b>{r[0]}</b><small>{r[2]} · Plot {r[1]}</small></div>
                   <div className="overdue-val">
-                    <b className="danger-text">{item.amount}</b>
-                    <span className="overdue-tag">{item.overdueDays} overdue</span>
+                    <b className="danger-text">₹{r[5]}</b>
+                    <span className="overdue-tag">{daysOver(r, now)} days overdue</span>
                   </div>
                 </div>
-
                 <div className="overdue-actions">
-                  <span className="last-notice">Last Notice: {item.lastNotice}</span>
+                  <span className="last-notice">Due {r[6]} · Agent {r[8]}</span>
                   <div className="btn-group">
-                    <button className="button button-white small-btn" onClick={() => handleReminder(item.client, item.phone)}>
-                      <Send size={11} /> WhatsApp Ping
-                    </button>
-                    <button className="button button-primary small-btn" onClick={() => handleDemandNotice(item.client, item.amount)}>
-                      <FileText size={11} /> Issue Demand Notice
-                    </button>
+                    <button className="button button-primary small-btn" onClick={() => D('payment')}>Record Payment</button>
                   </div>
                 </div>
               </div>
@@ -154,45 +144,31 @@ export function AccountsDashboard({ go, D, notify, pays = [] }) {
           </div>
         </section>
 
-        {/* Commission Disbursement Desk */}
         <section className="panel accounts-disburse-panel">
           <div className="panel-head">
             <div>
-              <h2>Agent Payout & TDS Desk</h2>
-              <p>Approved payouts ready for bank release</p>
+              <h2>Agent Payout &amp; TDS Desk</h2>
+              <p>{approved.length} approved payout{approved.length === 1 ? '' : 's'} ready for bank release</p>
             </div>
+            <button className="text-button" onClick={() => go('Commissions')}>Open Commissions →</button>
           </div>
-
           <div className="disburse-list">
-            {disbursedList.map((item) => (
-              <div className="disburse-card" key={item.id}>
+            {desk.length === 0 && <p className="empty-note">No approved commissions waiting.</p>}
+            {desk.map((c) => (
+              <div className="disburse-card" key={c.id}>
                 <div className="disburse-head">
-                  <div>
-                    <b>{item.agent}</b>
-                    <small>{item.deal}</small>
-                  </div>
-                  <span className={`badge-pill ${item.status === 'Disbursed' ? 'green' : 'amber'}`}>
-                    {item.status}
-                  </span>
+                  <div><b>{c.agent_name}</b><small>{c.public_id}</small></div>
+                  <span className={`badge-pill ${c.status === 'PAID' ? 'green' : 'amber'}`}>{c.status === 'PAID' ? 'Disbursed' : 'Approved'}</span>
                 </div>
-
                 <div className="disburse-calc">
-                  <div><span>Gross:</span> <b>{item.gross}</b></div>
-                  <div><span>TDS (5%):</span> <b className="danger-text">-{item.tds}</b></div>
-                  <div className="net-row"><span>Net Payout:</span> <b className="green-text">{item.net}</b></div>
+                  <div><span>Gross:</span> <b>₹{fmtINR(c.gross_amount)}</b></div>
+                  <div><span>TDS:</span> <b className="danger-text">-₹{fmtINR(c.tds_amount)}</b></div>
+                  <div className="net-row"><span>Net Payout:</span> <b className="green-text">₹{fmtINR(c.net_amount)}</b></div>
                 </div>
-
-                <div className="bank-meta">
-                  <ShieldCheck size={12} className="green-text" />
-                  <span>{item.bank}</span>
-                </div>
-
-                {item.status !== 'Disbursed' ? (
-                  <button className="button button-primary full-btn" onClick={() => handleDisburse(item.id, item.agent, item.net)}>
-                    Disburse via NEFT ({item.net})
-                  </button>
+                {c.status === 'PAID' ? (
+                  <div className="disbursed-stamp"><ShieldCheck size={12} className="green-text" /> Paid · Ref {c.payout_reference || '—'}</div>
                 ) : (
-                  <div className="disbursed-stamp">✓ Disbursed via NEFT Ref #{item.id}</div>
+                  <button className="button button-primary full-btn" onClick={() => go('Commissions')}>Disburse (₹{fmtINR(c.net_amount)})</button>
                 )}
               </div>
             ))}

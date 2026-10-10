@@ -1768,3 +1768,8 @@
 .input-with-icon .eye-toggle svg{position:static;left:auto}
 .login-card-container .login-foot,.login-card-container>p:last-child{text-align:center}
 .security-guarantee{display:flex;justify-content:center;align-items:center;gap:6px;margin-top:16px}
+
+.login-notice-banner{background:#e9f7f1;border-color:#bfe6d6;color:#1f7a5b}
+
+.login-forgot{display:block;margin:12px auto 0}
+.login-dev-hint{font-size:11px;color:#8892a4;text-align:center;margin-top:8px}

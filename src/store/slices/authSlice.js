@@ -30,6 +30,7 @@ const readStoredRole = (key) => {
 };
 
 const initialState = {
+  loginNotice: '',
   /** Role string of the active session ('' = signed out). */
   session: readStoredRole('session'),
   role: readStoredRole('role') || ROLES.ADMIN,
@@ -78,6 +79,7 @@ const authSlice = createSlice({
           tenantId: user.tenant_id ?? null,
           tenantName: user.tenant_name || '',
           tenantSlug: user.tenant_slug || '',
+          mustChangePassword: Boolean(user.must_change_password),
         };
         state.permissions = permissions.length ? permissions : user.permissions || [];
       }
@@ -100,6 +102,17 @@ const authSlice = createSlice({
       if (index >= 0) state.users[index] = { ...state.users[index], ...user };
       else state.users.unshift(user);
     },
+    /** Replace the team list (live mode: the signed-in organisation's real users). */
+    /** One-line message shown on the sign-in screen (e.g. after a password change). */
+    loginNoticeSet(state, action) {
+      state.loginNotice = action.payload || '';
+    },
+    passwordChangeCleared(state) {
+      if (state.currentUser) state.currentUser.mustChangePassword = false;
+    },
+    usersLoaded(state, action) {
+      state.users = action.payload;
+    },
     userRemoved(state, action) {
       state.users = state.users.filter((u) => u.id !== action.payload);
     },
@@ -112,6 +125,6 @@ const authSlice = createSlice({
 });
 
 export const {
-  signedIn, sessionLoaded, sessionFailed, signedOut, userSaved, userRemoved, authError,
+  signedIn, sessionLoaded, sessionFailed, signedOut, userSaved, usersLoaded, userRemoved, authError, loginNoticeSet, passwordChangeCleared,
 } = authSlice.actions;
 export default authSlice.reducer;

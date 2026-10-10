@@ -109,6 +109,13 @@ class PlotService(BaseService[Plot]):
     def serialise(self, plot: Plot) -> PlotResponse:
 
         plot_number = plot.plot_number
+        # Inventory is visible to everyone; who holds a plot only to people entitled to know.
+        full = self.actor.can(Permission.CUSTOMER_VIEW_ALL)
+        mine = plot.agent_id is not None and plot.agent_id == self.actor.agent_id
+        customer_id = plot.customer_id if (full or (mine and not self.actor.is_customer_portal)
+                                           or (self.actor.is_customer_portal
+                                               and plot.customer_id == self.actor.customer_id)) else None
+        agent_id = plot.agent_id if (full or mine) else None
         return PlotResponse(
             id=plot.id,
             public_id=plot.public_id,
@@ -120,8 +127,8 @@ class PlotService(BaseService[Plot]):
             facing=plot.facing,
             price=plot.price,
             status=plot.status,
-            customer_id=plot.customer_id,
-            agent_id=plot.agent_id,
+            customer_id=customer_id,
+            agent_id=agent_id,
             hold_expires_at=plot.hold_expires_at,
             created_at=plot.created_at,
             updated_at=plot.updated_at,
@@ -202,8 +209,28 @@ class DocumentService(BaseService[Document]):
         super().__init__(db, actor)
         self.documents: DocumentRepository = self.repository  # type: ignore[assignment]
 
+    def scope_clause(self):
+        """Staff with full customer access see all; an agent only their customers' files;
+        a portal customer only files explicitly shared with them."""
+        from sqlalchemy import and_, false, select
+
+        from app.models.customer import Customer
+
+        if self.actor.can(Permission.CUSTOMER_VIEW_ALL):
+            return None
+        if self.actor.is_customer_portal:
+            if not self.actor.customer_id:
+                return false()
+            return and_(Document.customer_id == self.actor.customer_id,
+                        Document.is_shared_with_customer.is_(True))
+        if self.actor.agent_id:
+            return Document.customer_id.in_(
+                select(Customer.id).where(Customer.agent_id == self.actor.agent_id)
+            )
+        return false()
+
     def paginate(self, page: PaginationContext) -> Paginated[Document]:
-        return self.list(page)
+        return self.list(page, scope_clause=self.scope_clause())
 
     def serialise(self, document: Document) -> DocumentResponse:
         return DocumentResponse(
@@ -231,7 +258,7 @@ class DocumentService(BaseService[Document]):
 
     def share(self, document_id: int, payload: DocumentUpdate | None = None) -> Document:
         self._authorise("update")
-        document = self.documents.get_or_404(document_id)
+        document = self.get(document_id, scope_clause=self.scope_clause())
         self.documents.mark_shared(document)
         self._audit(AuditAction.UPDATE, document, summary="Document shared with customer")
         return document
@@ -240,4 +267,10 @@ class DocumentService(BaseService[Document]):
         self._authorise("view")
         # Portal users only ever see documents explicitly shared with them.
         shared_only = self.actor.is_customer_portal
-        return [self.serialise(d) for d in self.documents.for_customer(customer_id, shared_only=shared_only)]
+        visible = {
+            d.id for d in self.documents.paginate(
+                page=1, page_size=200, filters={"customer_id": customer_id}, scope_clause=self.scope_clause(),
+            ).items
+        }
+        return [self.serialise(d) for d in self.documents.for_customer(customer_id, shared_only=shared_only)
+                if d.id in visible]

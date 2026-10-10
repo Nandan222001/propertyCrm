@@ -104,7 +104,8 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
             "Content-Security-Policy": settings.CSP_POLICY,
             "Cache-Control": "no-store" if not request.url.path.startswith("/static") else "public, max-age=31536000, immutable",
         }
-        if settings.FORCE_HTTPS or request.url.scheme == "https":
+        behind_tls_proxy = request.headers.get("x-forwarded-proto", "").split(",")[0].strip().lower() == "https"
+        if settings.FORCE_HTTPS or request.url.scheme == "https" or behind_tls_proxy:
             headers["Strict-Transport-Security"] = "max-age=63072000; includeSubDomains; preload"
         for key, value in headers.items():
             response.headers.setdefault(key, value)

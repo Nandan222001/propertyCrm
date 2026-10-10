@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { X, ChevronRight } from 'lucide-react';
 import { projects as seedProjects, agents } from '../../data/seedData';
+import { hasSession } from '../../api';
 import { parseAmt, fmtINR, isAdmin } from '../../utils';
 
 function Shell({ kicker, title, sub, close, children }) {
@@ -31,8 +32,12 @@ const Field = ({ label, children, hint, wide }) => (
 
 // ---------------------------------------------------------------- booking
 export function BookingModal({ role, agentName, customers, plots, projects = seedProjects, close, save, preset }) {
+  // The agents this tenant really has (taken from its own customers); the sample roster only offline.
+  const fromCustomers = [...new Set(customers.map((c) => c.agent).filter(Boolean))].sort();
+  const agentOptions = fromCustomers.length ? fromCustomers : agents.map((a) => a[0]);
   const agentMode = role === 'SALES AGENT';
-  const myCustomers = customers.filter(c => c.status === 'Approved' && (!agentMode || c.agent === agentName));
+  // Live data is already limited to the agent's own customers by the server; offline we match by name.
+  const myCustomers = customers.filter(c => c.status === 'Approved' && (!agentMode || hasSession() || c.agent === agentName));
   const [customer, setCustomer] = useState(myCustomers[0]?.name || '');
   const [project, setProject] = useState(preset?.project || projects[0]?.[0] || '');
   const free = useMemo(() => plots.filter(p => p[8] === project && p[5] === 'AVAILABLE'), [plots, project]);
@@ -55,7 +60,7 @@ export function BookingModal({ role, agentName, customers, plots, projects = see
 
   return (
     <Shell
-      kicker="Lalita ERP · BOOKINGS"
+      kicker="ERP · BOOKINGS"
       title="Create Sales Booking"
       sub={agentMode ? 'Your booking is sent to the admin for approval. The plot is held until then.' : 'Admin bookings are confirmed immediately.'}
       close={close}
@@ -94,7 +99,7 @@ export function BookingModal({ role, agentName, customers, plots, projects = see
             <Field label="Sales agent"><input value={agentName} readOnly /></Field>
           ) : (
             <Field label="Sales agent">
-              <select name="agent" defaultValue={agents[0][0]}>{agents.map(a => <option key={a[0]}>{a[0]}</option>)}</select>
+              <select name="agent" defaultValue={agentOptions[0] || ''}>{agentOptions.map(name => <option key={name}>{name}</option>)}</select>
             </Field>
           )}
         </div>
@@ -138,7 +143,7 @@ export function PaymentModal({ bookings, pays, close, save }) {
   }
 
   return (
-    <Shell kicker="Lalita ERP · ACCOUNTS" title="Record Customer Payment" sub="Select the plot. A bill (office + customer copy) is generated after saving." close={close}>
+    <Shell kicker="ERP · ACCOUNTS" title="Record Customer Payment" sub="Select the plot. A bill (office + customer copy) is generated after saving." close={close}>
       <form onSubmit={submit}>
         <div className="form-grid">
           <Field label="Plot" wide>
@@ -186,7 +191,7 @@ export function CustomerModal({ agentName, customers, projects = [], defaultProj
     save({ name: d.name.trim(), mobile, email: d.email.trim(), address: d.address.trim(), agent: agentName, project: d.project || '' });
   }
   return (
-    <Shell kicker="Lalita ERP · CUSTOMERS" title="Add New Customer" sub="Only sales agents add customers. The admin approves every new customer." close={close}>
+    <Shell kicker="ERP · CUSTOMERS" title="Add New Customer" sub="Only sales agents add customers. The admin approves every new customer." close={close}>
       <form onSubmit={submit}>
         <div className="form-grid">
           <Field label="Full name"><input name="name" required placeholder="Neha Kapoor" /></Field>

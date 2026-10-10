@@ -9,7 +9,13 @@ from fastapi import APIRouter, Depends, status
 from app.controllers import booking_controller as controller
 from app.core.constants import Permission
 from app.core.dependencies import ActorDep, DbDep, PaginationDep, require
-from app.schemas.booking import BookingCreate, BookingDecision, BookingStatusUpdate, BookingUpdate
+from app.schemas.booking import (
+    BookingCreate,
+    BookingDecision,
+    BookingStatusUpdate,
+    BookingUpdate,
+    RegistryStageUpdate,
+)
 
 router = APIRouter(prefix="/bookings", tags=["Bookings"])
 
@@ -68,6 +74,12 @@ def reject_booking(booking_id: int, payload: BookingDecision, service: controlle
 def change_status(booking_id: int, payload: BookingStatusUpdate, service: controller.BookingServiceDep,
                   _: APPROVE = None):
     return controller.change_status(booking_id, payload, service)
+
+
+@router.post("/{booking_id}/registry", summary="Registration progress (documents → agreement → sub-registrar → registered)")
+def set_registry_stage(booking_id: int, payload: RegistryStageUpdate, service: controller.BookingServiceDep,
+                       _: APPROVE = None):
+    return controller.set_registry_stage(booking_id, payload, service)
 
 
 @router.delete("/{booking_id}", summary="Soft-delete a booking")

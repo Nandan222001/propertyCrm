@@ -118,13 +118,17 @@ class _InvoicePDF:
 
         self._text(MARGIN, self.y, company.get("name", ""), size=16, bold=True, color=ACCENT)
         self.y -= 13
-        for line in (company.get("address", ""), f"GSTIN: {company.get('gstin', '-')}"):
+        # Only print what the organisation has actually filled in (no empty "GSTIN:" lines).
+        letterhead = (
+            company.get("address", ""),
+            f"GSTIN: {company['gstin']}" if company.get("gstin") else "",
+            f"Phone: {company['phone']}" if company.get("phone") else "",
+            f"E-mail: {company['email']}" if company.get("email") else "",
+        )
+        for line in letterhead:
             if line:
                 self._text(MARGIN, self.y, line, size=8, color=MUTED)
                 self.y -= 10.5
-        for line in (f"Phone: {company.get('phone', '-')}", f"E-mail: {company.get('email', '-')}"):
-            self._text(MARGIN, self.y, line, size=8, color=MUTED)
-            self.y -= 10.5
 
         title_y = PAGE_H - MARGIN - 16
         self._text(PAGE_W - MARGIN, title_y, "TAX INVOICE", size=18, bold=True, align="right")

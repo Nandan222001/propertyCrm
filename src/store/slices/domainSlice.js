@@ -69,7 +69,7 @@ const domainSlice = createSlice({
       Object.entries(payload).forEach(([key, rows]) => {
         if (key in state && Array.isArray(rows)) state[key] = rows;
       });
-      state.registry = {};
+      state.registry = payload.registry && !Array.isArray(payload.registry) ? payload.registry : {};
       state.mode = 'live';
       state.status = 'ready';
       state.error = '';

@@ -13,7 +13,6 @@ from decimal import Decimal
 from sqlalchemy.orm import Session
 
 from app.core.constants import (
-    COMPANY,
     Permission,
     PlotStatus,
     Role,
@@ -29,6 +28,7 @@ from app.repositories.property_repository import PlotRepository, ProjectReposito
 from app.repositories.user_repository import UserRepository
 from app.schemas.governance import DashboardMetric, DashboardResponse, ReportResponse, ReportRow
 from app.services.base_service import BaseService
+from app.services.company_profile import company_profile
 
 
 class DashboardService(BaseService):
@@ -334,7 +334,7 @@ class ReportService(BaseService):
         totals = {
             "bookings": len(bookings_today),
             "collected": collected,
-            "company_gstin": COMPANY["gstin"],
+            "company_gstin": company_profile(self.db, self.actor.tenant_id)["gstin"],
         }
         rows = [ReportRow(label="Collections", values={"amount": float(collected)})]
         rows += [

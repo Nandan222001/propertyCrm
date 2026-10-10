@@ -5,7 +5,7 @@
  * demo seed fills, which is why the app works both against MySQL and offline.
  */
 import { ApiUnavailableError, actions, api, setTokens, clearTokens } from '../api';
-import { ROLES } from '../constants/roles';
+import { ROLES, toUiRole } from '../constants/roles';
 import { COMPANY, roleConfigs } from '../data/seedData';
 import { amountInWords, fmtINR, parseAmt } from '../utils/money';
 import { todayLabel } from '../utils/date';
@@ -14,11 +14,13 @@ import { nextReference, newId } from '../utils/id';
 import { getSettings } from '../utils/settings';
 import { loadTenants } from './tenantThunks';
 import { projectApiPayload, projectFromApi, projectRowFromForm } from '../utils/projects';
-import { adaptWorkspace, adaptCustomer } from '../utils/liveAdapters';
+import { adaptWorkspace, adaptCustomer, REGISTRY_CODE } from '../utils/liveAdapters';
 import { notificationsLoaded, notificationPatched } from './slices/notificationsSlice';
+import { generatePassword } from '../utils/tenants';
+import { setRemoteSettings } from '../utils/settings';
 import { clientAudit } from '../utils/security';
 import {
-  sessionFailed, sessionLoaded, signedIn, signedOut, userSaved, userRemoved, authError,
+  sessionFailed, sessionLoaded, signedIn, signedOut, userSaved, usersLoaded, userRemoved, authError, loginNoticeSet,
 } from './slices/authSlice';
 import {
   crudRowRemoved, crudRowUpserted, followUpSet, registryStatusSet, paymentStatusSet, projectSaved, rowPatched, rowRemoved, rowUpserted,
@@ -28,7 +30,7 @@ import {
   computeTotals, itemsPayload, nextInvoiceNumber,
 } from '../utils/billing';
 import { buildInvoicePdf, downloadPdfBytes } from '../utils/pdf';
-import { modalClosed, toastPushed } from './slices/uiSlice';
+import { modalClosed, toastPushed, userCredentialShown } from './slices/uiSlice';
 
 /** Toast helper — every page calls `notify(...)` through this one action. */
 export const notify = (message) => toastPushed(message);
@@ -71,6 +73,12 @@ export const signOut = () => async (dispatch, getState) => {
   dispatch(toastPushed('Logged out of workspace session.'));
 };
 
+/** Collections a role has no permission to read — never requested. */
+const HIDDEN_COLLECTIONS = {
+  'SALES AGENT': ['ledger', 'receipts', 'invoices'],
+  CUSTOMER: ['customers'],
+};
+
 /** Hydrate every collection the UI needs; silently stays in demo mode. */
 export const hydrateWorkspace = ({ silent = false } = {}) => async (dispatch, getState) => {
   // The platform owner has no business data: their workspace is the tenant list.
@@ -82,11 +90,19 @@ export const hydrateWorkspace = ({ silent = false } = {}) => async (dispatch, ge
   try {
     // A role may not be allowed to read every collection (e.g. agents cannot list invoices):
     // a 403 simply means "none for you", never a reason to abandon the whole workspace.
+    // Only ask for what this role may read (the API would answer 403 anyway; skipping keeps the
+    // console and the server's denied-access log free of noise).
+    const forbidden = HIDDEN_COLLECTIONS[getState().auth.role] || [];
+    const load = (name, resource) => (forbidden.includes(name) ? Promise.resolve([]) : listAll(resource));
     const [projects, plots, bookings, customers, ledger, receipts, invoices, agents] = await Promise.all([
-      listAll(api.projects), listAll(api.plots), listAll(api.bookings), listAll(api.customers),
-      listAll(api.ledger), listAll(api.receipts), listAll(api.invoices), listAll(api.agents),
+      load('projects', api.projects), load('plots', api.plots), load('bookings', api.bookings),
+      load('customers', api.customers), load('ledger', api.ledger), load('receipts', api.receipts),
+      load('invoices', api.invoices), load('agents', api.agents),
     ]);
     dispatch(workspaceHydrated(adaptWorkspace({ projects, plots, bookings, customers, ledger, receipts, invoices, agents })));
+    dispatch(usersLoaded([]));                                   // never show the sample roster for a real organisation
+    try { setRemoteSettings((await actions.orgSettings()).data); } catch { /* keep defaults; printing still works */ }
+    if (['ADMIN', 'SALES MANAGER'].includes(getState().auth.role)) dispatch(loadUsers());
   } catch (error) {
     if (error instanceof ApiUnavailableError) {
       dispatch(workspaceDemo(''));            // offline preview: keep the demo dataset
@@ -134,8 +150,34 @@ export const saveProject = (form, editing = null) => async (dispatch, getState) 
 };
 
 // --------------------------------------------------------------- bookings
+/** Live booking: the server decides the status (approver => confirmed, agent => pending) and the plot hold. */
+const createBookingLive = (form) => async (dispatch, getState) => {
+  const { domain } = getState();
+  const customer = domain.customers.find((c) => c.name === form.customer);
+  const plot = domain.plots.find((p) => p[0] === form.plot && p[8] === form.project);
+  if (!customer || typeof customer.id !== 'number' || !plot || typeof plot[9] !== 'number') {
+    dispatch(toastPushed('Could not book: the customer or plot is no longer available. Refresh and try again.'));
+    return;
+  }
+  try {
+    const response = await api.bookings.create({
+      customer_id: customer.id, plot_id: plot[9], final_price: parseAmt(form.amount),
+      token_amount: parseAmt(form.paid || 0), payment_plan: form.plan,
+    });
+    const booking = response.data;
+    dispatch(modalClosed());
+    await dispatch(hydrateWorkspace({ silent: true }));
+    dispatch(toastPushed(booking.status === 'CONFIRMED'
+      ? `Booking ${booking.booking_number} confirmed · Plot ${form.plot} booked`
+      : `Booking ${booking.booking_number} sent to admin for approval · Plot ${form.plot} on hold`));
+  } catch (error) {
+    dispatch(toastPushed(`Could not create the booking: ${error.message}`));
+  }
+};
+
 export const createBooking = (form) => (dispatch, getState) => {
   const { auth, domain } = getState();
+  if (auth.mode === 'live') return dispatch(createBookingLive(form));
   const approved = auth.role === ROLES.ADMIN;
   const reference = nextReference('BK', domain.bookings.map((b) => b[0]));
   const row = [
@@ -155,12 +197,6 @@ export const createBooking = (form) => (dispatch, getState) => {
     ? `Booking ${reference} confirmed · Plot ${form.plot} booked`
     : `Booking ${reference} sent to admin for approval · Plot ${form.plot} on hold`));
   clientAudit('booking.created', { reference, approved });
-  if (auth.mode === 'live') {
-    api.bookings.create({
-      customer_name: form.customer, plot_number: form.plot, final_price: form.amount,
-      token_amount: form.paid || 0,
-    }).catch(() => dispatch(toastPushed('Saved locally — the server rejected the sync')));
-  }
 };
 
 /** Token advance rows + receipts for a confirmed booking (idempotent). */
@@ -268,7 +304,23 @@ export const decideCustomer = (customer, status) => (dispatch, getState) => {
   }
 };
 
-export const setRegistryStatus = (id, value) => (dispatch) => {
+export const setRegistryStatus = (id, value) => async (dispatch, getState) => {
+  if (getState().auth.mode === 'live') {
+    // Saved on the server: reaching "Agreement signed" / "Registered" also moves the booking itself.
+    const booking = getState().domain.bookings.find((b) => b[0] === id);
+    if (!booking || typeof booking[10] !== 'number') {
+      dispatch(toastPushed('Could not update the registry: refresh and try again.'));
+      return;
+    }
+    try {
+      await actions.setRegistryStage(booking[10], { stage: REGISTRY_CODE[value] });
+      await dispatch(hydrateWorkspace({ silent: true }));
+      dispatch(toastPushed(`Registry status set to "${value}"`));
+    } catch (error) {
+      dispatch(toastPushed(`Could not update the registry: ${error.message}`));
+    }
+    return;
+  }
   dispatch(registryStatusSet({ id, value }));
   dispatch(toastPushed(`Registry status set to "${value}"`));
 };
@@ -276,7 +328,27 @@ export const setRegistryStatus = (id, value) => (dispatch) => {
 export const setFollowUp = (id, value) => (dispatch) => dispatch(followUpSet({ id, value }));
 
 // --------------------------------------------------------------- payments
+/** Live payment: the server updates the booking, ledger, plot and issues the numbered receipt. */
+const recordPaymentLive = ({ booking, finalPrice, amount, mode, reference, due }) => async (dispatch) => {
+  if (typeof booking[10] !== 'number') {
+    dispatch(toastPushed('Could not record the payment: this booking is not synced yet. Refresh and try again.'));
+    return;
+  }
+  try {
+    const response = await api.payments.create({
+      booking_id: booking[10], amount, mode: String(mode).toUpperCase(), reference: reference || undefined,
+      final_price: finalPrice, ...(due ? { due_date: due } : {}),
+    });
+    dispatch(modalClosed());
+    await dispatch(hydrateWorkspace({ silent: true }));
+    dispatch(toastPushed(response.message || `₹${fmtINR(amount)} recorded for ${booking[1]}`));
+  } catch (error) {
+    dispatch(toastPushed(`Could not record the payment: ${error.message}`));
+  }
+};
+
 export const recordPayment = ({ booking, finalPrice, amount, mode, reference, due }) => (dispatch, getState) => {
+  if (getState().auth.mode === 'live') return dispatch(recordPaymentLive({ booking, finalPrice, amount, mode, reference, due }));
   const { receipts, payments } = getState().domain;
   const paid = parseAmt(booking[6]) + amount;
   const balance = finalPrice - paid;
@@ -314,22 +386,38 @@ export const recordPayment = ({ booking, finalPrice, amount, mode, reference, du
   dispatch(modalClosed());
   dispatch(toastPushed(`₹${fmtINR(amount)} recorded for ${booking[1]} · bill ${receipt.no} generated`));
   clientAudit('payment.recorded', { receipt: receipt.no, mode });
-  if (getState().auth.mode === 'live') {
-    api.payments.create({
-      booking_id: booking[0], amount, mode, reference, paid_on: new Date().toISOString(),
-    }).catch(() => dispatch(toastPushed('Saved locally — sync failed')));
-  }
   return receipt;
 };
 
 /** Manual ledger status (e.g. flag a due instalment as overdue). Settling to PAID goes through Record Payment. */
+/** Live: the status (pending / overdue) follows from the next instalment's due date, saved on the server. */
+export const setNextDueDate = (payment, isoDate) => async (dispatch) => {
+  try {
+    const response = await actions.setDueDate(payment[9], isoDate);
+    await dispatch(hydrateWorkspace({ silent: true }));
+    dispatch(toastPushed(`${payment[0]} · Plot ${payment[1]}: next due date set — now ${String(response.data.status).replace(/_/g, ' ').toLowerCase()}`));
+    return '';
+  } catch (error) {
+    return error.message || 'Could not set the due date.';
+  }
+};
+
 export const setPaymentStatus = (payment, status) => (dispatch) => {
   dispatch(paymentStatusSet({ customer: payment[0], plot: payment[1], status }));
   dispatch(toastPushed(`${payment[0]} · Plot ${payment[1]} marked ${status.toLowerCase()}`));
   clientAudit('payment.status_changed', { customer: payment[0], plot: payment[1], status });
 };
 
-export const markReceiptShared = (receipt) => (dispatch) => {
+export const markReceiptShared = (receipt) => async (dispatch, getState) => {
+  if (getState().auth.mode === 'live' && typeof receipt.id === 'number') {
+    // Only the server flag makes the bill visible in the customer's own login.
+    try {
+      await actions.shareReceipt(receipt.id);
+    } catch (error) {
+      dispatch(toastPushed(`Could not share the bill: ${error.message}`));
+      return;
+    }
+  }
   dispatch(rowPatched({ key: 'receipts', id: receipt.no, changes: { shared: true } }));
   dispatch(toastPushed(`Bill ${receipt.no} shared with ${receipt.customer} (visible in their login)`));
 };
@@ -605,8 +693,52 @@ export const downloadInvoicePdf = (invoice) => async (dispatch, getState) => {
 };
 
 // --------------------------------------------------------------- masters
+/** API user -> the row the Roles page renders. */
+const adaptUser = (u) => ({
+  id: u.id, name: u.name, email: u.email, phone: u.phone || '', role: toUiRole(u.role),
+  status: u.status ? u.status.charAt(0) + u.status.slice(1).toLowerCase() : '', title: u.title || '',
+  agentCode: u.agent_code || '',
+});
+const toApiRole = (uiRole) => String(uiRole || '').trim().replace(/\s+/g, '_').toUpperCase();
+
+/** My organisation's team (live; only roles allowed to read /users get a list). */
+export const loadUsers = () => async (dispatch) => {
+  try {
+    const rows = await listAll(api.users);
+    dispatch(usersLoaded(rows.map(adaptUser)));
+  } catch (error) {
+    if (error?.status === 403) dispatch(usersLoaded([]));
+    else dispatch(toastPushed(`Could not load the team: ${error.message}`));
+  }
+};
+
+/** Create / edit a team member against the real API; a new member gets a one-time password. */
+const saveUserLive = (record) => async (dispatch, getState) => {
+  const editing = getState().ui.userEdit || getState().ui.editRecord;
+  const base = {
+    name: record.name, phone: record.phone || undefined, title: record.title || undefined,
+    role: toApiRole(record.role), ...(record.agent_code ? { agent_code: record.agent_code.trim().toUpperCase() } : {}),
+  };
+  try {
+    if (editing && typeof editing.id === 'number') {
+      await api.users.update(editing.id, { ...base, status: String(record.status || '').toUpperCase() || undefined });
+      dispatch(toastPushed(`Team member ${record.name} updated`));
+    } else {
+      const password = generatePassword();
+      await api.users.create({ ...base, email: record.email, temporary_password: password });
+      dispatch(userCredentialShown({ name: record.name, email: record.email, password }));
+      dispatch(toastPushed(`Team member ${record.name} added`));
+    }
+    dispatch(modalClosed());
+    await dispatch(loadUsers());
+  } catch (error) {
+    dispatch(toastPushed(`Could not save the team member: ${error.message}`));
+  }
+};
+
 export const saveRecord = (record) => (dispatch, getState) => {
   const { crudPage, editRecord, modal } = getState().ui;
+  if (modal === 'user' && getState().auth.mode === 'live') return dispatch(saveUserLive(record));
   if (modal === 'user') {
     const user = editRecord
       ? { ...editRecord, ...record }
@@ -624,9 +756,19 @@ export const saveRecord = (record) => (dispatch, getState) => {
   dispatch(modalClosed());
 };
 
-export const deleteRecord = (record) => (dispatch, getState) => {
+export const deleteRecord = (record) => async (dispatch, getState) => {
   const { crudPage, page } = getState().ui;
   if (page === 'User & role management') {
+    if (getState().auth.mode === 'live' && typeof record.id === 'number') {
+      try {
+        await api.users.remove(record.id);
+        dispatch(toastPushed(`Removed user ${record.name}`));
+        await dispatch(loadUsers());
+      } catch (error) {
+        dispatch(toastPushed(`Could not remove the user: ${error.message}`));
+      }
+      return;
+    }
     dispatch(userRemoved(record.id));
     dispatch(toastPushed(`Removed user ${record.name}`));
   } else {
@@ -640,7 +782,29 @@ export const openCustomerDetail = (customer) => (dispatch) => {
   dispatch({ type: 'ui/customerSelected', payload: customer });
 };
 
-/** Self-registration from the login screen: creates the customer file + session. */
+/**
+ * Self-registration. Against the real API the request is only *recorded*: an administrator of that
+ * organisation must activate the account before anyone can sign in. Offline it keeps the sample flow.
+ */
+export const registerAccount = (account) => async (dispatch) => {
+  try {
+    const response = await actions.register({
+      name: account.name, email: account.email, phone: account.phone || undefined,
+      password: account.password, confirm_password: account.confirmPassword,
+      role: toApiRole(account.role), title: account.title || undefined,
+      consent: true, tenant: String(account.org || '').trim().toLowerCase(),
+    });
+    return { pending: true, message: response.message };
+  } catch (error) {
+    if (error instanceof ApiUnavailableError) {
+      dispatch(registerCustomerAccount(account));
+      return { local: true };
+    }
+    return { error: error.message };
+  }
+};
+
+/** Offline sample flow: creates the customer file + session locally. */
 export const registerCustomerAccount = (account) => (dispatch) => {
   dispatch(rowUpserted({
     key: 'customers',
@@ -664,7 +828,7 @@ export { sessionFailed };
 // ----------------------------------------------------------- notifications
 /** Refresh my queue (live only; the API returns just what is addressed to me). */
 export const loadNotifications = () => async (dispatch, getState) => {
-  if (getState().auth.mode !== 'live') return;
+  if (getState().auth.mode !== 'live' || getState().auth.role === ROLES.SUPER_ADMIN) return;   // platform owner has no queue
   try {
     const response = await actions.notificationQueue();
     dispatch(notificationsLoaded(response.data || []));
@@ -680,4 +844,17 @@ export const actionNotification = (item) => async (dispatch, getState) => {
     try { await actions.notificationAction(item.id); } catch { /* the queue reloads from the server next */ }
     dispatch(loadNotifications());
   }
+};
+
+/** Change my own password. The server revokes every session, so the user signs in again with the new one. */
+export const changeMyPassword = ({ current, next, confirm }) => async (dispatch) => {
+  try {
+    await actions.changePassword({ current_password: current, new_password: next, confirm_password: confirm });
+  } catch (error) {
+    return error.message || 'Could not change the password.';
+  }
+  clearTokens();
+  dispatch(signedOut());
+  dispatch(loginNoticeSet('Password changed. Please sign in with your new password.'));
+  return '';
 };

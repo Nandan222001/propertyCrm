@@ -1,15 +1,7 @@
-import React, { useState, useMemo, useEffect } from 'react';
-import {
-  LayoutDashboard, Map, ClipboardList, Wallet, Users, Handshake, Percent,
-  ChartNoAxesCombined, FolderOpen, Bell, Settings, Shield, Search, Plus,
-  Download, ChevronDown, ChevronRight, Menu, X, ArrowUpRight, MoreHorizontal,
-  CalendarDays, Building2, House, Receipt, FileText, Clock3, CheckCircle2,
-  AlertCircle, SlidersHorizontal, Send, Eye, Edit2, LockKeyhole, RefreshCw,
-  FileSpreadsheet, MapPin, IndianRupee, Mail, Phone, Activity, Trash2, LogOut,
-  Sparkles, Check, CheckCircle, Printer, MessageCircle
-} from 'lucide-react';
-import { parseAmt, fmtINR, amountInWords, agentKey, todayLabel, openWhatsApp, waLink, isAdmin, canCreateBooking, canApprove, canCreateCustomer, canRecordPayment, canManageBills, isCustomer, isPendingStatus } from '../../utils';
-import { projects, agents, seedUsers } from '../../data/seedData';
+import React, { useCallback, useEffect, useState } from 'react';
+import { Eye, X } from 'lucide-react';
+import { parseAmt, fmtINR } from '../../utils';
+import { api, actions, hasSession } from '../../api';
 
 import { Table } from '../../components/common/DataTable';
 import { Badge } from '../../components/common/Badge';
@@ -65,55 +57,141 @@ export const COMMISSION_ROWS = [
     ['N. Bose', 'Park View', 'C-031', '24,75,000', '2.0%', '49,500', 'ON HOLD']
 ];
 
-export function Commissions({ search, notify, role }) {
-  const [viewing, setViewing] = useState(null);
-  const isAgent = role === 'SALES AGENT';
-  const isManager = role === 'SALES MANAGER';
-  const isAccounts = role === 'ACCOUNTS';
+const STATUS_LABEL = (status) => String(status || '').replace(/_/g, ' ');
+const crLakh = (n) => (n >= 10000000 ? `₹${(n / 10000000).toFixed(2)} Cr` : n >= 100000 ? `₹${(n / 100000).toFixed(2)} L` : `₹${fmtINR(n)}`);
 
-  const data = COMMISSION_ROWS;
+/** One API commission -> the table row ([agent, project, plot, deal, slab, amount, status, id]). */
+export const toRow = (c, bookingById) => {
+  const booking = bookingById.get(c.booking_id);
+  return [
+    c.agent_name || '—', booking?.[2] || '—', booking?.[3] || '—', fmtINR(c.deal_value),
+    `${Number((Number(c.rate) * 100).toFixed(2))}%`, fmtINR(c.gross_amount), STATUS_LABEL(c.status), c.id,
+  ];
+};
+
+/** Bank reference is mandatory before a commission can be marked paid. */
+function PayoutModal({ row, close, save }) {
+  const [ref, setRef] = useState('');
+  const [error, setError] = useState('');
+  const submit = async (e) => {
+    e.preventDefault();
+    if (ref.trim().length < 4) { setError('Enter the bank / NEFT reference.'); return; }
+    const problem = await save(row, 'PAID', ref.trim());
+    if (problem) setError(problem); else close();
+  };
+  return (
+    <div className="modal-backdrop" onMouseDown={(e) => e.target === e.currentTarget && close()}>
+      <form className="modal view-modal" onSubmit={submit} noValidate>
+        <div className="modal-head">
+          <div><span className="modal-kicker">DISBURSE COMMISSION</span><h2>{row[0]} · ₹{row[5]}</h2><p>{row[1]} · Plot {row[2]}</p></div>
+          <button type="button" className="modal-close" onClick={close} aria-label="Close"><X size={16} /></button>
+        </div>
+        <div className="form-grid">
+          <label>Payout reference (NEFT / UTR)<input value={ref} onChange={(e) => setRef(e.target.value)} autoFocus /></label>
+        </div>
+        {error && <p className="form-error">{error}</p>}
+        <div className="modal-actions">
+          <button type="button" className="button button-white" onClick={close}>Cancel</button>
+          <button type="submit" className="button button-primary">Mark as paid</button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
+export function Commissions({ search, notify, role, bookings = [] }) {
+  const live = hasSession();
+  const [viewing, setViewing] = useState(null);
+  const [paying, setPaying] = useState(null);
+  const [rows, setRows] = useState(null);
+  const isManager = role === 'SALES MANAGER' || role === 'ADMIN';
+  const isAccounts = role === 'ACCOUNTS' || role === 'ADMIN';
+
+  const load = useCallback(async () => {
+    try {
+      const response = await api.commissions.list({ page_size: 200 });
+      const byId = new Map(bookings.filter((b) => typeof b[10] === 'number').map((b) => [b[10], b]));
+      setRows((response.data || []).map((c) => toRow(c, byId)));
+    } catch (error) {
+      notify(`Could not load commissions: ${error.message}`);
+      setRows([]);
+    }
+  }, [bookings, notify]);
+
+  useEffect(() => { if (live) load(); }, [live, load]);
+
+  const decide = async (row, status, reference) => {
+    try {
+      await actions.commissionDecision(row[7], { status, ...(reference ? { payout_reference: reference } : {}) });
+      notify(`Commission for ${row[0]}: ${STATUS_LABEL(status).toLowerCase()}`);
+      await load();
+      return '';
+    } catch (error) {
+      return error.message || 'Could not save the decision.';
+    }
+  };
+
+  // The server already returns only the commissions this role may see (an agent: their own).
+  const data = live ? (rows || []) : COMMISSION_ROWS;
+  const sum = (filter) => data.filter(filter).reduce((t, r) => t + parseAmt(r[5]), 0);
+  const stats = live
+    ? [
+      ['TOTAL COMMISSIONS', crLakh(sum(() => true)), ''],
+      ['DISBURSED TO DATE', crLakh(sum((r) => r[6] === 'PAID')), 'green-text'],
+      ['READY FOR DISBURSAL', crLakh(sum((r) => r[6] === 'APPROVED')), 'indigo-text'],
+      ['PENDING APPROVAL', crLakh(sum((r) => ['PAYABLE', 'PROCESSING'].includes(r[6]))), 'amber-text'],
+    ]
+    : [['TOTAL COMMISSIONS', '₹7.68 L', ''], ['DISBURSED TO DATE', '₹4.82 L', 'green-text'],
+      ['READY FOR DISBURSAL', '₹1.92 L', 'indigo-text'], ['PENDING APPROVAL', '₹94,000', 'amber-text']];
 
   return (
     <>
       <RoleContextBanner role={role} page="Commissions" />
 
       <div className="mini-stats four">
-        <Mini title="TOTAL COMMISSIONS" value="₹7.68 L" />
-        <Mini title="DISBURSED TO DATE" value="₹4.82 L" color="green-text" />
-        <Mini title="READY FOR DISBURSAL" value="₹1.92 L" color="indigo-text" />
-        <Mini title="PENDING APPROVAL" value="₹94,000" color="amber-text" />
+        {stats.map(([title, value, color]) => <Mini key={title} title={title} value={value} color={color || undefined} />)}
       </div>
 
       <div className="panel section-panel">
-        <Table
-          headers={['AGENT', 'PROJECT', 'PLOT', 'DEAL VALUE', 'COMM. SLAB', 'AMOUNT (₹)', 'STATUS', 'ACTIONS']}
-          rows={data.filter(a => a.join(' ').toLowerCase().includes(search.toLowerCase())).map(a => [
-            <b>{a[0]}</b>,
-            a[1],
-            a[2],
-            `₹${a[3]}`,
-            a[4],
-            `₹${a[5]}`,
-            <Badge>{a[6]}</Badge>,
-            <div className="table-actions-cell" key={a[0]}>
-              <button className="icon-action" onClick={() => setViewing(a)} title="Inspect calculation">
-                <Eye size={14} />
-              </button>
-              {isManager && a[6] === 'PROCESSING' && (
-                <button className="button button-white small-btn" onClick={() => notify(`Approved commission for ${a[0]}`)}>
-                  Approve
+        {live && rows === null ? <p className="empty-note">Loading commissions…</p> : (
+          <Table
+            headers={['AGENT', 'PROJECT', 'PLOT', 'DEAL VALUE', 'COMM. SLAB', 'AMOUNT (₹)', 'STATUS', 'ACTIONS']}
+            empty="No commissions yet"
+            rows={data.filter(a => a.join(' ').toLowerCase().includes(search.toLowerCase())).map(a => [
+              <b>{a[0]}</b>,
+              a[1],
+              a[2],
+              `₹${a[3]}`,
+              a[4],
+              `₹${a[5]}`,
+              <Badge>{a[6]}</Badge>,
+              <div className="table-actions-cell" key={`${a[0]}-${a[2]}-${a[7] ?? ''}`}>
+                <button className="icon-action" onClick={() => setViewing(a)} title="Inspect calculation">
+                  <Eye size={14} />
                 </button>
-              )}
-              {isAccounts && a[6] === 'APPROVED' && (
-                <button className="button button-primary small-btn" onClick={() => notify(`NEFT payout initiated for ${a[0]}`)}>
-                  Disburse
-                </button>
-              )}
-            </div>
-          ])}
-        />
+                {isManager && ['PROCESSING', 'PAYABLE', 'ON HOLD'].includes(a[6]) && (
+                  <button
+                    className="button button-white small-btn"
+                    onClick={() => (live ? decide(a, 'APPROVED') : notify(`Approved commission for ${a[0]}`))}
+                  >
+                    {a[6] === 'ON HOLD' ? 'Release & approve' : 'Approve'}
+                  </button>
+                )}
+                {isAccounts && a[6] === 'APPROVED' && (
+                  <button
+                    className="button button-primary small-btn"
+                    onClick={() => (live ? setPaying(a) : notify(`NEFT payout initiated for ${a[0]}`))}
+                  >
+                    Disburse
+                  </button>
+                )}
+              </div>
+            ])}
+          />
+        )}
       </div>
       {viewing && <CommissionSlip row={viewing} close={() => setViewing(null)} />}
+      {paying && <PayoutModal row={paying} close={() => setPaying(null)} save={decide} />}
     </>
   );
 }

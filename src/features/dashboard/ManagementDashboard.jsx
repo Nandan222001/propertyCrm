@@ -1,106 +1,131 @@
 import React from 'react';
-import { Briefcase, TrendingUp, PieChart, BarChart3, Download, ArrowUpRight, ShieldCheck, Building, Landmark, FileSpreadsheet } from 'lucide-react';
+import { Download, Building, Landmark, TrendingUp, FileSpreadsheet } from 'lucide-react';
+import { parseAmt } from '../../utils';
+import { compactINR } from '../../utils/dashboardStats';
 
-export function ManagementDashboard({ go, notify, projects = [] }) {
-  const portfolioMatrix = [
-    { name: 'Green Meadows', location: 'Phase II · Mumbai', units: 128, gdv: '₹12.6 Cr', sold: 82, collected: '₹7.9 Cr', margin: '42.5%', status: 'Cash Cow' },
-    { name: 'Silver Oaks', location: 'West Zone · Pune', units: 104, gdv: '₹8.4 Cr', sold: 54, collected: '₹3.8 Cr', margin: '38.0%', status: 'Growth Phase' },
-    { name: 'Park View', location: 'North District · Thane', units: 88, gdv: '₹5.2 Cr', sold: 41, collected: '₹2.1 Cr', margin: '35.2%', status: 'Steady Sales' },
-    { name: 'River Enclave', location: 'East Corridor · Mumbai', units: 64, gdv: '₹3.8 Cr', sold: 28, collected: '₹1.4 Cr', margin: '32.0%', status: 'Launch Phase' }
-  ];
+const money = (n) => { const c = compactINR(n); return `${c.val}${c.unit ? ` ${c.unit}` : ''}`; };
+const LIVE = (b) => !['Pending Approval', 'Rejected', 'Cancelled'].includes(b[7]);
+const asDate = (label) => { const d = new Date(String(label || '').replace('Sept', 'Sep')); return Number.isNaN(d.getTime()) ? null : d; };
+const quarterOf = (d) => `${d.getFullYear()}-Q${Math.floor(d.getMonth() / 3) + 1}`;
+
+/** A development's stage, from how much of it is already allocated. */
+const stage = (absorption) => (absorption >= 75 ? 'Cash Cow' : absorption >= 50 ? 'Steady Sales' : absorption >= 20 ? 'Growth Phase' : 'Launch Phase');
+
+/**
+ * Executive view — a read-only roll-up of the tenant's own projects, plots, bookings and receipts.
+ * (Margins/EBITDA need cost data the ERP does not hold, so they are not shown.)
+ */
+export function ManagementDashboard({ go, notify, projects = [], plots = [], bookings = [], receipts = [] }) {
+  const matrix = projects.map((p) => {
+    const mine = plots.filter((x) => x[8] === p[0]);
+    const units = mine.length || parseAmt(p[2]);
+    const allocated = mine.filter((x) => ['BOOKED', 'SOLD', 'HOLD'].includes(x[5])).length;
+    const gdv = mine.reduce((t, x) => t + parseAmt(x[4]), 0);
+    const deals = bookings.filter((b) => b[2] === p[0] && LIVE(b));
+    const booked = deals.reduce((t, b) => t + parseAmt(b[5]), 0);
+    const cash = deals.reduce((t, b) => t + parseAmt(b[6]), 0);
+    const absorption = units ? Math.round((allocated / units) * 100) : 0;
+    return { name: p[0], where: p[1], units, gdv, absorption, booked, cash, collectedPct: booked ? Math.round((cash / booked) * 100) : 0, stage: stage(absorption) };
+  });
+
+  const totalUnits = matrix.reduce((t, m) => t + m.units, 0);
+  const allocated = plots.filter((x) => ['BOOKED', 'SOLD', 'HOLD'].includes(x[5])).length;
+  const gdv = matrix.reduce((t, m) => t + m.gdv, 0);
+  const cash = matrix.reduce((t, m) => t + m.cash, 0);
+  const booked = matrix.reduce((t, m) => t + m.booked, 0);
+  const absorptionAll = totalUnits ? Math.round((allocated / totalUnits) * 100) : 0;
+  const liquidity = gdv ? Math.round((cash / gdv) * 100) : 0;
+
+  // Cash actually received, per calendar quarter (last four).
+  const now = new Date();
+  const quarters = Array.from({ length: 4 }, (_, i) => {
+    const d = new Date(now.getFullYear(), now.getMonth() - 3 * (3 - i), 1);
+    return { key: quarterOf(d), label: `Q${Math.floor(d.getMonth() / 3) + 1} ${d.getFullYear()}`, amount: 0 };
+  });
+  receipts.forEach((r) => {
+    const d = asDate(r.date);
+    const q = d && quarters.find((x) => x.key === quarterOf(d));
+    if (q) q.amount += parseAmt(r.amount);
+  });
+  const peak = Math.max(...quarters.map((q) => q.amount), 1);
+
+  const hottest = [...matrix].sort((a, b) => b.absorption - a.absorption)[0];
+  const slowestCash = [...matrix].filter((m) => m.booked > 0).sort((a, b) => a.collectedPct - b.collectedPct)[0];
+  const pending = bookings.filter((b) => b[7] === 'Pending Approval').length;
 
   return (
     <div className="role-dashboard management-dash">
       <div className="role-welcome management-welcome">
         <div>
-          <span className="eyebrow"><i className="live-dot" /> EXECUTIVE BOARDROOM · STRATEGIC BI</span>
-          <h2>Macro Portfolio Health & Capital Allocation</h2>
-          <p>High-level Gross Development Value (GDV), cash realization trajectory, inventory absorption rate, and project-wise EBITDA margins.</p>
+          <span className="eyebrow"><i className="live-dot" /> EXECUTIVE BOARDROOM · PORTFOLIO VIEW</span>
+          <h2>Portfolio Health &amp; Cash Realisation</h2>
+          <p>Gross development value, cash realised, inventory absorption and collection by development — from live records.</p>
         </div>
         <div className="welcome-actions">
-          <button className="button button-white" onClick={() => notify('Capital allocation model downloaded')}>
-            <FileSpreadsheet size={13} /> Capital Model
-          </button>
-          <button className="button button-primary" onClick={() => notify('Board Briefing Pack (Q3 2026) exported')}>
-            <Download size={13} /> Download Board Pack
-          </button>
+          <button className="button button-white" onClick={() => go('Reports')}><FileSpreadsheet size={13} /> Reports</button>
+          <button className="button button-primary" onClick={() => go('Reports')}><Download size={13} /> Export Data</button>
         </div>
       </div>
 
-      {/* Strategic Board KPIs */}
       <div className="mini-stats four">
         <div className="mini-stat">
           <small>PORTFOLIO GDV</small>
-          <b className="indigo-text">₹30.0 Cr</b>
-          <span className="stat-sub">Across 4 master developments</span>
+          <b className="indigo-text">{money(gdv)}</b>
+          <span className="stat-sub">Across {matrix.length} development{matrix.length === 1 ? '' : 's'}</span>
         </div>
         <div className="mini-stat">
-          <small>REALIZED CASH TO DATE</small>
-          <b className="green-text">₹15.2 Cr</b>
-          <span className="stat-sub">50.6% portfolio liquidity</span>
+          <small>REALISED CASH TO DATE</small>
+          <b className="green-text">{money(cash)}</b>
+          <span className="stat-sub">{liquidity}% of portfolio GDV</span>
         </div>
         <div className="mini-stat">
           <small>INVENTORY ABSORPTION</small>
-          <b className="green-text">64.2%</b>
-          <span className="stat-sub">246 of 384 plots sold / held</span>
+          <b className="green-text">{absorptionAll}%</b>
+          <span className="stat-sub">{allocated} of {totalUnits} plots booked / sold / held</span>
         </div>
         <div className="mini-stat">
-          <small>BLENDED EBITDA MARGIN</small>
-          <b className="amber-text">38.5%</b>
-          <span className="stat-sub">+3.2% vs previous fiscal year</span>
+          <small>BOOKED, NOT YET COLLECTED</small>
+          <b className="amber-text">{money(Math.max(booked - cash, 0))}</b>
+          <span className="stat-sub">{booked ? Math.round((cash / booked) * 100) : 0}% of booked value collected</span>
         </div>
       </div>
 
-      {/* Project-by-Project Performance Matrix */}
       <section className="panel section-panel">
         <div className="panel-head">
           <div>
-            <h2>Project Portfolio Performance & Yield Matrix</h2>
-            <p>Comparative analysis of capital realization and margins by development</p>
+            <h2>Project Portfolio Performance Matrix</h2>
+            <p>Absorption and cash realisation by development</p>
           </div>
-          <span className="badge-pill indigo">All 4 Developments Active</span>
+          <span className="badge-pill indigo">{matrix.length} Development{matrix.length === 1 ? '' : 's'}</span>
         </div>
-
         <div className="table-scroll">
           <table className="data-table">
             <thead>
               <tr>
-                <th>DEVELOPMENT & LOCATION</th>
-                <th>UNITS</th>
-                <th>TOTAL GDV</th>
-                <th>ABSORPTION / SOLD</th>
-                <th>REALIZED CASH</th>
-                <th>EBITDA MARGIN</th>
-                <th>CLASSIFICATION</th>
+                <th>DEVELOPMENT &amp; LOCATION</th><th>UNITS</th><th>TOTAL GDV</th><th>ABSORPTION</th>
+                <th>BOOKED VALUE</th><th>REALISED CASH</th><th>COLLECTED</th><th>STAGE</th>
               </tr>
             </thead>
             <tbody>
-              {portfolioMatrix.map((item) => (
-                <tr key={item.name}>
+              {matrix.length === 0 && <tr><td colSpan={8} className="empty-cell">No projects yet.</td></tr>}
+              {matrix.map((m) => (
+                <tr key={m.name}>
                   <td>
                     <div className="customer-cell">
                       <div className="avatar avatar-indigo"><Building size={14} /></div>
-                      <div>
-                        <b>{item.name}</b>
-                        <small>{item.location}</small>
-                      </div>
+                      <div><b>{m.name}</b><small>{m.where}</small></div>
                     </div>
                   </td>
-                  <td><b>{item.units} Plots</b></td>
-                  <td><b className="indigo-text">{item.gdv}</b></td>
-                  <td style={{ minWidth: 140 }}>
-                    <div className="inline-progress">
-                      <div className="inline-bar green" style={{ width: `${item.sold}%` }} />
-                    </div>
-                    <small className="muted-text">{item.sold}% units allocated</small>
+                  <td><b>{m.units} Plots</b></td>
+                  <td><b className="indigo-text">{money(m.gdv)}</b></td>
+                  <td style={{ minWidth: 130 }}>
+                    <div className="inline-progress"><div className="inline-bar green" style={{ width: `${m.absorption}%` }} /></div>
+                    <small className="muted-text">{m.absorption}% allocated</small>
                   </td>
-                  <td><b className="green-text">{item.collected}</b></td>
-                  <td><b className="amber-text">{item.margin}</b></td>
-                  <td>
-                    <span className={`badge-pill ${item.sold > 70 ? 'green' : item.sold > 40 ? 'indigo' : 'amber'}`}>
-                      {item.status}
-                    </span>
-                  </td>
+                  <td><b>{money(m.booked)}</b></td>
+                  <td><b className="green-text">{money(m.cash)}</b></td>
+                  <td><b className="amber-text">{m.collectedPct}%</b></td>
+                  <td><span className={`badge-pill ${m.absorption >= 75 ? 'green' : m.absorption >= 20 ? 'indigo' : 'amber'}`}>{m.stage}</span></td>
                 </tr>
               ))}
             </tbody>
@@ -108,72 +133,64 @@ export function ManagementDashboard({ go, notify, projects = [] }) {
         </div>
       </section>
 
-      {/* Cash Flow Trajectory & Strategic Insights */}
       <div className="role-dash-grid">
         <section className="panel">
           <div className="panel-head">
             <div>
-              <h2>Cash Flow Inflow Trajectory</h2>
-              <p>Historical quarters and projected Q4 2026 receivables</p>
+              <h2>Cash Received by Quarter</h2>
+              <p>Receipts issued in the last four quarters</p>
             </div>
-            <span className="badge-pill green">+22% YoY Growth</span>
           </div>
-
           <div className="trajectory-chart">
-            <div className="traj-bar-wrap">
-              <div className="traj-bar" style={{ height: '55%' }}>
-                <span>₹2.8 Cr</span>
+            {quarters.map((q, i) => (
+              <div className={`traj-bar-wrap ${i === quarters.length - 1 ? 'highlight' : ''}`} key={q.key}>
+                <div className="traj-bar" style={{ height: `${Math.max(Math.round((q.amount / peak) * 85), q.amount ? 8 : 2)}%` }} />
+                <b className="traj-val">{money(q.amount)}</b>
+                <small>{q.label}</small>
               </div>
-              <small>Q1 2026 (Act)</small>
-            </div>
-            <div className="traj-bar-wrap">
-              <div className="traj-bar" style={{ height: '62%' }}>
-                <span>₹3.2 Cr</span>
-              </div>
-              <small>Q2 2026 (Act)</small>
-            </div>
-            <div className="traj-bar-wrap">
-              <div className="traj-bar" style={{ height: '78%' }}>
-                <span>₹4.1 Cr</span>
-              </div>
-              <small>Q3 2026 (Act)</small>
-            </div>
-            <div className="traj-bar-wrap highlight">
-              <div className="traj-bar project" style={{ height: '95%' }}>
-                <span>₹5.1 Cr</span>
-              </div>
-              <small>Q4 2026 (Proj)</small>
-            </div>
+            ))}
           </div>
         </section>
 
-        {/* Board Strategic Decisions */}
         <section className="panel management-decisions">
           <div className="panel-head">
             <div>
-              <h2>Strategic Board Directives</h2>
-              <p>Action items for executive committee</p>
+              <h2>Watch List</h2>
+              <p>Signals computed from current portfolio data</p>
             </div>
           </div>
-
           <div className="directive-cards">
-            <div className="directive-item">
-              <div className="dir-icon green"><Landmark size={15} /></div>
-              <div>
-                <b>Phase III Land Acquisition</b>
-                <p>Green Meadows expansion: Preliminary feasibility study ready for sign-off.</p>
-                <button className="text-button" onClick={() => notify('Feasibility report opened')}>Review Dossier →</button>
+            {hottest && hottest.units > 0 && (
+              <div className="directive-item">
+                <div className="dir-icon green"><TrendingUp size={15} /></div>
+                <div>
+                  <b>{hottest.name} is {hottest.absorption}% allocated</b>
+                  <p>Highest absorption in the portfolio — a candidate for a price review.</p>
+                  <button className="text-button" onClick={() => go('Projects & plots')}>Open projects →</button>
+                </div>
               </div>
-            </div>
-
-            <div className="directive-item">
-              <div className="dir-icon amber"><TrendingUp size={15} /></div>
-              <div>
-                <b>Dynamic Plot Price Escalation</b>
-                <p>Silver Oaks Phase II hits 50% absorption. Recommended 6% price hike.</p>
-                <button className="text-button" onClick={() => notify('Price revision proposal queued for approval')}>Authorize Escalation →</button>
+            )}
+            {slowestCash && (
+              <div className="directive-item">
+                <div className="dir-icon amber"><Landmark size={15} /></div>
+                <div>
+                  <b>{slowestCash.name}: {slowestCash.collectedPct}% of booked value collected</b>
+                  <p>{money(Math.max(slowestCash.booked - slowestCash.cash, 0))} still to collect on this development.</p>
+                  <button className="text-button" onClick={() => go('Payments')}>Open ledger →</button>
+                </div>
               </div>
-            </div>
+            )}
+            {pending > 0 && (
+              <div className="directive-item">
+                <div className="dir-icon amber"><Building size={15} /></div>
+                <div>
+                  <b>{pending} booking{pending === 1 ? '' : 's'} awaiting admin approval</b>
+                  <p>Plots stay on hold until the admin confirms them.</p>
+                  <button className="text-button" onClick={() => go('Bookings')}>Open bookings →</button>
+                </div>
+              </div>
+            )}
+            {!hottest && !slowestCash && pending === 0 && <p className="empty-note">Nothing to flag yet.</p>}
           </div>
         </section>
       </div>

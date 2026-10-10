@@ -54,6 +54,8 @@ class Booking(Base, PkMixin, PublicIdMixin, TenantMixin, TimestampMixin, SoftDel
         String(24), default=BookingStatus.PENDING_APPROVAL.value, nullable=False, index=True
     )
     notes: Mapped[str | None] = mapped_column(Text)
+    #: Registration progress (finer than the booking status): NOT_STARTED … REGISTERED.
+    registry_stage: Mapped[str] = mapped_column(String(32), default="NOT_STARTED", nullable=False)
 
     created_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
     approved_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))

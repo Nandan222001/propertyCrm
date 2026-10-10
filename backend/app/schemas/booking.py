@@ -56,6 +56,21 @@ class BookingDecision(SafeText):
         return to_decimal(value, minimum=Decimal("0")) if value not in (None, "") else None
 
 
+REGISTRY_STAGES = (
+    "NOT_STARTED", "DOCUMENTS_PENDING", "AGREEMENT_SIGNED", "SUB_REGISTRAR_APPOINTMENT", "REGISTERED",
+)
+
+
+class RegistryStageUpdate(SafeText):
+    stage: str
+    reason: str | None = Field(default=None, max_length=255)
+
+    @field_validator("stage")
+    @classmethod
+    def _stage(cls, value: str) -> str:
+        return normalise_enum(value, list(REGISTRY_STAGES), field="stage")
+
+
 class BookingStatusUpdate(SafeText):
     status: str
     reason: str | None = Field(default=None, max_length=255)
@@ -86,6 +101,7 @@ class BookingResponse(TimestampedResponse):
     payment_plan: str | None = None
     approved_at: datetime | None = None
     rejection_reason: str | None = None
+    registry_stage: str = "NOT_STARTED"
 
 
 class BookingTimelineEntry(ORMModel):

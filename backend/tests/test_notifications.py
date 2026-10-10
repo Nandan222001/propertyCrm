@@ -88,3 +88,26 @@ def test_new_customer_notifies_admin_and_the_decision_notifies_the_agent(
     assert decided.status_code == 200, decided.text
     assert "Customer approved" in _titles(client, agent_headers)
     assert "Customer approved" not in _titles(client, accounts_headers)
+
+
+def test_agent_linked_only_by_code_still_gets_decision_notifications(client, admin_headers, unique_email, unique_phone):
+    """Agents created from the admin screen are linked to their login by agent code only."""
+    code = "AG-NTF1"
+    assert client.post("/api/v1/agents", headers=admin_headers,
+                       json={"name": "Code Linked", "code": code}).status_code == 201
+    email = f"codelinked-{unique_email}"
+    created = client.post("/api/v1/users", headers=admin_headers, json={
+        "name": "Code Linked", "email": email, "role": "SALES_AGENT",
+        "temporary_password": "Temp#Pass2026", "agent_code": code,
+    })
+    assert created.status_code in (200, 201), created.text
+    token = client.post("/api/v1/auth/login", json={"email": email, "password": "Temp#Pass2026"})
+    assert token.status_code == 200, token.text
+    agent_headers = {"Authorization": f"Bearer {token.json()['data']['tokens']['access_token']}"}
+    customer = client.post("/api/v1/customers", headers=agent_headers, json={
+        "name": "Linked Probe", "email": unique_email, "phone": unique_phone,
+    })
+    assert customer.status_code in (200, 201), customer.text
+    client.post(f"/api/v1/customers/{customer.json()['data']['id']}/decision", headers=admin_headers,
+                json={"status": "APPROVED"})
+    assert "Customer approved" in _titles(client, agent_headers)
