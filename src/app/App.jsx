@@ -33,6 +33,7 @@ import {
 
 import { ChangePasswordDialog } from '../features/auth/ChangePasswordDialog';
 import { UserCredentialDialog } from '../features/users/UserCredentialDialog';
+import { COMPANY } from '../data/seedData';
 import { LoginScreen } from '../features/auth/LoginScreen';
 import { ApprovalsPage } from '../features/approvals/ApprovalsPage';
 import { AdminDashboard } from '../features/dashboard/AdminDashboard';
@@ -130,6 +131,13 @@ export function App() {
     return () => clearInterval(timer);
   }, [page, auth.mode, dispatch]);
 
+  // Utilities (e.g. WhatsApp) report problems through this event so the user always gets feedback.
+  useEffect(() => {
+    const onNotify = (event) => notify(String(event.detail || ''));
+    window.addEventListener('erp:notify', onNotify);
+    return () => window.removeEventListener('erp:notify', onNotify);
+  }, [notify]);
+
   // Global search keyboard shortcut (⌘K / Ctrl-K).
   useEffect(() => {
     const onKey = (event) => {
@@ -177,12 +185,8 @@ export function App() {
 
   const shareReceipt = (receipt) => {
     dispatch(markReceiptShared(receipt));
-    const phone = customerPhone(receipt.customer);
-    if (phone.includes('*')) {
-      notify('The bill is now visible in the customer\'s login. Their number is masked for your role, so WhatsApp was not opened.');
-      return;
-    }
-    openWhatsApp(phone, billText(receipt));
+    // The bill is visible in the customer's login either way; WhatsApp only opens when the number is usable.
+    openWhatsApp(customerPhone(receipt.customer), billText(receipt));
   };
 
   const shareInvoiceBill = (invoice) => {

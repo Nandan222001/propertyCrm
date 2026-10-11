@@ -184,7 +184,7 @@ export function CustomerProfile({
       {portal && (
         <div className="panel contact-card">
           <div><b>Need help?</b><br /><small>Your property consultant: {agentName}</small></div>
-          <button className="button whatsapp-btn" onClick={() => openWhatsApp('9876500001', `Hello, I am ${customer.name}. I have a question about my plot.`)}>
+          <button className="button whatsapp-btn" onClick={() => openWhatsApp(COMPANY.phone, `Hello, I am ${customer.name}. I have a question about my plot.`)}>
             <MessageCircle size={14} /> WhatsApp office
           </button>
         </div>
