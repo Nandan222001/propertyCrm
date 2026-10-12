@@ -147,7 +147,7 @@ const listAll = async (resource) => {
 export const saveProject = (form, editing = null) => async (dispatch, getState) => {
   const row = projectRowFromForm(form, editing);
   dispatch(projectSaved({ previousName: editing ? editing[0] : null, row }));
-  dispatch(toastPushed(editing ? `Project ${row[0]} updated` : `Project ${row[0]} added`));
+  dispatch(toastPushed(editing ? `Project ${row[0]} updated` : `Project ${row[0]} added — now use Add Plots to create its plots so agents can book them`));
   clientAudit(editing ? 'project.updated' : 'project.created', { name: row[0] });
   if (getState().auth.mode !== 'live') return;
   try {
@@ -186,6 +186,8 @@ export const deleteProjectLive = (project) => writeThenRefresh(
   () => api.projects.remove(project[6]), `Project ${project[0]} deleted`);
 export const updatePlotLive = (plot, changes) => writeThenRefresh(
   () => api.plots.update(plot[9], changes), `Plot ${plot[0]} updated`);
+export const addPlotsLive = (body, count) => writeThenRefresh(
+  () => api.plots.createBulk(body), `${count} plot${count === 1 ? '' : 's'} added — they are now available for booking`);
 export const deletePlotLive = (plot) => writeThenRefresh(
   () => api.plots.remove(plot[9]), `Plot ${plot[0]} deleted`);
 export const resetUserPasswordLive = (user) => async (dispatch, getState) => {

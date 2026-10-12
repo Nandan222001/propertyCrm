@@ -216,3 +216,29 @@ def test_plot_can_be_rebooked_after_a_booking_is_deleted_rejected_or_cancelled(c
     clash = client.post("/api/v1/bookings", headers=admin_headers, json={
         "customer_id": agent_approved_customer["id"], "plot_id": available_plot["id"], "final_price": available_plot["price"]})
     assert clash.status_code in (400, 409), clash.text
+
+
+def test_admin_adds_a_run_of_plots_to_a_project_and_agents_can_then_book_them(client, admin_headers, agent_headers,
+                                                                              agent_approved_customer):
+    project = client.post("/api/v1/projects", headers=admin_headers, json={
+        "name": f"Bulk Plots {uuid.uuid4().hex[:5]}", "city": "Pune", "total_plots": 2}).json()["data"]
+    body = {"project_id": project["id"], "prefix": "a-", "start": 1, "count": 4, "layout": "Layout 1",
+            "facing": "East", "area_sqft": "1500", "price": "1200000"}
+    assert client.post("/api/v1/plots/bulk", headers=agent_headers, json=body).status_code == 403
+    created = client.post("/api/v1/plots/bulk", headers=admin_headers, json=body)
+    assert created.status_code == 201, created.text
+    assert [p["plot_number"] for p in created.json()["data"]] == ["A-1", "A-2", "A-3", "A-4"]
+    # the project cannot declare fewer plots than it holds
+    listed = client.get("/api/v1/projects?page_size=200", headers=admin_headers).json()["data"]
+    assert next(p for p in listed if p["id"] == project["id"])["total_plots"] == 4
+    # all-or-nothing: overlapping numbers are refused and nothing is added
+    clash = client.post("/api/v1/plots/bulk", headers=admin_headers, json={**body, "start": 3, "count": 3})
+    assert clash.status_code == 409 and "already exist" in clash.text
+    plots = client.get("/api/v1/plots?page_size=200&search=A-", headers=admin_headers).json()["data"]
+    assert len([p for p in plots if p["project_id"] == project["id"]]) == 4
+    assert client.post("/api/v1/plots/bulk", headers=admin_headers, json={**body, "count": 0}).status_code == 422
+    # an agent can now book one of the new plots
+    first = created.json()["data"][0]
+    booked = client.post("/api/v1/bookings", headers=agent_headers, json={
+        "customer_id": agent_approved_customer["id"], "plot_id": first["id"], "final_price": "1200000"})
+    assert booked.status_code == 201, booked.text

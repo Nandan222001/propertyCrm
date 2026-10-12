@@ -12,6 +12,7 @@ from app.core.dependencies import PaginationDep, require
 from app.schemas.property import (
     DocumentCreate,
     DocumentUpdate,
+    PlotBulkCreate,
     PlotCreate,
     PlotStatusUpdate,
     PlotUpdate,
@@ -70,6 +71,11 @@ def inventory(service: controller.PlotServiceDep, _: PLOT_VIEW = None):
 @router.post("/plots", status_code=status.HTTP_201_CREATED, summary="Create a plot")
 def create_plot(payload: PlotCreate, service: controller.PlotServiceDep, _: PLOT_WRITE = None):
     return controller.create_plot(payload, service)
+
+
+@router.post("/plots/bulk", status_code=status.HTTP_201_CREATED, summary="Create a numbered run of plots in a project")
+def create_plots_bulk(payload: PlotBulkCreate, service: controller.PlotServiceDep, _: PLOT_WRITE = None):
+    return controller.create_plots_bulk(payload, service)
 
 
 @router.patch("/plots/{plot_id}", summary="Update a plot")

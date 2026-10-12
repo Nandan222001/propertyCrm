@@ -11,6 +11,7 @@ from app.core.responses import success
 from app.schemas.property import (
     DocumentCreate,
     DocumentUpdate,
+    PlotBulkCreate,
     PlotCreate,
     PlotStatusUpdate,
     PlotUpdate,
@@ -78,6 +79,11 @@ def list_plots(page: PaginationDep, service: PlotServiceDep) -> dict:
 def create_plot(payload: PlotCreate, service: PlotServiceDep) -> dict:
     plot = service.create_plot(payload)
     return success(service.serialise(plot).model_dump(), "Plot created")
+
+
+def create_plots_bulk(payload: PlotBulkCreate, service: PlotServiceDep) -> dict:
+    plots = service.create_plots_bulk(payload)
+    return success([service.serialise(p).model_dump() for p in plots], f"{len(plots)} plots created")
 
 
 def update_plot(plot_id: int, payload: PlotUpdate, service: PlotServiceDep) -> dict:

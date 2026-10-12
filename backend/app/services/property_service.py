@@ -18,6 +18,7 @@ from app.schemas.property import (
     DocumentCreate,
     DocumentResponse,
     DocumentUpdate,
+    PlotBulkCreate,
     PlotCreate,
     PlotResponse,
     PlotStatusUpdate,
@@ -175,6 +176,35 @@ class PlotService(BaseService[Plot]):
         self.plots.create(plot)
         self._audit(AuditAction.CREATE, plot, summary=f"Plot {plot.plot_number} added")
         return plot
+
+    def create_plots_bulk(self, payload: PlotBulkCreate) -> list[Plot]:
+        """Add a numbered run of identical plots to a project in one go (all or nothing)."""
+        self._authorise("create")
+        project = ProjectRepository(self.db).get_or_404(payload.project_id)
+        numbers = [f"{payload.prefix}{payload.start + i}" for i in range(payload.count)]
+        if any(len(n) > 24 for n in numbers):
+            raise BusinessRuleError("Plot numbers would be longer than 24 characters — use a shorter prefix")
+        clashes = [n for n in numbers if self.plots.find_by_number(n, payload.project_id)]
+        if clashes:
+            shown = ", ".join(clashes[:5]) + (" …" if len(clashes) > 5 else "")
+            raise ConflictError(f"{len(clashes)} of these plot numbers already exist in {project.name}: {shown}")
+        created: list[Plot] = []
+        for number in numbers:
+            plot = Plot(
+                plot_number=number, project_id=payload.project_id, layout=payload.layout, facing=payload.facing,
+                area_sqft=payload.area_sqft, price=payload.price, status=payload.status.value,
+            )
+            self.plots.create(plot)
+            created.append(plot)
+        total = self.db.execute(select(func.count(Plot.id)).where(
+            Plot.project_id == project.id, Plot.is_deleted.is_(False))).scalar_one()
+        if (project.total_plots or 0) < total:
+            project.total_plots = int(total)        # the project cannot hold fewer plots than it now has
+        self.audit.log(
+            action=AuditAction.CREATE, resource="plot", resource_id=project.public_id,
+            summary=f"{len(created)} plots added to {project.name} ({numbers[0]} to {numbers[-1]})", actor=self.actor,
+        )
+        return created
 
     def update_plot(self, plot_id: int, payload: PlotUpdate) -> Plot:
         self._authorise("update")

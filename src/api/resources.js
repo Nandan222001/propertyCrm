@@ -70,6 +70,8 @@ export const actions = {
   acknowledgeEvent: (id, body) => authedRequest(ENDPOINTS.securityEvents.acknowledge(id), { method: 'POST', body }),
 };
 
+api.plots.createBulk = (body) => authedRequest(`${ENDPOINTS.plots.list}/bulk`, { method: 'POST', body });
+
 api.agents.provisionLogin = (id) => authedRequest(`${ENDPOINTS.agents.item(id)}/login`, { method: 'POST', body: {} });
 
 /** Per-agent sales totals (deals, gross sales, collected) for the Agents page. */

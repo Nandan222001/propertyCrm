@@ -73,6 +73,21 @@ class PlotCreate(PlotBase):
         return cleaned
 
 
+class PlotBulkCreate(PlotBase):
+    """Add a run of plots to a project: ``A-1`` … ``A-20`` from prefix ``A-``, start 1, count 20."""
+
+    project_id: int = Field(gt=0)
+    prefix: str = Field(default="", max_length=12)
+    start: int = Field(default=1, ge=0, le=99999)
+    count: int = Field(ge=1, le=500)
+    status: PlotStatus = PlotStatus.AVAILABLE
+
+    @field_validator("prefix")
+    @classmethod
+    def _prefix(cls, value: str) -> str:
+        return clean_text(value, max_length=12).upper()
+
+
 class PlotUpdate(SafeText):
     layout: str | None = Field(default=None, max_length=80)
     facing: str | None = Field(default=None, max_length=24)

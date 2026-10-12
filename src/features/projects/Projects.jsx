@@ -17,10 +17,12 @@ import { ProjectModal } from './ProjectModal';
 import { PlotViewModal, ProjectViewModal } from './ProjectViews';
 import { PlotMap3D } from '../../features/plots/PlotMap3D';
 import { EditPlotModal } from './EditPlotModal';
+import { AddPlotsModal } from './AddPlotsModal';
 import { ConfirmDialog } from '../../components/common/ConfirmDialog';
 import { RoleContextBanner } from '../../components/layout/RoleContextBanner';
 
-export function Projects({ plots, search, project, filter, F, tab, TB, notify, projects, role, onBook, onSaveProject, onDeleteProject, onDeletePlot, onEditPlot }) {
+export function Projects({ plots, search, project, filter, F, tab, TB, notify, projects, role, onBook, onSaveProject, onDeleteProject, onDeletePlot, onEditPlot, onAddPlots }) {
+  const [addingPlots, setAddingPlots] = useState(false);
   const [editingPlot, setEditingPlot] = useState(null);
   const [removing, setRemoving] = useState(null); // { kind: 'project' | 'plot', row }
   const [editing, setEditing] = useState(undefined); // undefined = closed, null = new, row = edit
@@ -86,12 +88,16 @@ export function Projects({ plots, search, project, filter, F, tab, TB, notify, p
           <button className={tab === '3D' ? 'active' : ''} onClick={() => TB('3D')}>3D map</button>
           <button className={tab === 'Projects' ? 'active' : ''} onClick={() => TB('Projects')}>Master projects ({projects.length})</button>
           {canManage && (
-            <button
-              className="button button-primary small-btn" style={{ marginLeft: 'auto' }}
-              onClick={() => setEditing(null)}
-            >
-              <Plus size={12} /> Add Project
-            </button>
+            <span style={{ marginLeft: 'auto', display: 'inline-flex', gap: 8 }}>
+              {onAddPlots && (
+                <button className="button button-white small-btn" onClick={() => setAddingPlots(true)}>
+                  <Plus size={12} /> Add Plots
+                </button>
+              )}
+              <button className="button button-primary small-btn" onClick={() => setEditing(null)}>
+                <Plus size={12} /> Add Project
+              </button>
+            </span>
           )}
           <div className="table-tools">
             <span className="filter-label">FILTER STATUS:</span>
@@ -113,6 +119,9 @@ export function Projects({ plots, search, project, filter, F, tab, TB, notify, p
                 <Badge>{p[11] === false ? 'Inactive' : 'Active'}</Badge>,
                 <div className="table-actions-cell" key={p[0]}>
                   <button className="icon-action" title="View project" onClick={() => setViewProject(p)}><Eye size={14} /></button>
+                  {canManage && onAddPlots && typeof p[6] === 'number' && (
+                    <button className="icon-action" title="Add plots to this project" onClick={() => setAddingPlots(true)}><Plus size={14} /></button>
+                  )}
                   {canManage && <button className="icon-action" title="Edit project" onClick={() => setEditing(p)}><Edit2 size={14} /></button>}
                   {canManage && onDeleteProject && typeof p[6] === 'number' && (
                     <button className="icon-action danger" title="Delete project" onClick={() => setRemoving({ kind: 'project', row: p })}><Trash2 size={14} /></button>
@@ -139,6 +148,7 @@ export function Projects({ plots, search, project, filter, F, tab, TB, notify, p
         />
       )}
       {editingPlot && <EditPlotModal plot={editingPlot} close={() => setEditingPlot(null)} save={onEditPlot} />}
+      {addingPlots && <AddPlotsModal projects={projects} defaultProject={project === 'All projects' ? '' : project} close={() => setAddingPlots(false)} save={onAddPlots} />}
       {removing && (
         <ConfirmDialog
           title={`Delete ${removing.kind}`}

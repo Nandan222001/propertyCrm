@@ -22,7 +22,7 @@ import {
 import { hasSession } from '../api';
 import {
   createBooking, createCustomer, decideBooking, decideCustomer, deleteRecord, hydrateWorkspace, restoreSession,
-  markReceiptShared, recordPayment, saveProject, setInvoiceStatus, setPaymentStatus, setNextDueDate, changeMyPassword, saveRecord, setFollowUp, updateCustomerLive, deleteCustomerLive, updateBookingLive, deleteBookingLive, deleteProjectLive, deletePlotLive, updatePlotLive, resetUserPasswordLive,
+  markReceiptShared, recordPayment, saveProject, setInvoiceStatus, setPaymentStatus, setNextDueDate, changeMyPassword, saveRecord, setFollowUp, updateCustomerLive, deleteCustomerLive, updateBookingLive, deleteBookingLive, deleteProjectLive, deletePlotLive, updatePlotLive, addPlotsLive, resetUserPasswordLive,
   setRegistryStatus, actionNotification, loadNotifications, signIn, signOut, saveInvoice, issueInvoice, cancelInvoice, payInvoice,
   shareInvoice, downloadInvoicePdf,
 } from '../store/thunks';
@@ -392,6 +392,7 @@ export function App() {
               onDeleteProject={(project) => dispatch(deleteProjectLive(project))}
               onDeletePlot={(plot) => dispatch(deletePlotLive(plot))}
               onEditPlot={(plot, changes) => dispatch(updatePlotLive(plot, changes))}
+              onAddPlots={(body, count) => dispatch(addPlotsLive(body, count))}
               onBook={(plot) => dispatch(modalOpened({ modal: 'booking', preset: { project: plot[8], plot: plot[0] } }))}
             />
           )}

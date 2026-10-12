@@ -79,7 +79,7 @@ export function BookingModal({ role, agentName, customers, plots, projects = [],
           </Field>
           <Field label="Plot (available)" hint={selected ? `${selected[2]} sq.ft · ${selected[3]} facing · list ₹${selected[4]}` : undefined}>
             <select value={selected?.[0] || ''} onChange={e => { setPlotNo(e.target.value); setPrice(''); }}>
-              {free.length === 0 && <option value="">No available plots</option>}
+              {free.length === 0 && <option value="">No available plots in this project — the admin adds plots under Projects &amp; plots → Add Plots</option>}
               {free.map(p => <option key={p[0]} value={p[0]}>{p[0]} · ₹{p[4]}</option>)}
             </select>
           </Field>
