@@ -33,7 +33,7 @@ typing-extensions==4.16.0  # backports used by pydantic/sqlalchemy
 
 # --- configuration & validation ---------------------------------------------
 pydantic==2.10.4           # request/response schemas + strict input validation
-pydantic-settings==2.7.0   # 12-factor settings loaded from env / .env
+pydantic-settings==2.15.0   # 12-factor settings loaded from env / .env
 python-dotenv==1.2.4       # .env support for local development
 
 # --- document generation ------------------------------------------------------
