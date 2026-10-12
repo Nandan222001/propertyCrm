@@ -21,7 +21,7 @@ python-multipart==0.0.32   # multipart/form-data parsing (kept >= 0.0.31: CVE fi
 # --- data layer --------------------------------------------------------------
 SQLAlchemy==2.0.36         # ORM; all queries are parameterised by construction
 alembic==1.14.0            # schema migrations (backend/migrations)
-PyMySQL==1.1.1             # pure-python MySQL driver (no libmysqlclient CVE surface)
+PyMySQL==1.2.3             # pure-python MySQL driver (no libmysqlclient CVE surface)
 cryptography==50.0.2       # TLS + Fernet field-level encryption for PII at rest
 greenlet==3.5.6            # SQLAlchemy async/bridge dependency
 
