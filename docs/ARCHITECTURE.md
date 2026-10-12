@@ -27,7 +27,7 @@ app/
 ├── schemas/        Pydantic request/response contracts (validation lives here)
 ├── core/           config, security (JWT/crypto), permissions, exceptions, responses,
 │                   middleware, rate limiting, logging, request context, dependencies
-├── db/             engine/session factory, metadata base, bootstrap, seed
+├── db/             engine/session factory, metadata base, schema bootstrap, platform-owner CLI
 ├── utils/          money (Indian formatting/words), helpers
 └── main.py         application factory: middleware order, routers, lifespan
 migrations/         Alembic revisions (initial + security hardening + billing)
@@ -80,7 +80,7 @@ src/
 * **Liskov / interface segregation** — every page receives only the props it
   uses; shared primitives keep one signature used by every caller.
 * **Dependency inversion** — features depend on hooks/selectors, not on the
-  store's shape; swapping demo data for the live API changes only `store/thunks.js`.
+  store's shape; the SPA only ever shows data returned by the live API.
 
 Anything repeated more than three times was extracted: filter bar, status badge
 tone, CSV export, money/date formatting, permission checks, toast, empty state,
@@ -104,7 +104,7 @@ modal frame, table shell.
 
 | Env | Database | Notes |
 | --- | --- | --- |
-| local | SQLite (`var/demo.sqlite3`) or Docker MySQL | docs enabled, demo seed, permissive hosts |
+| local | SQLite (`var/demo.sqlite3`) or Docker MySQL | docs enabled, permissive hosts |
 | test | in-process SQLite/MySQL | `ENVIRONMENT=test`, secrets from CI vars |
-| staging | managed MySQL, TLS required | production-like, docs disabled, seeded test data |
+| staging | managed MySQL, TLS required | production-like, docs disabled |
 | production | Multi-AZ RDS, TLS + IAM-secreted credentials | docs disabled, HSTS, wildcard CORS rejected at startup |

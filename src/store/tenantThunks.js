@@ -1,15 +1,15 @@
 /**
  * Platform console actions (SUPER ADMIN). Live mode talks to `/tenants`; demo mode
  * keeps the same shapes in the store so the console behaves identically offline.
- * Passwords are never stored: a one-time credential is surfaced once, then cleared.
+ * Passwords are never shown or stored: the server sets a starting password from the name and mobile.
  */
 import { api, actions } from '../api/resources';
 import { ApiUnavailableError } from '../api/client';
 import { clientAudit } from '../utils/security';
-import { generatePassword, slugify } from '../utils/tenants';
+import { slugify } from '../utils/tenants';
 import { toastPushed } from './slices/uiSlice';
 import {
-  credentialShown, tenantUpserted, tenantsFailed, tenantsLoaded, tenantsLoading,
+  tenantUpserted, tenantsFailed, tenantsLoaded, tenantsLoading,
 } from './slices/tenantsSlice';
 
 const isLive = (getState) => getState().auth.mode === 'live';
@@ -56,13 +56,10 @@ const apiBody = (form) => ({
 const adminBody = (admin) => ({
   name: admin.name.trim(),
   email: admin.email.trim().toLowerCase(),
-  ...(admin.phone?.trim() ? { phone: admin.phone.trim() } : {}),
-  ...(admin.temporary_password ? { temporary_password: admin.temporary_password } : {}),
+  phone: String(admin.phone || '').trim(),
 });
 
-const showCredential = (dispatch, { tenantName, email, password }) => {
-  if (password) dispatch(credentialShown({ tenantName, email, password }));
-};
+const PASSWORD_NOTE = 'Starting password: first 4 letters of the name + last 5 digits of the mobile — it is never displayed, and they must change it at first sign-in.';
 
 /** Create (editing = null) or update a tenant. Returns true on success. */
 export const saveTenant = (form, editing = null) => async (dispatch, getState) => {
@@ -86,13 +83,11 @@ export const saveTenant = (form, editing = null) => async (dispatch, getState) =
         slug: form.slug.trim() || slugify(form.name),
         admin: adminBody(form.admin),
       });
-      const { tenant, admin, initial_password: password } = response.data;
+      const { tenant, admin } = response.data;
       dispatch(tenantUpserted({ ...tenant, admins: [admin] }));
-      showCredential(dispatch, { tenantName: tenant.name, email: admin.email, password });
     } else {
       const state = getState().tenants.items;
       const id = Math.max(0, ...state.map((t) => t.id)) + 1;
-      const password = form.admin.temporary_password ? null : generatePassword();
       dispatch(tenantUpserted({
         id, public_id: `TEN-${String(id).padStart(8, '0')}`, ...apiBody(form), name: form.name.trim(),
         slug: form.slug.trim() || slugify(form.name), status: 'ACTIVE',
@@ -100,9 +95,8 @@ export const saveTenant = (form, editing = null) => async (dispatch, getState) =
         usage: { users: 1, projects: 0, plots: 0, customers: 0, bookings: 0 },
         admins: [{ id: id * 100 + 1, name: form.admin.name.trim(), email: form.admin.email.trim().toLowerCase(), status: 'ACTIVE', must_change_password: true }],
       }));
-      showCredential(dispatch, { tenantName: form.name.trim(), email: form.admin.email.trim().toLowerCase(), password });
     }
-    dispatch(toastPushed(`Organisation ${form.name.trim()} created`));
+    dispatch(toastPushed(`Organisation ${form.name.trim()} created. ${PASSWORD_NOTE}`));
     clientAudit('tenant.created', { name: form.name.trim() });
     return true;
   } catch (error) {
@@ -148,22 +142,18 @@ export const activateTenant = (tenant) => async (dispatch, getState) => {
 export const addTenantAdmin = (tenant, form) => async (dispatch, getState) => {
   try {
     let admin;
-    let password = null;
     if (isLive(getState)) {
       const response = await actions.addTenantAdmin(tenant.id, adminBody(form));
       admin = response.data.admin;
-      password = response.data.initial_password;
     } else {
       admin = { id: Date.now(), name: form.name.trim(), email: form.email.trim().toLowerCase(), status: 'ACTIVE', must_change_password: true };
-      password = form.temporary_password ? null : generatePassword();
     }
     dispatch(tenantUpserted({
       ...tenant,
       admins: [...(tenant.admins || []), admin],
       usage: { ...tenant.usage, users: (tenant.usage?.users ?? 0) + 1 },
     }));
-    showCredential(dispatch, { tenantName: tenant.name, email: admin.email, password });
-    dispatch(toastPushed(`Administrator ${admin.email} added to ${tenant.name}`));
+    dispatch(toastPushed(`Administrator ${admin.email} added to ${tenant.name}. ${PASSWORD_NOTE}`));
     clientAudit('tenant.admin_added', { id: tenant.id });
     return true;
   } catch (error) {
@@ -174,11 +164,8 @@ export const addTenantAdmin = (tenant, form) => async (dispatch, getState) => {
 
 export const resetTenantAdminPassword = (tenant, admin) => async (dispatch, getState) => {
   try {
-    const password = isLive(getState)
-      ? (await actions.resetTenantAdminPassword(tenant.id, admin.id)).data.initial_password
-      : generatePassword();
-    showCredential(dispatch, { tenantName: tenant.name, email: admin.email, password });
-    dispatch(toastPushed(`New one-time password issued for ${admin.email}`));
+    if (isLive(getState)) await actions.resetTenantAdminPassword(tenant.id, admin.id);
+    dispatch(toastPushed(`Password for ${admin.email} was reset to the starting password. They must change it at next sign-in.`));
     clientAudit('tenant.admin_password_reset', { id: tenant.id });
     return true;
   } catch (error) {

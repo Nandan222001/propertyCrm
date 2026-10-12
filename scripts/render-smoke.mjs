@@ -13,7 +13,7 @@ import { mkdirSync, rmSync } from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 
-const ROLES = ['SUPER ADMIN', 'ADMIN', 'SALES MANAGER', 'SALES AGENT', 'ACCOUNTS', 'MANAGEMENT', 'CUSTOMER'];
+const ROLES = ['SUPER ADMIN', 'ADMIN', 'SALES MANAGER', 'SALES AGENT', 'ACCOUNTS', 'CUSTOMER'];
 
 const dom = new JSDOM('<!doctype html><html><body><div id="root"></div></body></html>', {
   url: 'http://localhost/',
@@ -82,7 +82,7 @@ for (const role of ROLES) {
     const store = createStore();
     store.dispatch(signedIn({ role, user: { name: `${role} Tester`, role, email: `${role}@test` } }));
     const html = render(store, '/');
-    if (!html.includes('Lalita') && !html.includes('Workspace')) failures.push(`${role}: shell markup missing`);
+    if (!html.includes('class="sidebar')) failures.push(`${role}: shell markup missing`);
     console.log(`  ✓ ${role} workspace`);
   } catch (error) {
     failures.push(`${role} render threw: ${error.message}`);
@@ -90,7 +90,7 @@ for (const role of ROLES) {
 }
 
 // 3. Deep links on the heavier pages.
-for (const [role, route] of [['ADMIN', '/bookings'], ['ACCOUNTS', '/payments'], ['ACCOUNTS', '/billing'], ['CUSTOMER', '/billing'], ['ADMIN', '/projects-plots'], ['SUPER ADMIN', '/user-roles'], ['CUSTOMER', '/documents'], ['ADMIN', '/reports'], ['ADMIN', '/administration'], ['SUPER ADMIN', '/reports'], ['MANAGEMENT', '/reports'], ['ADMIN', '/approvals'], ['ADMIN', '/commissions'], ['ADMIN', '/agents'], ['ADMIN', '/notifications']]) {
+for (const [role, route] of [['ADMIN', '/bookings'], ['ACCOUNTS', '/payments'], ['ACCOUNTS', '/billing'], ['CUSTOMER', '/billing'], ['ADMIN', '/projects-plots'], ['SUPER ADMIN', '/user-roles'], ['CUSTOMER', '/documents'], ['ADMIN', '/reports'], ['ADMIN', '/administration'], ['SUPER ADMIN', '/reports'], ['ACCOUNTS', '/reports'], ['ADMIN', '/approvals'], ['ADMIN', '/commissions'], ['ADMIN', '/agents'], ['ADMIN', '/notifications']]) {
   try {
     const store = createStore();
     store.dispatch(signedIn({ role, user: { name: `${role} Tester`, role } }));

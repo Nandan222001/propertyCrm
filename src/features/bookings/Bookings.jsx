@@ -8,16 +8,19 @@ import {
   FileSpreadsheet, MapPin, IndianRupee, Mail, Phone, Activity, Trash2, LogOut,
   Sparkles, Check, CheckCircle, Printer, MessageCircle
 } from 'lucide-react';
-import { parseAmt, fmtINR, amountInWords, agentKey, todayLabel, openWhatsApp, waLink, isAdmin, canCreateBooking, canApprove, canCreateCustomer, canRecordPayment, canManageBills, isCustomer, isPendingStatus } from '../../utils';
-import { projects, agents, seedUsers } from '../../data/seedData';
+import { parseAmt, fmtINR, amountInWords, agentKey, todayLabel, openWhatsApp, waLink, isAdmin, canCreateBooking, canApprove, canCreateCustomer, canRecordPayment, canManageBills, canEditBooking, canDeleteBooking, isCustomer, isPendingStatus } from '../../utils';
 
 import { Table } from '../../components/common/DataTable';
 import { Badge } from '../../components/common/Badge';
 import { Mini } from '../../components/common/StatTile';
 import { Avatar } from '../../components/common/Avatar';
+import { ConfirmDialog } from '../../components/common/ConfirmDialog';
+import { EditBookingModal } from './EditBookingModal';
 import { RoleContextBanner } from '../../components/layout/RoleContextBanner';
 
-export function Bookings({ bookings, project, search, tab, TB, role, onNew, onOpenCustomer, onApprove, onReject, onPrint, onWhatsApp }) {
+export function Bookings({ bookings, project, search, tab, TB, role, onNew, onOpenCustomer, onApprove, onReject, onPrint, onWhatsApp, onEdit, onDelete }) {
+  const [editing, setEditing] = useState(null);
+  const [removing, setRemoving] = useState(null);
   const statuses = ['All bookings', 'Confirmed', 'Pending Approval', 'Processing', 'Agreement', 'Rejected'];
   const rows = bookings.filter(b => {
     const textMatch = b.join(' ').toLowerCase().includes(search.toLowerCase());
@@ -74,6 +77,12 @@ export function Bookings({ bookings, project, search, tab, TB, role, onNew, onOp
               <button className="icon-action wa-icon" onClick={() => onWhatsApp(b)} title="WhatsApp customer">
                 <MessageCircle size={14} />
               </button>
+              {onEdit && canEditBooking(role, b) && typeof b[10] === 'number' && (
+                <button className="icon-action" onClick={() => setEditing(b)} title="Edit booking"><Edit2 size={14} /></button>
+              )}
+              {onDelete && canDeleteBooking(role, b) && typeof b[10] === 'number' && (
+                <button className="icon-action danger" onClick={() => setRemoving(b)} title="Delete booking"><Trash2 size={14} /></button>
+              )}
               {canApprove(role) && b[7] === 'Pending Approval' && (
                 <>
                   <button className="button button-primary small-btn" onClick={() => onApprove(b)}>Approve</button>
@@ -87,6 +96,15 @@ export function Bookings({ bookings, project, search, tab, TB, role, onNew, onOp
           Showing {rows.length} bookings <span>{role === 'SALES AGENT' ? 'Your bookings only' : 'Role-filtered view'}</span>
         </div>
       </div>
+      {editing && <EditBookingModal booking={editing} canPrice={canApprove(role)} close={() => setEditing(null)} save={onEdit} />}
+      {removing && (
+        <ConfirmDialog
+          title="Delete booking"
+          message={`Delete booking ${removing[0]} (${removing[1]}, plot ${removing[3]})? The plot becomes available again. Bookings with payments or invoices cannot be deleted — cancel those instead.`}
+          onConfirm={() => onDelete(removing)}
+          onCancel={() => setRemoving(null)}
+        />
+      )}
     </>
   );
 }

@@ -40,7 +40,9 @@ def get_customer(customer_id: int, service: CustomerServiceDep) -> dict:
 
 def create_customer(payload: CustomerCreate, service: CustomerServiceDep) -> dict:
     customer = service.create_customer(payload)
-    return success(service.serialise(customer).model_dump(), "Customer created (pending approval)")
+    data = service.serialise(customer).model_dump()
+    data["portal_login"] = service.portal_login
+    return success(data, "Customer created (pending approval)")
 
 
 def update_customer(customer_id: int, payload: CustomerUpdate, service: CustomerServiceDep) -> dict:
@@ -54,7 +56,7 @@ def decide_customer(customer_id: int, payload: CustomerDecision, service: Custom
 
 
 def delete_customer(customer_id: int, service: CustomerServiceDep) -> dict:
-    service.delete(customer_id)
+    service.delete_customer(customer_id)
     return success(None, "Customer deleted")
 
 

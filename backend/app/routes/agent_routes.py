@@ -48,3 +48,8 @@ def create_agent(payload: AgentCreate, service: controller.AgentServiceDep, _: M
 def update_agent(agent_id: int, payload: AgentUpdate, service: controller.AgentServiceDep,
                  _: MANAGE = None):
     return controller.update_agent(agent_id, payload, service)
+
+
+@router.delete("/{agent_id}", summary="Delete an agent who has no bookings")
+def delete_agent(agent_id: int, service: controller.AgentServiceDep, _: MANAGE = None):
+    return controller.delete_agent(agent_id, service)

@@ -1,15 +1,25 @@
-import React, { useState } from 'react';
-import { 
-  Shield, ChevronRight, Lock, Mail, User, Phone, Building2, 
-  CheckCircle2, Sparkles, Layers, ArrowRight, Eye, EyeOff, Award, 
-  Briefcase, Wallet, Users, Target, Check, RefreshCw
+import React, { useEffect, useState } from 'react';
+import {
+  Lock, Mail, CheckCircle2, Layers, ArrowRight, Eye, EyeOff
 } from 'lucide-react';
-import { roleConfigs } from '../../data/seedData';
+import { actions } from '../../api';
 import { ForgotPasswordForm, ResetPasswordForm } from './PasswordResetForms';
 
-export function LoginScreen({ onLogin, onRegister, customers = [], users = [], notice: initialNotice = '' }) {
-  const [tab, setTab] = useState('login'); // 'login' | 'register'
+export function LoginScreen({ onLogin, notice: initialNotice = '' }) {
   const [selectedImage, setSelectedImage] = useState(0); // 0, 1, 2
+  // The deployment's name comes from the server (no tenant is known before sign-in).
+  const [brand, setBrand] = useState({ name: '', tagline: '' });
+  useEffect(() => {
+    let live = true;
+    actions.branding().then((r) => {
+      if (!live || !r?.data) return;
+      setBrand(r.data);
+      if (r.data.name) document.title = r.data.name;
+    }).catch(() => {});
+    return () => { live = false; };
+  }, []);
+  const [brandFirst, ...brandWords] = (brand.name || '').split(' ');
+  const brandRest = brandWords.join(' ');
   const [showPassword, setShowPassword] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -20,53 +30,27 @@ export function LoginScreen({ onLogin, onRegister, customers = [], users = [], n
   const [resetView, setResetView] = useState(() => (typeof window !== 'undefined' && window.location.pathname === '/reset-password' ? 'reset' : ''));
   const [resetToken, setResetToken] = useState(() => (typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('token') || '' : ''));
   const finishReset = (message) => {
-    setNotice(message); setResetView(''); setResetToken(''); setTab('login');
+    setNotice(message); setResetView(''); setResetToken('');
     window.history.replaceState({}, '', '/');
   };
-
-  // Registration state
-  const [regData, setRegData] = useState({
-    name: '',
-    email: '',
-    phone: '',
-    org: 'Apex Real Estate Developers',
-    role: 'SALES AGENT',
-    password: '',
-    confirmPassword: '',
-    agreed: true
-  });
 
   const heroImages = [
     {
       url: '/images/auth-luxury-estate.jpg',
       title: 'Master-Planned Township',
-      caption: 'Green Meadows Phase II · Mumbai',
       tag: 'Portfolio View'
     },
     {
       url: '/images/auth-township-model.jpg',
       title: 'Architectural Blueprint & Modeling',
-      caption: 'Silver Oaks & Park View Master Layouts',
       tag: 'Master Layout'
     },
     {
       url: '/images/auth-agent-portal.jpg',
       title: 'Executive Sales Experience Lounge',
-      caption: 'Modern Interactive Customer Presentation Suite',
       tag: 'Client Suite'
     }
   ];
-
-  const quickRoles = [
-    { role: 'SUPER ADMIN', label: 'Super Admin', icon: Shield, desc: 'Platform owner · Tenants, plans & access', color: '#7b39ed', bg: '#f3e8ff' },
-    { role: 'ADMIN', label: 'Admin', icon: Building2, desc: 'Operations Command & Project Inventory', color: '#4f5fce', bg: '#eef0ff' },
-    { role: 'SALES MANAGER', label: 'Sales Manager', icon: Target, desc: 'Team Pipeline & Quota Realization', color: '#0891b2', bg: '#e0f2fe' },
-    { role: 'SALES AGENT', label: 'Sales Agent', icon: Users, desc: 'My Sales Desk, Deals & Commissions', color: '#16a34a', bg: '#dcfce7' },
-    { role: 'ACCOUNTS', label: 'Accounts', icon: Wallet, desc: 'Financial Ledger & Aging Receivables', color: '#ea580c', bg: '#ffedd5' },
-    { role: 'MANAGEMENT', label: 'Management', icon: Briefcase, desc: 'Executive Boardroom & Portfolio GDV', color: '#be123c', bg: '#ffe4e6' },
-    { role: 'CUSTOMER', label: 'Customer', icon: User, desc: 'My Plots, Payments, Bills & Registry (view only)', color: '#0d9488', bg: '#ccfbf1' }
-  ];
-  const registerRoles = quickRoles.filter((r) => r.role === 'SALES AGENT' || r.role === 'CUSTOMER');
 
   const handleLoginSubmit = async (e) => {
     e.preventDefault();
@@ -79,22 +63,11 @@ export function LoginScreen({ onLogin, onRegister, customers = [], users = [], n
       return;
     }
     const typed = email.trim().toLowerCase();
-    // The server decides the role on sign-in; this only picks the offline demo identity.
-    const role = users.find((x) => (x.email || '').toLowerCase() === typed)?.role || 'ADMIN';
-    let user = { ...(roleConfigs[role]?.defaultUser || { name: 'Workspace User', role }), email: typed };
-    if (role === 'CUSTOMER') {
-      // Offline demo only; with the live API the server decides who may sign in.
-      const c = customers.find((x) => (x.email || '').toLowerCase() === typed);
-      if (c) user = { ...user, name: c.name, customerName: c.name };
-    } else if (role === 'SALES AGENT') {
-      const u = users.find((x) => x.role === 'SALES AGENT' && x.email.toLowerCase() === typed);
-      if (u) user = { ...u, email: typed };
-    }
     setError('');
     setNotice('');
     setBusy(true);
     try {
-      await onLogin(role, user, { email: typed, password });
+      await onLogin({ email: typed, password });
     } catch (failure) {
       // Wrong password, a locked / suspended / not-yet-activated account, a suspended organisation…
       setError(failure?.message || 'Sign-in failed. Please try again.');
@@ -103,62 +76,15 @@ export function LoginScreen({ onLogin, onRegister, customers = [], users = [], n
     }
   };
 
-  const handleRegisterSubmit = async (e) => {
-    e.preventDefault();
-    if (!regData.name.trim()) {
-      setError('Please enter your full name.');
-      return;
-    }
-    if (!regData.email.includes('@')) {
-      setError('Please enter a valid business email.');
-      return;
-    }
-    if (regData.password.length < 4) {
-      setError('Password must be at least 4 characters.');
-      return;
-    }
-    if (regData.password !== regData.confirmPassword) {
-      setError('Passwords do not match.');
-      return;
-    }
-    setError('');
-
-    const newUser = {
-      id: `USR-${Math.floor(100 + Math.random() * 900)}`,
-      name: regData.name,
-      email: regData.email,
-      phone: regData.phone || '+91 98765 00000',
-      role: regData.role,
-      status: 'Active',
-      title: `${regData.role} · ${regData.org}`
-    };
-
-    if (onRegister) {
-      const result = await onRegister({
-        ...newUser, password: regData.password, confirmPassword: regData.confirmPassword, org: regData.org,
-      });
-      if (result?.error) { setError(result.error); return; }
-      if (result?.pending) {
-        setNotice(result.message || 'Request received — an administrator must activate your account before you can sign in.');
-        setTab('login');
-        setEmail(regData.email);
-      }
-    } else {
-      onLogin(regData.role, newUser);
-    }
-  };
-
-  const currentRoleConfig = roleConfigs[regData.role] || roleConfigs['ADMIN'];
-
   return (
     <main className="login-screen interactive-auth">
       {/* Visual Showcase Left Panel */}
       <section className="login-art auth-hero-panel" style={{ backgroundImage: `linear-gradient(rgba(18, 26, 49, 0.72), rgba(18, 26, 49, 0.88)), url(${heroImages[selectedImage].url})` }}>
         <div className="login-brand">
-          <div className="brand-mark">L</div>
+          <div className="brand-mark">{(brand.name || '·').slice(0, 1).toUpperCase()}</div>
           <div>
-            <b>Lalita <span>Realestate Infra</span></b>
-            <small>ENTERPRISE REAL ESTATE OPERATIONS</small>
+            <b>{brandFirst} <span>{brandRest}</span></b>
+            <small>{(brand.tagline || '').toUpperCase()}</small>
           </div>
         </div>
 
@@ -172,7 +98,7 @@ export function LoginScreen({ onLogin, onRegister, customers = [], users = [], n
                 type="button"
                 className={`showcase-thumb-btn ${selectedImage === i ? 'active' : ''}`}
                 onClick={() => setSelectedImage(i)}
-                title={img.caption}
+                title={img.title}
               >
                 <span>{img.tag}</span>
               </button>
@@ -191,38 +117,18 @@ export function LoginScreen({ onLogin, onRegister, customers = [], users = [], n
           </h1>
           <p>
             An end-to-end operational operating system designed specifically for real estate developers, 
-            sales forces, accounts treasury, and executive management.
+            sales forces and accounts treasury.
           </p>
 
           <div className="current-photo-badge">
             <span className="photo-title">{heroImages[selectedImage].title}</span>
-            <span className="photo-caption">{heroImages[selectedImage].caption}</span>
           </div>
 
-          <div className="login-metrics">
-            <div>
-              <b>384</b>
-              <small>Plots in portfolio</small>
-            </div>
-            <div>
-              <b>4</b>
-              <small>Active projects</small>
-            </div>
-            <div>
-              <b>₹7.9 Cr</b>
-              <small>Reconciled cash</small>
-            </div>
-            <div>
-              <b>99.98%</b>
-              <small>SLA availability</small>
-            </div>
-          </div>
         </div>
 
         {/* Feature Highlights on Image */}
         <div className="auth-footer-features">
           <div className="trust-pill"><CheckCircle2 size={13} /> Role-Based Access Control</div>
-          <div className="trust-pill"><CheckCircle2 size={13} /> 256-Bit Financial Encryption</div>
           <div className="trust-pill"><CheckCircle2 size={13} /> Multi-Development Ready</div>
         </div>
       </section>
@@ -230,23 +136,7 @@ export function LoginScreen({ onLogin, onRegister, customers = [], users = [], n
       {/* Interactive Form Right Panel */}
       <section className="login-form-wrap">
         <div className="login-card-container">
-          {/* Auth Mode Tabs */}
-          <div className="auth-mode-tabs">
-            <button 
-              type="button" 
-              className={`mode-tab ${tab === 'login' ? 'active' : ''}`}
-              onClick={() => { setTab('login'); setError(''); }}
-            >
-              Sign In to Workspace
-            </button>
-            <button 
-              type="button" 
-              className={`mode-tab ${tab === 'register' ? 'active' : ''}`}
-              onClick={() => { setTab('register'); setError(''); }}
-            >
-              Create Account / Register
-            </button>
-          </div>
+          <div className="auth-mode-tabs"><span className="mode-tab active">Sign In to Workspace</span></div>
 
           {error && (
             <div className="login-error-banner">
@@ -263,17 +153,11 @@ export function LoginScreen({ onLogin, onRegister, customers = [], users = [], n
           {resetView === 'forgot' && (
             <ForgotPasswordForm
               onBack={() => setResetView('')}
-              onDevToken={(token) => { setResetToken(token); }}
+              onDevToken={(token) => { setResetToken(token); setResetView('reset'); setNotice('Development mode: no mail server is configured, so you can choose your new password right away.'); }}
             />
           )}
-          {resetView === 'forgot' && resetToken && (
-            <p className="login-dev-hint">
-              Development mode: <button type="button" className="text-button" onClick={() => setResetView('reset')}>open the reset form with this token</button>
-            </p>
-          )}
-
           {/* SIGN IN FORM */}
-          {!resetView && tab === 'login' && (
+          {!resetView && (
             <form className="login-card" onSubmit={handleLoginSubmit}>
               <div className="form-group">
                 <label>
@@ -284,7 +168,7 @@ export function LoginScreen({ onLogin, onRegister, customers = [], users = [], n
                       type="email"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
-                      placeholder="e.g. user@company.com"
+                      placeholder="Your work e-mail"
                       required
                     />
                   </div>
@@ -323,150 +207,6 @@ export function LoginScreen({ onLogin, onRegister, customers = [], users = [], n
               </button>
             </form>
           )}
-
-          {/* REGISTRATION FORM */}
-          {!resetView && tab === 'register' && (
-            <form className="login-card register-card" onSubmit={handleRegisterSubmit}>
-              <div className="form-grid-2">
-                <label>
-                  Full Name
-                  <div className="input-with-icon">
-                    <User size={15} />
-                    <input
-                      type="text"
-                      placeholder="e.g. Vikram Malhotra"
-                      value={regData.name}
-                      onChange={(e) => setRegData({ ...regData, name: e.target.value })}
-                      required
-                    />
-                  </div>
-                </label>
-
-                <label>
-                  Business Email
-                  <div className="input-with-icon">
-                    <Mail size={15} />
-                    <input
-                      type="email"
-                      placeholder="e.g. vikram@realty.com"
-                      value={regData.email}
-                      onChange={(e) => setRegData({ ...regData, email: e.target.value })}
-                      required
-                    />
-                  </div>
-                </label>
-              </div>
-
-              <div className="form-grid-2">
-                <label>
-                  Mobile Number
-                  <div className="input-with-icon">
-                    <Phone size={15} />
-                    <input
-                      type="tel"
-                      placeholder="+91 98200 45678"
-                      value={regData.phone}
-                      onChange={(e) => setRegData({ ...regData, phone: e.target.value })}
-                    />
-                  </div>
-                </label>
-
-                <label>
-                  Organisation code
-                  <div className="input-with-icon">
-                    <Building2 size={15} />
-                    <input
-                      type="text"
-                      placeholder="e.g. lalita (ask your administrator)"
-                      value={regData.org}
-                      onChange={(e) => setRegData({ ...regData, org: e.target.value })}
-                    />
-                  </div>
-                </label>
-              </div>
-
-              <div className="form-group">
-                <label>
-                  Requested Workspace Role
-                  <select 
-                    value={regData.role} 
-                    onChange={(e) => setRegData({ ...regData, role: e.target.value })}
-                  >
-                    {registerRoles.map((r) => (
-                      <option key={r.role} value={r.role}>{r.label} — {r.desc}</option>
-                    ))}
-                  </select>
-                </label>
-              </div>
-
-              {/* Dynamic Role Capability Preview */}
-              <div className="role-preview-box register-preview" style={{ borderLeftColor: currentRoleConfig.color }}>
-                <div className="preview-top">
-                  <span className="preview-badge" style={{ background: currentRoleConfig.bg, color: currentRoleConfig.color }}>
-                    <Shield size={11} /> {regData.role} WORKSPACE SPECIFICATION
-                  </span>
-                </div>
-                <p className="preview-desc">{currentRoleConfig.subtitle}</p>
-                <div className="preview-tags">
-                  {currentRoleConfig.permissions.slice(0, 4).map((p) => (
-                    <span key={p} className="preview-perm-tag">✓ {p.replace('_', ' ')}</span>
-                  ))}
-                </div>
-              </div>
-
-              <div className="form-grid-2">
-                <label>
-                  Create Password
-                  <div className="input-with-icon">
-                    <Lock size={15} />
-                    <input
-                      type={showPassword ? 'text' : 'password'}
-                      placeholder="Min 4 characters"
-                      value={regData.password}
-                      onChange={(e) => setRegData({ ...regData, password: e.target.value })}
-                      required
-                    />
-                  </div>
-                </label>
-
-                <label>
-                  Confirm Password
-                  <div className="input-with-icon">
-                    <Lock size={15} />
-                    <input
-                      type={showPassword ? 'text' : 'password'}
-                      placeholder="Repeat password"
-                      value={regData.confirmPassword}
-                      onChange={(e) => setRegData({ ...regData, confirmPassword: e.target.value })}
-                      required
-                    />
-                  </div>
-                </label>
-              </div>
-
-              <div className="checkbox-row">
-                <label className="checkbox-label">
-                  <input
-                    type="checkbox"
-                    checked={regData.agreed}
-                    onChange={(e) => setRegData({ ...regData, agreed: e.target.checked })}
-                    required
-                  />
-                  <span>I agree to ERP operational guidelines and role audit tracking.</span>
-                </label>
-              </div>
-
-              <button type="submit" className="button button-primary login-submit">
-                <span>Complete Registration & Launch {regData.role}</span>
-                <ArrowRight size={15} />
-              </button>
-            </form>
-          )}
-
-          <div className="security-guarantee">
-            <Shield size={13} className="green-text" />
-            <span>Multi-Tenant Enterprise Architecture · ISO/IEC 27001 Ready</span>
-          </div>
         </div>
       </section>
     </main>

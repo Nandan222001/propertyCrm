@@ -11,17 +11,6 @@ const TARGETS = {
   SYSTEM: [PAGES.ADMIN],
 };
 
-/** Offline-preview samples. Each carries the roles that would actually receive it. */
-const DEMO = [
-  { id: 'd1', title: 'Payment overdue · Sneha Mehta', body: 'Plot B-033 · ₹5,60,000 is 10 days overdue.', category: 'PAYMENT_OVERDUE', severity: 'warning', roles: ['ACCOUNTS', 'ADMIN'] },
-  { id: 'd2', title: 'Booking awaiting approval', body: 'Meena Kapoor · Plot C-044 submitted by an agent.', category: 'APPROVAL', severity: 'info', roles: ['ADMIN'] },
-  { id: 'd3', title: 'Customer awaiting approval', body: 'A customer added by an agent needs sign-off.', category: 'APPROVAL', severity: 'info', roles: ['ADMIN'] },
-  { id: 'd4', title: 'Registry milestone', body: 'Plot A-101 agreement signed — sub-registrar appointment pending.', category: 'REGISTRY', severity: 'info', roles: ['ADMIN', 'SALES MANAGER'] },
-  { id: 'd5', title: 'Your booking was approved', body: 'Plot A-012 was confirmed by the admin.', category: 'APPROVAL', severity: 'info', roles: ['SALES AGENT'] },
-  { id: 'd6', title: 'Instalment due', body: 'Your next instalment for Plot A-101 is due soon.', category: 'PAYMENT_OVERDUE', severity: 'warning', roles: ['CUSTOMER'] },
-  { id: 'd7', title: 'Collections summary ready', body: 'This week’s collection report is ready to review.', category: 'FOLLOW_UP', severity: 'info', roles: ['MANAGEMENT'] },
-];
-
 const dot = (severity) => (severity === 'alert' || severity === 'critical' || severity === 'error' ? 'red'
   : severity === 'warning' || severity === 'warn' ? 'amber' : 'green');
 
@@ -32,7 +21,7 @@ const when = (iso) => {
 };
 
 export function Notifications({ items, live, role, fups = {}, FUP, onAction, notify, onNavigate, allowedPages = [] }) {
-  const list = live ? items : DEMO.filter((n) => n.roles.includes(role)).map((n) => ({ ...n, actioned_at: fups[n.id] ? 'done' : null }));
+  const list = live ? items : [];
 
   const act = (item) => {
     if (live) onAction(item);

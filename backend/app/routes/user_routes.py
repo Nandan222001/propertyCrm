@@ -52,6 +52,11 @@ def unlock_user(user_id: int, service: controller.UserServiceDep, _: MANAGE = No
     return controller.unlock_user(user_id, service)
 
 
+@router.post("/users/{user_id}/reset-password", summary="Reset to the starting password (never displayed)")
+def reset_user_password(user_id: int, service: controller.UserServiceDep, _: MANAGE = None):
+    return controller.reset_user_password(user_id, service)
+
+
 @router.delete("/users/{user_id}", summary="Soft-delete an account")
 def delete_user(user_id: int, service: controller.UserServiceDep, _: MANAGE = None):
     return controller.delete_user(user_id, service)

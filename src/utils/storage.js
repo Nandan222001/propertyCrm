@@ -3,7 +3,7 @@
  * one namespace, so no component ever touches `window.localStorage` directly.
  */
 
-const PREFIX = 'lalita_erp:';
+const PREFIX = 'erp:';
 
 export const storageKey = (key) => `${PREFIX}${key}`;
 

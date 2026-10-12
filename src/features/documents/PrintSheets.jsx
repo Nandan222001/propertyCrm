@@ -1,7 +1,7 @@
 import React from 'react';
 import { createPortal } from 'react-dom';
 import { Printer, X, MessageCircle, Send, Copy, CheckCircle2 } from 'lucide-react';
-import { COMPANY } from '../../data/seedData';
+import { COMPANY } from '../../data/appConfig';
 import { getSettings } from '../../utils/settings';
 import { amountInWords, parseAmt, fmtINR } from '../../utils';
 

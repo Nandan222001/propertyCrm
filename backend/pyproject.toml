@@ -33,4 +33,4 @@ skips = ["B101"]
 
 [tool.coverage.run]
 source = ["app"]
-omit = ["app/db/seed.py"]
+omit = ["tests/*"]

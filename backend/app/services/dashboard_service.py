@@ -14,7 +14,6 @@ from sqlalchemy.orm import Session
 
 from app.core.constants import (
     Permission,
-    PlotStatus,
     Role,
 )
 from app.core.context import ActorContext
@@ -117,18 +116,6 @@ class DashboardService(BaseService):
                 {"label": bucket, "value": float(value)} for bucket, value in self.payments.aging_buckets().items()
             ]
             alerts = self._alerts()
-        elif role == Role.MANAGEMENT:
-            values = self.plots.inventory_value()
-            metrics = [
-                self._metric("gdv", "Gross development value", sum(values.values())),
-                self._metric("collected", "Collected to date", totals["collected"]),
-                self._metric("outstanding", "Receivable pipeline", totals["outstanding"]),
-                self._metric("unsold_value", "Unsold inventory", values.get(PlotStatus.AVAILABLE.value, 0)),
-            ]
-            charts["inventory_by_status"] = [
-                {"label": status, "value": count} for status, count in inventory.items()
-            ]
-            charts["absorption"] = self._collections_trend()
         else:  # customer portal
             portal = self.bookings.totals(
                 self.bookings.scope_clause_for(agent_id=None, customer_id=self.actor.customer_id)

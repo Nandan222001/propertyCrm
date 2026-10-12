@@ -89,7 +89,7 @@ def test_admin_cannot_create_super_admin(client, admin_headers, unique_email):
             "name": "Ascension Probe",
             "email": unique_email,
             "role": "SUPER_ADMIN",
-            "temporary_password": "Strong@12345",
+            "phone": "9876500002",
         },
         headers=admin_headers,
     )
@@ -100,7 +100,7 @@ def test_permission_grants_require_role_manage(client, admin_headers, accounts_h
     created = client.post(
         "/api/v1/users",
         json={"name": "Grant Probe", "email": unique_email, "role": "ACCOUNTS",
-              "temporary_password": "Strong@12345"},
+              "phone": "9876500003"},
         headers=admin_headers,
     )
     assert created.status_code == 201
@@ -164,14 +164,14 @@ def test_every_business_route_rejects_anonymous_access(client):
     assert not leaked, f"endpoints reachable without authentication: {leaked}"
 
 
-def test_public_routes_are_exactly_health_and_auth():
+def test_public_routes_are_exactly_health_branding_and_auth():
     """Anything new that is anonymously reachable must be a deliberate decision."""
     from app.routes.api_router import route_inventory
 
     public_paths = {route["path"] for route in route_inventory() if route["public"]}
     unexpected = {
         path for path in public_paths
-        if not (path.startswith("/auth/") or path in {"/health", "/ready", "/metrics"})
+        if not (path.startswith("/auth/") or path in {"/health", "/ready", "/metrics", "/branding"})
     }
     assert not unexpected, f"unexpected public endpoints: {sorted(unexpected)}"
 

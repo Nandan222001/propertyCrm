@@ -36,12 +36,14 @@ from app.schemas.finance import (
 )
 from app.services.base_service import BaseService
 from app.services.company_profile import company_profile
+from app.services.org_settings import setting_int
 from app.utils.money import amount_in_words
 
 PAYMENT_STATUS_FOR = {
     True: PaymentStatus.PAID.value,
     False: PaymentStatus.PARTIALLY_PAID.value,
 }
+
 
 
 class PaymentService(BaseService[Payment]):
@@ -193,7 +195,7 @@ class PaymentService(BaseService[Payment]):
             mode=payload.mode,
             reference=payload.reference,
             received_on=received_on,
-            due_date=payload.due_date or (None if fully_paid else received_on + timedelta(days=30)),
+            due_date=payload.due_date or (None if fully_paid else received_on + timedelta(days=setting_int(self.db, "tax", "installmentDays"))),
             status=PAYMENT_STATUS_FOR[fully_paid],
             balance_after=max(balance_after, Decimal("0")),
             notes=payload.notes,

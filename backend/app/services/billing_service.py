@@ -21,7 +21,6 @@ from decimal import ROUND_HALF_UP, Decimal
 from sqlalchemy.orm import Session
 
 from app.core.constants import (
-    INVOICE_PAYMENT_TERM_DAYS,
     AuditAction,
     InvoiceStatus,
     Permission,
@@ -201,10 +200,11 @@ class BillingService(BaseService[Invoice]):
         if booking.status in ("CANCELLED", "REJECTED"):
             raise BusinessRuleError("Bills can only be raised against live bookings")
 
+        from app.services.org_settings import setting_text
+
         issue_date = payload.issue_date or date.today()
-        totals = compute_totals(
-            payload.items, discount_amount=payload.discount_amount, gst_rate=payload.gst_rate
-        )
+        gst_rate = payload.gst_rate if payload.gst_rate is not None else Decimal(setting_text(self.db, "tax", "defaultGst"))
+        totals = compute_totals(payload.items, discount_amount=payload.discount_amount, gst_rate=gst_rate)
         invoice = Invoice(
             invoice_number=self.invoices.next_number(year=issue_date.year),
             booking_id=booking.id,
@@ -213,7 +213,7 @@ class BillingService(BaseService[Invoice]):
             issue_date=issue_date,
             due_date=payload.due_date,
             status=InvoiceStatus.DRAFT.value,
-            gst_rate=payload.gst_rate,
+            gst_rate=gst_rate,
             notes=payload.notes,
             terms=payload.terms,
             created_by_id=self.actor.user_id,
@@ -298,7 +298,9 @@ class BillingService(BaseService[Invoice]):
         if payload.due_date:
             invoice.due_date = payload.due_date
         elif invoice.due_date is None:
-            invoice.due_date = invoice.issue_date + timedelta(days=INVOICE_PAYMENT_TERM_DAYS)
+            from app.services.org_settings import setting_int
+
+            invoice.due_date = invoice.issue_date + timedelta(days=setting_int(self.db, "tax", "dueDays"))
         if payload.notes:
             invoice.notes = payload.notes
         self.db.flush()

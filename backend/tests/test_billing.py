@@ -377,3 +377,31 @@ def test_invoice_validation_errors(client, accounts_headers, billing_booking,
     body = _invoice_payload(billing_booking["id"], **payload)
     response = client.post("/api/v1/invoices", json=body, headers=accounts_headers)
     assert response.status_code == expected_status, response.text
+
+
+def test_organisation_settings_drive_default_gst_and_payment_terms(client, admin_headers, accounts_headers, billing_booking):
+    """Default GST and payment terms are the organisation's own settings, not constants in the code."""
+    from datetime import date, timedelta
+
+    original = client.get("/api/v1/organisation/settings", headers=admin_headers).json()["data"]["tax"]
+    try:
+        saved = client.put("/api/v1/organisation/settings/tax", headers=admin_headers,
+                           json={"values": {**original, "defaultGst": "0.12", "dueDays": "21"}})
+        assert saved.status_code == 200, saved.text
+        body = {"booking_id": billing_booking["id"], "items": [{"description": "Plot cost", "quantity": "1", "unit_price": "100000"}]}
+        created = client.post("/api/v1/invoices", headers=accounts_headers, json=body)
+        assert created.status_code == 201, created.text
+        invoice = created.json()["data"]
+        assert float(invoice["gst_rate"]) == 0.12 and float(invoice["gst_amount"]) == 12000.0
+        issued = client.post(f"/api/v1/invoices/{invoice['id']}/issue", json={}, headers=accounts_headers).json()["data"]
+        assert issued["due_date"] == (date.fromisoformat(issued["issue_date"]) + timedelta(days=21)).isoformat()
+    finally:
+        client.put("/api/v1/organisation/settings/tax", headers=admin_headers, json={"values": original})
+
+
+def test_branding_is_public_and_comes_from_configuration(client):
+    from app.core.config import settings
+
+    response = client.get("/api/v1/branding")
+    assert response.status_code == 200
+    assert response.json()["data"] == {"name": settings.BRAND_NAME, "tagline": settings.BRAND_TAGLINE}

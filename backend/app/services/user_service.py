@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from app.core.constants import AuditAction, Permission, Role, UserStatus
 from app.core.context import ActorContext, PaginationContext
 from app.core.exceptions import BusinessRuleError, ConflictError, PermissionDeniedError
+from app.core.passwords import initial_password
 from app.core.responses import Paginated
 from app.core.security import hash_password
 from app.db.base import utcnow
@@ -85,7 +86,7 @@ class UserService(BaseService[User]):
             role=payload.role.value,
             title=payload.title,
             status=UserStatus.INVITED.value,
-            password_hash=hash_password(payload.temporary_password),
+            password_hash=hash_password(initial_password(payload.name, payload.phone)),
             must_change_password=1,
             password_changed_at=utcnow(),
             agent_code=payload.agent_code,
@@ -139,6 +140,30 @@ class UserService(BaseService[User]):
         self._audit(AuditAction.UPDATE, user, summary="Account unlocked")
         return user
 
+    def reset_password(self, user_id: int) -> User:
+        """Put an account back on its starting password (first 4 letters of the name + last 5 digits of the mobile).
+
+        Nothing is returned or displayed; the person must choose a new password at the next sign-in.
+        """
+        from app.repositories.user_repository import AuthTokenRepository
+
+        self._authorise("update")
+        user = self.users.get_or_404(user_id)
+        self._assert_escalation_allowed(Role(user.role))
+        if user.id == self.actor.user_id:
+            raise BusinessRuleError("Use Change password for your own account")
+        user.password_hash = hash_password(initial_password(user.name, user.phone))
+        user.must_change_password = 1
+        user.password_changed_at = utcnow()
+        user.failed_login_attempts = 0
+        user.locked_until = None
+        if user.status == UserStatus.LOCKED.value:
+            user.status = UserStatus.ACTIVE.value
+        AuthTokenRepository(self.db).revoke_all_for_user(user.id)
+        self.db.flush()
+        self._audit(AuditAction.UPDATE, user, summary="Password reset to the starting password")
+        return user
+
     def set_permission_grants(self, user_id: int, grants: list[dict]) -> list[dict]:
         """Only a super admin may hand out permissions beyond a role."""
         if not self.actor.can(Permission.ROLE_MANAGE):
@@ -181,7 +206,7 @@ class UserService(BaseService[User]):
         if tenant is None:
             return
         seats = int(self.db.execute(
-            select(func.count(User.id)).where(User.is_deleted.is_(False))
+            select(func.count(User.id)).where(User.is_deleted.is_(False), User.role != Role.CUSTOMER.value)
         ).scalar_one() or 0)
         if seats >= tenant.max_users:
             raise BusinessRuleError(

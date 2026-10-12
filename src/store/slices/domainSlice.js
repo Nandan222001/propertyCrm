@@ -6,10 +6,6 @@
  * key + an id accessor, never another copy of the same upsert/remove logic.
  */
 import { createSlice } from '@reduxjs/toolkit';
-import {
-  projects as seedProjects, seedPlots, seedBookings, seedPays, seedReceipts, seedInvoices,
-  seedCustomers, seedRegistry, seedCrud,
-} from '../../data/seedData';
 import { readJson } from '../../utils/storage';
 import { signedOut } from './authSlice';
 import { nowIso } from '../../utils/date';
@@ -31,15 +27,15 @@ const saved = readJson('collections', null) || {};
 const LIVE_COLLECTIONS = ['projects', 'plots', 'bookings', 'payments', 'receipts', 'invoices', 'customers'];
 
 const initialState = {
-  projects: saved.projects || seedProjects,
-  plots: saved.plots || seedPlots,
-  bookings: saved.bookings || seedBookings,
-  payments: saved.payments || seedPays,
-  receipts: saved.receipts || seedReceipts,
-  invoices: saved.invoices || seedInvoices,
-  customers: saved.customers || seedCustomers,
-  registry: saved.registry || seedRegistry,
-  crud: withCrudIds(readJson('crud', null) || seedCrud),
+  projects: saved.projects || [],
+  plots: saved.plots || [],
+  bookings: saved.bookings || [],
+  payments: saved.payments || [],
+  receipts: saved.receipts || [],
+  invoices: saved.invoices || [],
+  customers: saved.customers || [],
+  registry: saved.registry || {},
+  crud: withCrudIds(readJson('crud', null) || {}),
   followUps: readJson('follow_ups', null) || {},
   /** 'demo' until the API answers; 'live' once the workspace is hydrated. */
   mode: 'demo',
@@ -81,11 +77,6 @@ const domainSlice = createSlice({
       state.mode = 'live';
       state.status = 'error';
       state.error = action.payload || 'Workspace data unavailable';
-    },
-    workspaceDemo(state, action) {
-      state.mode = 'demo';
-      state.status = 'ready';
-      state.error = action.payload || '';
     },
     workspaceLoading(state) {
       state.status = 'loading';
@@ -168,7 +159,7 @@ const domainSlice = createSlice({
 });
 
 export const {
-  collectionReplaced, workspaceHydrated, workspaceDemo, workspaceLoading,
+  collectionReplaced, workspaceHydrated, workspaceLoading,
   rowUpserted, rowPatched, rowRemoved, projectSaved, paymentStatusSet, registryStatusSet, followUpSet,
   crudRowUpserted, crudRowRemoved, domainError, workspaceFailed,
 } = domainSlice.actions;

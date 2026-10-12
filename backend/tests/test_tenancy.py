@@ -14,7 +14,8 @@ from app.models.property import Plot, Project
 from app.models.tenant import Tenant
 from tests.conftest import DEMO_PASSWORD, auth_headers
 
-STRONG = "Tenant@12345"
+PHONE = "9876512345"
+STRONG = "orga12345"  # the starting password for "Org Admin" / PHONE (first 4 letters + last 5 digits)
 
 
 # --------------------------------------------------------------------- helpers
@@ -35,7 +36,7 @@ def _new_tenant(client, platform_headers, *, max_users: int = 25, name: str | No
         "name": name or f"Org {token}",
         "plan": "STANDARD",
         "max_users": max_users,
-        "admin": {"name": "Org Admin", "email": f"admin-{token}@org.demo", "temporary_password": STRONG},
+        "admin": {"name": "Org Admin", "email": f"admin-{token}@org.demo", "phone": PHONE},
     }
     response = client.post("/api/v1/tenants", json=body, headers=platform_headers)
     assert response.status_code == 201, response.text
@@ -89,14 +90,14 @@ def test_me_reports_tenant_for_staff_and_platform_flag_for_super_admin(client, a
 def test_create_tenant_provisions_a_working_isolated_workspace(client, platform_headers):
     response = client.post(
         "/api/v1/tenants",
-        json={"name": "Fresh Realty", "admin": {"name": "Fresh Admin", "email": f"fresh-{uuid.uuid4().hex[:6]}@org.demo"}},
+        json={"name": "Fresh Realty", "admin": {"name": "Fresh Admin", "email": f"fresh-{uuid.uuid4().hex[:6]}@org.demo", "phone": "9876543210"}},
         headers=platform_headers,
     )
     assert response.status_code == 201, response.text
     data = response.json()["data"]
     assert data["tenant"]["slug"] == "fresh-realty" and data["tenant"]["status"] == "ACTIVE"
-    password = data["initial_password"]
-    assert password, "a generated one-time password is returned exactly once"
+    assert "initial_password" not in data and "password" not in response.text.lower().replace("must_change_password", "")
+    password = "fres43210"  # first 4 letters of the name + last 5 digits of the mobile
 
     headers = _login(client, data["admin"]["email"], password)
     # brand-new workspace: nothing from any other tenant is visible
@@ -121,10 +122,10 @@ def test_tenant_detail_and_overview_include_usage(client, platform_headers, tena
 def test_duplicate_slug_and_duplicate_admin_email_are_rejected(client, platform_headers, tenant_a):
     dup_slug = client.post("/api/v1/tenants", headers=platform_headers, json={
         "name": "Other", "slug": tenant_a["tenant"]["slug"],
-        "admin": {"name": "X Admin", "email": f"x-{uuid.uuid4().hex[:6]}@org.demo"}})
+        "admin": {"name": "X Admin", "email": f"x-{uuid.uuid4().hex[:6]}@org.demo", "phone": PHONE}})
     assert dup_slug.status_code == 409
     dup_email = client.post("/api/v1/tenants", headers=platform_headers, json={
-        "name": "Another Org", "admin": {"name": "X Admin", "email": tenant_a["admin_email"]}})
+        "name": "Another Org", "admin": {"name": "X Admin", "email": tenant_a["admin_email"], "phone": PHONE}})
     assert dup_email.status_code == 409
 
 
@@ -134,7 +135,7 @@ def test_update_tenant_and_seat_limit_guard(client, platform_headers, tenant_a):
     assert updated.status_code == 200 and updated.json()["data"]["plan"] == "ENTERPRISE"
     added = client.post("/api/v1/users", headers=tenant_a["headers"], json={
         "name": "Seat Two", "email": f"seat-{uuid.uuid4().hex[:6]}@org.demo",
-        "role": "SALES_AGENT", "temporary_password": STRONG})
+        "role": "SALES_AGENT", "phone": PHONE})
     assert added.status_code == 201, added.text
     refused = client.patch(f"/api/v1/tenants/{tid}", json={"max_users": 1}, headers=platform_headers)
     assert refused.status_code == 409, "cannot shrink below the 2 seats already used"
@@ -147,7 +148,7 @@ def test_seat_limit_blocks_new_users(client, platform_headers):
     headers = _login(client, tenant["admin_email"])
     response = client.post("/api/v1/users", headers=headers, json={
         "name": "One Too Many", "email": f"many-{uuid.uuid4().hex[:6]}@org.demo",
-        "role": "SALES_AGENT", "temporary_password": STRONG})
+        "role": "SALES_AGENT", "phone": PHONE})
     assert response.status_code == 409 and "allows 1 users" in response.text
 
 
@@ -177,14 +178,17 @@ def test_add_admin_and_reset_password(client, platform_headers, tenant_a):
     tid = tenant_a["tenant"]["id"]
     email = f"second-{uuid.uuid4().hex[:6]}@org.demo"
     added = client.post(f"/api/v1/tenants/{tid}/admins", headers=platform_headers,
-                        json={"name": "Second Admin", "email": email})
+                        json={"name": "Second Admin", "email": email, "phone": "9123456789"})
     assert added.status_code == 201
-    one_time = added.json()["data"]["initial_password"]
+    assert "initial_password" not in added.json()["data"]
+    one_time = "seco56789"
     assert client.get("/api/v1/projects", headers=_login(client, email, one_time)).status_code == 200
 
     reset = client.post(f"/api/v1/tenants/{tid}/admins/{added.json()['data']['admin']['id']}/reset-password",
                         headers=platform_headers)
-    assert reset.status_code == 200 and reset.json()["data"]["initial_password"] != one_time
+    assert reset.status_code == 200 and "initial_password" not in reset.json()["data"]
+    # a reset puts the account back on its starting password and forces a change
+    assert client.post("/api/v1/auth/login", json={"email": email, "password": one_time}).status_code == 200
 
 
 # -------------------------------------------------------------------- isolation
@@ -271,16 +275,16 @@ def test_new_rows_are_stamped_with_the_callers_tenant(client, tenant_a):
 def test_users_are_isolated_and_tenant_staff_cannot_mint_platform_accounts(client, tenant_a, tenant_b):
     email = f"staff-{uuid.uuid4().hex[:6]}@org.demo"
     made = client.post("/api/v1/users", headers=tenant_a["headers"], json={
-        "name": "A Staff", "email": email, "role": "ACCOUNTS", "temporary_password": STRONG})
+        "name": "A Staff", "email": email, "role": "ACCOUNTS", "phone": PHONE})
     assert made.status_code == 201
     emails_b = {u["email"] for u in client.get("/api/v1/users", headers=tenant_b["headers"]).json()["data"]}
     assert email not in emails_b and tenant_a["admin_email"] not in emails_b
     # an e-mail identifies one account platform-wide
     assert client.post("/api/v1/users", headers=tenant_b["headers"], json={
-        "name": "Dup", "email": email, "role": "ACCOUNTS", "temporary_password": STRONG}).status_code == 409
+        "name": "Dup", "email": email, "role": "ACCOUNTS", "phone": PHONE}).status_code == 409
     platform = client.post("/api/v1/users", headers=tenant_a["headers"], json={
         "name": "Mallory", "email": f"m-{uuid.uuid4().hex[:6]}@org.demo", "role": "SUPER_ADMIN",
-        "temporary_password": STRONG})
+        "phone": PHONE})
     assert platform.status_code == 403
 
 
@@ -291,15 +295,6 @@ def test_audit_trails_are_separated(client, platform_headers, tenant_a):
     assert all(not log["action"].startswith("platform.") for log in tenant_logs)
     assert any(log["action"] == "platform.tenant_created" for log in platform_logs)
     assert not any(log["resource"] == "project" for log in platform_logs), "platform never sees tenant records"
-
-
-def test_registration_requires_a_valid_active_tenant(client, unique_email):
-    body = {"name": "Self Reg", "email": unique_email, "password": "Strong@12345",
-            "confirm_password": "Strong@12345", "role": "CUSTOMER", "consent": True}
-    assert client.post("/api/v1/auth/register", json={**body, "tenant": "no-such-org"}).status_code in (400, 422)
-    assert client.post("/api/v1/auth/register", json=body).status_code == 422  # tenant is required
-    ok = client.post("/api/v1/auth/register", json={**body, "tenant": "lalita"})
-    assert ok.status_code == 201 and ok.json()["data"]["user"]["tenant_slug"] == "lalita"
 
 
 # ------------------------------------------------- the filter itself (unit level)

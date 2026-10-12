@@ -13,10 +13,15 @@ const monthKey = (label) => { const d = new Date(String(label || '')); return Nu
  * bookings / customers (props), the agent leaderboard and the commissions awaiting
  * sign-off (API). Nothing is hard-coded.
  */
-export function SalesManagerDashboard({ go, D, notify, bookings = [], customers = [] }) {
+export function SalesManagerDashboard({ go, D, notify, bookings: allBookings = [], customers: allCustomers = [], project = 'All projects' }) {
   const live = hasSession();
-  const [team, setTeam] = useState([]);
+  const [fullTeam, setTeam] = useState([]);
   const [commissions, setCommissions] = useState([]);
+  const all = project === 'All projects';
+  // The project chosen in the sidebar / filter bar scopes every figure on this page.
+  const bookings = all ? allBookings : allBookings.filter((b) => b[2] === project);
+  const customers = all ? allCustomers : allCustomers.filter((c) => c.project === project
+    || allBookings.some((b) => b[2] === project && (c.id != null && b[11] != null ? b[11] === c.id : b[1] === c.name)));
 
   const load = useCallback(async () => {
     if (!live) return;
@@ -36,7 +41,7 @@ export function SalesManagerDashboard({ go, D, notify, bookings = [], customers 
     }
   }, [live, notify]);
 
-  useEffect(() => { load(); }, [load, bookings.length]);
+  useEffect(() => { load(); }, [load, allBookings.length]);
 
   const counted = bookings.filter(LIVE);
   const sales = counted.reduce((t, b) => t + parseAmt(b[5]), 0);
@@ -44,6 +49,14 @@ export function SalesManagerDashboard({ go, D, notify, bookings = [], customers 
   const pct = sales ? Math.round((collected / sales) * 100) : 0;
   const thisMonth = monthKey(new Date().toDateString());
   const newThisMonth = counted.filter((b) => monthKey(b[4]) === thisMonth).length;
+  // Per-agent figures for the chosen project come from that project's bookings.
+  const team = all ? fullTeam : fullTeam.map((a) => {
+    const mine = counted.filter((b) => b[8] === a.name);
+    return {
+      ...a, deals: mine.length,
+      sales: mine.reduce((t, b) => t + parseAmt(b[5]), 0), collected: mine.reduce((t, b) => t + parseAmt(b[6]), 0),
+    };
+  }).sort((x, y) => y.sales - x.sales);
   const activeAgents = team.filter((a) => a.deals > 0).length;
   const submitted = bookings.length;
   const confirmed = bookings.filter((b) => ['Confirmed', 'Processing', 'Agreement', 'Registered'].includes(b[7])).length;
@@ -51,8 +64,9 @@ export function SalesManagerDashboard({ go, D, notify, bookings = [], customers 
   const agreements = bookings.filter((b) => ['Agreement', 'Registered'].includes(b[7])).length;
   const approvalRate = submitted ? Math.round((confirmed / submitted) * 100) : 0;
 
-  const bookingById = new Map(bookings.filter((b) => typeof b[10] === 'number').map((b) => [b[10], b]));
-  const queue = commissions.filter((c) => ['PAYABLE', 'PROCESSING', 'ON_HOLD'].includes(c.status));
+  const bookingById = new Map(allBookings.filter((b) => typeof b[10] === 'number').map((b) => [b[10], b]));
+  const queue = commissions.filter((c) => ['PAYABLE', 'PROCESSING', 'ON_HOLD'].includes(c.status)
+    && (all || bookingById.get(c.booking_id)?.[2] === project));
   const topSales = team[0]?.sales || 0;
   const decide = async (commission, status) => {
     try {

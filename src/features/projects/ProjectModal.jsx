@@ -36,15 +36,15 @@ export function ProjectModal({ editing, projects, close, save }) {
         <div className="form-grid">
           <label className="span-2">
             Project name *
-            <input value={form.name} onChange={set('name')} placeholder="e.g. Green Meadows" autoFocus />
+            <input value={form.name} onChange={set('name')} placeholder="Project name" autoFocus />
           </label>
           <label>
             Phase
-            <input value={form.phase} onChange={set('phase')} placeholder="e.g. Phase II" />
+            <input value={form.phase} onChange={set('phase')} placeholder="Phase" />
           </label>
           <label>
             City
-            <input value={form.city} onChange={set('city')} placeholder="e.g. Mumbai" />
+            <input value={form.city} onChange={set('city')} placeholder="City" />
           </label>
           <label className="span-2">
             Location / address
@@ -52,19 +52,19 @@ export function ProjectModal({ editing, projects, close, save }) {
           </label>
           <label>
             Total plots *
-            <input type="number" min="0" step="1" value={form.total} onChange={set('total')} placeholder="128" />
+            <input type="number" min="0" step="1" value={form.total} onChange={set('total')} placeholder="Number of plots" />
           </label>
           <label>
             RERA number
-            <input value={form.rera} onChange={set('rera')} placeholder="P5180000…" />
+            <input value={form.rera} onChange={set('rera')} placeholder="RERA registration number" />
           </label>
           <label>
             Base rate (₹ / sq.ft)
-            <input type="number" min="0" step="any" value={form.rate} onChange={set('rate')} placeholder="3500" />
+            <input type="number" min="0" step="any" value={form.rate} onChange={set('rate')} placeholder="Rate per sq.ft" />
           </label>
           <label>
             Estimated revenue (₹ crore)
-            <input type="number" min="0" step="any" value={form.revenue} onChange={set('revenue')} placeholder="12.6" />
+            <input type="number" min="0" step="any" value={form.revenue} onChange={set('revenue')} placeholder="In crore" />
           </label>
           <label>
             Status

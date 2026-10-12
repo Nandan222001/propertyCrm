@@ -6,7 +6,7 @@ query strings, so Request/Response and dependency types are always spelled out.
 
 from __future__ import annotations
 
-from fastapi import APIRouter, BackgroundTasks, Request, Response, status
+from fastapi import APIRouter, BackgroundTasks, Request, Response
 
 from app.controllers import auth_controller as controller
 from app.core.dependencies import ActorDep, CurrentUserDep, DbDep
@@ -15,7 +15,6 @@ from app.schemas.auth import (
     ForgotPasswordRequest,
     LoginRequest,
     RefreshRequest,
-    RegisterRequest,
     ResetPasswordRequest,
 )
 
@@ -53,13 +52,6 @@ def logout(
     payload: RefreshRequest | None = None,
 ) -> dict:
     return controller.logout(request, actor, service, payload)
-
-
-@router.post("/register", status_code=status.HTTP_201_CREATED,
-             summary="Self-registration (customer / sales-agent accounts only)",
-             responses=AUTH_ERRORS)
-def register(payload: RegisterRequest, request: Request, service: controller.AuthServiceDep) -> dict:
-    return controller.register(payload, request, service)
 
 
 @router.get("/me", summary="Current identity, effective permissions and security policy")

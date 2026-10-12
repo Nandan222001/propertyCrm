@@ -8,12 +8,11 @@
  */
 import { createSlice } from '@reduxjs/toolkit';
 import { ROLES, ROLE_ORDER, toUiRole } from '../../constants/roles';
-import { roleConfigs, seedUsers } from '../../data/seedData';
 import { readJson } from '../../utils/storage';
 import { clientAudit, redact } from '../../utils/security';
 
-const defaultUserFor = (role = ROLES.ADMIN) =>
-  roleConfigs[role]?.defaultUser || { name: 'Workspace User', email: `${role.toLowerCase().replace(/\s+/g, '')}@lalitainfra.com`, role };
+/** Nobody is signed in until the server says so: an empty identity, never a sample person. */
+const defaultUserFor = (role = ROLES.ADMIN) => ({ name: '', email: '', role });
 
 /**
  * Role/session are persisted with writeJson, so read them with readJson. Older
@@ -34,7 +33,7 @@ const initialState = {
   /** Role string of the active session ('' = signed out). */
   session: readStoredRole('session'),
   role: readStoredRole('role') || ROLES.ADMIN,
-  users: readJson('users', null) || seedUsers,
+  users: [],
   currentUser: readJson('current_user', null) || defaultUserFor(ROLES.ADMIN),
   permissions: [],
   /** 'demo' until the backend handshake succeeds, then 'live'. */
@@ -47,7 +46,7 @@ const authSlice = createSlice({
   name: 'auth',
   initialState,
   reducers: {
-    /** Local sign-in (demo mode, or fallback when the API is unreachable). */
+    /** Local session (used by the render tests; real sign-in goes through `sessionLoaded`). */
     signedIn(state, action) {
       const { role, user, permissions = [] } = action.payload || {};
       state.session = role;

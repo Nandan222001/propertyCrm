@@ -22,23 +22,22 @@ import {
 import { hasSession } from '../api';
 import {
   createBooking, createCustomer, decideBooking, decideCustomer, deleteRecord, hydrateWorkspace,
-  markReceiptShared, recordPayment, saveProject, setInvoiceStatus, setPaymentStatus, setNextDueDate, registerAccount, changeMyPassword, saveRecord, setFollowUp,
+  markReceiptShared, recordPayment, saveProject, setInvoiceStatus, setPaymentStatus, setNextDueDate, changeMyPassword, saveRecord, setFollowUp, updateCustomerLive, deleteCustomerLive, updateBookingLive, deleteBookingLive, deleteProjectLive, deletePlotLive, updatePlotLive, resetUserPasswordLive,
   setRegistryStatus, actionNotification, loadNotifications, signIn, signOut, saveInvoice, issueInvoice, cancelInvoice, payInvoice,
   shareInvoice, downloadInvoicePdf,
 } from '../store/thunks';
 import {
-  billOpened, bookingPrintSet, agentInfoSet, userCredentialShown, customerSelected, filterChanged, modalClosed, modalOpened,
+  billOpened, bookingPrintSet, agentInfoSet, customerSelected, filterChanged, modalClosed, modalOpened,
   pageChanged, periodChanged, projectChanged, searchChanged, sidebarToggled, tabChanged,
 } from '../store/slices/uiSlice';
 
 import { ChangePasswordDialog } from '../features/auth/ChangePasswordDialog';
-import { UserCredentialDialog } from '../features/users/UserCredentialDialog';
-import { COMPANY } from '../data/seedData';
+import { COMPANY } from '../data/appConfig';
 import { LoginScreen } from '../features/auth/LoginScreen';
 import { ApprovalsPage } from '../features/approvals/ApprovalsPage';
 import { AdminDashboard } from '../features/dashboard/AdminDashboard';
 import { AccountsDashboard } from '../features/dashboard/AccountsDashboard';
-import { ManagementDashboard } from '../features/dashboard/ManagementDashboard';
+import { PortfolioInsights } from '../features/dashboard/PortfolioInsights';
 import { SalesAgentDashboard } from '../features/dashboard/SalesAgentDashboard';
 import { SalesManagerDashboard } from '../features/dashboard/SalesManagerDashboard';
 import { PlatformDashboard } from '../features/dashboard/PlatformDashboard';
@@ -61,7 +60,6 @@ import { AgentInfoModal, AgentLookup } from '../features/agents/AgentLookup';
 import {
   activateTenant, addTenantAdmin, loadTenantDetail, resetTenantAdminPassword, saveTenant, suspendTenant,
 } from '../store/tenantThunks';
-import { credentialCleared } from '../store/slices/tenantsSlice';
 import { openWhatsApp } from '../utils/whatsapp';
 import { agentKey } from '../utils/names';
 import { downloadCsv } from '../utils/csv';
@@ -173,7 +171,7 @@ export function App() {
         ? ['Invoice no.', 'Customer', 'Project', 'Plot', 'Booking', 'Issue date', 'Due date', 'Status',
           'Total', 'Paid', 'Balance', 'GST']
         : ['Booking ID', 'Customer', 'Project', 'Plot', 'Date', 'Value', 'Paid', 'Status', 'Agent'];
-    downloadCsv(`lalita-${page.toLowerCase().replaceAll(' ', '-')}`, rows, headers);
+    downloadCsv(`export-${page.toLowerCase().replaceAll(' ', '-')}`, rows, headers);
     clientAudit('report.exported', { page, rows: rows.length });
     notify('CSV report exported successfully');
   };
@@ -219,16 +217,16 @@ export function App() {
     openWhatsApp(customerPhone(booking[1]), text);
   };
 
+  // The tab title follows the signed-in organisation.
+  useEffect(() => {
+    if (auth.session && auth.user?.tenantName) document.title = auth.user.tenantName;
+  }, [auth.session, auth.user?.tenantName]);
+
   /* ---------------------------------------------------------------- auth */
   if (!auth.session) {
     return (
       <LoginScreen
-        onLogin={(selectedRole, user, credentials) => dispatch(signIn({
-          email: credentials?.email ?? user?.email, password: credentials?.password ?? user?.password, role: selectedRole, user,
-        }))}
-        onRegister={(account) => dispatch(registerAccount(account))}
-        customers={domain.customers}
-        users={teamUsers}
+        onLogin={(credentials) => dispatch(signIn(credentials))}
         notice={loginNotice}
       />
     );
@@ -333,8 +331,9 @@ export function App() {
               {role === ROLES.ADMIN && (
                 <AdminDashboard bookings={domain.bookings} pays={domain.payments} plots={domain.plots} go={go} D={(kind, preset) => dispatch(modalOpened({ modal: kind, preset }))} notify={notify} />
               )}
+              {role === ROLES.ADMIN && <PortfolioInsights go={go} projects={domain.projects} plots={domain.plots} bookings={scoped.bookings} receipts={scoped.receipts} />}
               {role === ROLES.SALES_MANAGER && (
-                <SalesManagerDashboard go={go} D={(kind, preset) => dispatch(modalOpened({ modal: kind, preset }))} notify={notify} bookings={scoped.bookings} customers={scoped.customers || domain.customers} />
+                <SalesManagerDashboard go={go} D={(kind, preset) => dispatch(modalOpened({ modal: kind, preset }))} notify={notify} bookings={scoped.bookings} customers={scoped.customers || domain.customers} project={ui.project} />
               )}
               {role === ROLES.SALES_AGENT && (
                 <SalesAgentDashboard agentName={auth.user?.name} go={go} D={(kind, preset) => dispatch(modalOpened({ modal: kind, preset }))} notify={notify} bookings={scoped.bookings} plots={domain.plots} />
@@ -356,7 +355,6 @@ export function App() {
               {role === ROLES.ACCOUNTS && (
                 <AccountsDashboard go={go} D={(kind, preset) => dispatch(modalOpened({ modal: kind, preset }))} notify={notify} pays={domain.payments} receipts={scoped.receipts} />
               )}
-              {role === ROLES.MANAGEMENT && <ManagementDashboard go={go} notify={notify} projects={domain.projects} plots={domain.plots} bookings={scoped.bookings} receipts={scoped.receipts} />}
             </>
           )}
 
@@ -386,6 +384,9 @@ export function App() {
               projects={domain.projects}
               role={role}
               onSaveProject={(form, editing) => dispatch(saveProject(form, editing))}
+              onDeleteProject={(project) => dispatch(deleteProjectLive(project))}
+              onDeletePlot={(plot) => dispatch(deletePlotLive(plot))}
+              onEditPlot={(plot, changes) => dispatch(updatePlotLive(plot, changes))}
               onBook={(plot) => dispatch(modalOpened({ modal: 'booking', preset: { project: plot[8], plot: plot[0] } }))}
             />
           )}
@@ -400,7 +401,7 @@ export function App() {
               role={role}
               onNew={() => dispatch(modalOpened({ modal: 'booking' }))}
               onOpenCustomer={(name, booking) => {
-                // Roles without a customer page (e.g. Management) see the booking form instead.
+                // Roles without a customer page see the booking form instead.
                 if (!allowedPages.includes(PAGES.CUSTOMER_DETAIL)) {
                   dispatch(bookingPrintSet(booking[0]));
                   return;
@@ -414,6 +415,8 @@ export function App() {
               onReject={(booking) => dispatch(decideBooking(booking, 'reject'))}
               onPrint={(booking) => dispatch(bookingPrintSet(booking[0]))}
               onWhatsApp={whatsappBooking}
+              onEdit={(booking, changes) => dispatch(updateBookingLive(booking, changes))}
+              onDelete={(booking) => dispatch(deleteBookingLive(booking))}
             />
           )}
 
@@ -476,6 +479,8 @@ export function App() {
               onAdd={() => dispatch(modalOpened({ modal: 'customer' }))}
               onApprove={(customer) => dispatch(decideCustomer(customer, 'Approved'))}
               onReject={(customer) => dispatch(decideCustomer(customer, 'Rejected'))}
+              onEdit={(customer, changes) => dispatch(updateCustomerLive(customer, changes))}
+              onDelete={(customer) => dispatch(deleteCustomerLive(customer))}
               onWhatsApp={(customer) => openWhatsApp(
                 customer.mobile,
                 `Hello ${customer.name}, this is ${COMPANY.name} regarding your plot booking.`,
@@ -487,7 +492,6 @@ export function App() {
             <TenantsPage
               tenants={tenants}
               search={ui.search}
-              credential={tenantsMeta.credential}
               loading={tenantsMeta.loading}
               error={tenantsMeta.error}
               onSave={(form, editing) => dispatch(saveTenant(form, editing))}
@@ -496,12 +500,11 @@ export function App() {
               onAddAdmin={(tenant, form) => dispatch(addTenantAdmin(tenant, form))}
               onResetPassword={(tenant, admin) => dispatch(resetTenantAdminPassword(tenant, admin))}
               onOpenDetail={(tenant) => dispatch(loadTenantDetail(tenant))}
-              onDismissCredential={() => dispatch(credentialCleared())}
             />
           )}
 
-          {page === PAGES.AGENTS && <Agents search={ui.search} notify={notify} role={role} onView={(agent) => dispatch(agentInfoSet(agent))} />}
-          {page === PAGES.COMMISSIONS && <Commissions search={ui.search} notify={notify} role={role} bookings={scoped.bookings} />}
+          {page === PAGES.AGENTS && <Agents search={ui.search} notify={notify} role={role} bookings={scoped.bookings} project={ui.project} onView={(agent) => dispatch(agentInfoSet(agent))} />}
+          {page === PAGES.COMMISSIONS && <Commissions search={ui.search} notify={notify} role={role} bookings={scoped.bookings} project={ui.project} />}
           {page === PAGES.REPORTS && (
             <Reports
               notify={notify}
@@ -510,6 +513,7 @@ export function App() {
               payments={scoped.payments}
               plots={domain.plots}
               projects={domain.projects}
+              project={ui.project}
               onExport={(key, rows) => clientAudit('report.exported', { report: key, rows })}
             />
           )}
@@ -544,6 +548,7 @@ export function App() {
               create={() => dispatch(modalOpened({ modal: 'user' }))}
               edit={(user) => dispatch(modalOpened({ modal: 'user', userEdit: user }))}
               remove={(user) => dispatch(deleteRecord(user))}
+              resetPassword={(user) => dispatch(resetUserPasswordLive(user))}
             />
           )}
 
@@ -613,13 +618,6 @@ export function App() {
           forced={Boolean(auth.user?.mustChangePassword)}
           onSubmit={(form) => dispatch(changeMyPassword(form))}
           close={() => setChangingPassword(false)}
-        />
-      )}
-
-      {ui.userCredential && (
-        <UserCredentialDialog
-          credential={ui.userCredential}
-          close={() => dispatch(userCredentialShown(null))}
         />
       )}
 

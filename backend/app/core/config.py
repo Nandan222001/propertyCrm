@@ -37,7 +37,11 @@ class Settings(BaseSettings):
     )
 
     # ------------------------------------------------------------------ app
-    APP_NAME: str = "Lalita Realestate Infra ERP API"
+    APP_NAME: str = "Property ERP API"
+    # Shown on the sign-in page (before anyone is signed in, so it belongs to the deployment, not a tenant).
+    BRAND_NAME: str = "Property ERP"
+    BRAND_TAGLINE: str = "Enterprise real estate operations"
+    SUPPORT_EMAIL: str | None = None
     APP_VERSION: str = "1.0.0"
     ENVIRONMENT: Environment = "local"
     DEBUG: bool = False

@@ -25,7 +25,7 @@ Legend — **Verified by**: the automated check that fails if the control regres
 
 ## 2. Role-based access control (RBAC)
 
-* Roles: SUPER_ADMIN, ADMIN, SALES_MANAGER, SALES_AGENT, ACCOUNTS, MANAGEMENT, CUSTOMER (`app/core/constants.py`).
+* Roles: SUPER_ADMIN, ADMIN, SALES_MANAGER, SALES_AGENT, ACCOUNTS, CUSTOMER (`app/core/constants.py`).
 * Permission catalogue (`app/core/permissions.py`) — ~60 granular permissions (`booking:approve`, `payment:create`, `pii:reveal`, `audit:view`, …).
 * Enforcement happens **in the service layer** (`BaseService._authorise`) — a new route cannot forget the check because the repository is never called directly by a controller.
 * Row-level scoping: agents see their own deals, customers only their own records (`scope_clause`), enforced in SQL, not in the UI.

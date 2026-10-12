@@ -9,11 +9,10 @@ import {
   Sparkles, Check, CheckCircle, Printer, MessageCircle
 } from 'lucide-react';
 import { parseAmt, fmtINR, amountInWords, agentKey, todayLabel, openWhatsApp, waLink, isAdmin, canCreateBooking, canApprove, canCreateCustomer, canRecordPayment, canManageBills, isCustomer, isPendingStatus } from '../../utils';
-import { projects, agents, seedUsers } from '../../data/seedData';
 import { buildReport, REPORT_PERIODS } from '../../utils/reports';
 import { getSettings } from '../../utils/settings';
 import { downloadCsv } from '../../utils/csv';
-import { COMMISSION_ROWS, toRow } from '../commissions/Commissions';
+import { toRow } from '../commissions/Commissions';
 import { api, hasSession } from '../../api';
 
 import { RoleContextBanner } from '../../components/layout/RoleContextBanner';
@@ -25,9 +24,10 @@ const REPORTS = [
   ['TDS & Commission Payroll', 'Agent commissions, tax withholding, and bank transfer ledger', 'tax', 'Uses project · TDS rate from Administration'],
 ];
 
-export function Reports({ notify, role, bookings = [], payments = [], plots = [], projects: projectList = projects, onExport }) {
+export function Reports({ notify, role, bookings = [], payments = [], plots = [], projects: projectList = [], project: activeProject = 'All projects', onExport }) {
   const [dateRange, setDateRange] = useState('All time');
-  const [reportProject, setReportProject] = useState('All projects');
+  const [reportProject, setReportProject] = useState(activeProject);
+  useEffect(() => { setReportProject(activeProject); }, [activeProject]);
 
   // Live: the commissions this role may see (from the server). Offline preview: the sample register.
   const [liveCommissions, setLiveCommissions] = useState(hasSession() ? [] : null);
@@ -41,7 +41,7 @@ export function Reports({ notify, role, bookings = [], payments = [], plots = []
       .catch(() => setLiveCommissions([]));
   }, [bookings]);
   const data = useMemo(
-    () => ({ bookings, payments, plots, commissions: liveCommissions ?? COMMISSION_ROWS }),
+    () => ({ bookings, payments, plots, commissions: liveCommissions ?? [] }),
     [bookings, payments, plots, liveCommissions],
   );
   const reports = useMemo(() => {

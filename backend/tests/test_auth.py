@@ -7,7 +7,7 @@ from datetime import timedelta
 from app.core.security import digest_token
 from app.db.base import utcnow
 from app.repositories.user_repository import AuthTokenRepository
-from tests.conftest import ROLE_CREDENTIALS, login
+from tests.conftest import ROLE_CREDENTIALS, login, starting_password
 
 
 def test_login_success_returns_tokens_and_identity(client):
@@ -45,7 +45,7 @@ def test_failed_logins_lock_the_account(client, admin_headers):
             "name": "Lockout Probe",
             "email": "lockout.probe@nmtsolution.demo",
             "role": "SALES_AGENT",
-            "temporary_password": "Probe@12345",
+            "phone": "9876500001",
         },
         headers=admin_headers,
     )
@@ -86,7 +86,7 @@ def test_refresh_token_rotates_and_reuse_is_detected(client):
 
 
 def test_logout_revokes_refresh_token(client):
-    tokens = login(client, "MANAGEMENT").json()["data"]["tokens"]
+    tokens = login(client, "ACCOUNTS").json()["data"]["tokens"]
     headers = {"Authorization": f"Bearer {tokens['access_token']}"}
     assert client.post("/api/v1/auth/logout", json={"refresh_token": tokens["refresh_token"]},
                        headers=headers).status_code == 200
@@ -115,17 +115,16 @@ def test_malformed_and_tampered_tokens_are_rejected(client):
         assert response.status_code == 401
 
 
-def test_password_change_requires_current_password_and_revokes_sessions(client, unique_email, admin_headers):
+def test_password_change_requires_current_password_and_revokes_sessions(client, unique_email, unique_phone, admin_headers):
     created = client.post(
         "/api/v1/users",
-        json={"name": "Password Probe", "email": unique_email, "role": "SALES_AGENT",
-              "temporary_password": "Initial@12345"},
+        json={"name": "Password Probe", "email": unique_email, "role": "SALES_AGENT", "phone": unique_phone},
         headers=admin_headers,
     )
     assert created.status_code == 201
 
     tokens = client.post(
-        "/api/v1/auth/login", json={"email": unique_email, "password": "Initial@12345"}
+        "/api/v1/auth/login", json={"email": unique_email, "password": starting_password("Password Probe", unique_phone)}
     ).json()["data"]["tokens"]
     headers = {"Authorization": f"Bearer {tokens['access_token']}"}
 
@@ -139,7 +138,7 @@ def test_password_change_requires_current_password_and_revokes_sessions(client, 
 
     changed = client.post(
         "/api/v1/auth/password/change",
-        json={"current_password": "Initial@12345", "new_password": "Changed@12345",
+        json={"current_password": starting_password("Password Probe", unique_phone), "new_password": "Changed@12345",
               "confirm_password": "Changed@12345"},
         headers=headers,
     )
@@ -148,52 +147,22 @@ def test_password_change_requires_current_password_and_revokes_sessions(client, 
     assert client.post("/api/v1/auth/refresh", json={"refresh_token": tokens["refresh_token"]}).status_code == 401
 
 
-def test_weak_passwords_are_rejected(client, unique_email):
+def test_weak_new_passwords_are_rejected(client, admin_headers, unique_email, unique_phone):
+    client.post("/api/v1/users", headers=admin_headers,
+                json={"name": "Weak Probe", "email": unique_email, "phone": unique_phone, "role": "SALES_AGENT"})
+    tokens = client.post("/api/v1/auth/login", json={
+        "email": unique_email, "password": starting_password("Weak Probe", unique_phone)}).json()["data"]["tokens"]
+    headers = {"Authorization": f"Bearer {tokens['access_token']}"}
     for weak in ("password", "short1!", "alllowercase1!", "ALLUPPERCASE1!", "NoDigits!!", "NoSymbols12"):
-        response = client.post(
-            "/api/v1/auth/register",
-            json={
-                "name": "Weak Probe",
-                "email": unique_email,
-                "password": weak,
-                "confirm_password": weak,
-                "role": "SALES_AGENT",
-                "consent": True,
-            },
-        )
+        response = client.post("/api/v1/auth/password/change", headers=headers, json={
+            "current_password": starting_password("Weak Probe", unique_phone), "new_password": weak, "confirm_password": weak})
         assert response.status_code == 422, f"{weak} should be rejected"
 
 
-def test_self_registration_cannot_create_privileged_roles(client, unique_email):
-    for role in ("SUPER_ADMIN", "ADMIN", "ACCOUNTS"):
-        response = client.post(
-            "/api/v1/auth/register",
-            json={
-                "name": "Escalation Attempt",
-                "email": unique_email,
-                "password": "Strong@12345",
-                "confirm_password": "Strong@12345",
-                "role": role,
-                "consent": True,
-            },
-        )
-        assert response.status_code == 422, f"self-registration must not mint {role}"
-
-
-def test_registration_requires_consent_and_unique_email(client, unique_email):
-    body = {
-        "name": "Consent Probe",
-        "email": unique_email,
-        "password": "Strong@12345",
-        "confirm_password": "Strong@12345",
-        "role": "CUSTOMER",
-        "consent": False,
-        "tenant": "lalita",
-    }
-    assert client.post("/api/v1/auth/register", json=body).status_code in (400, 422)
-    body["consent"] = True
-    assert client.post("/api/v1/auth/register", json=body).status_code == 201
-    assert client.post("/api/v1/auth/register", json=body).status_code == 409
+def test_there_is_no_self_registration(client, unique_email):
+    body = {"name": "Walk In", "email": unique_email, "password": "Strong@12345",
+            "confirm_password": "Strong@12345", "role": "SALES_AGENT", "consent": True, "tenant": "lalita"}
+    assert client.post("/api/v1/auth/register", json=body).status_code in (404, 405)
 
 
 def test_me_endpoint_exposes_permissions_not_secrets(client, admin_headers):
@@ -205,34 +174,11 @@ def test_me_endpoint_exposes_permissions_not_secrets(client, admin_headers):
     assert "secret" not in response.text.lower()
 
 
-def test_self_registered_account_waits_for_administrator_activation(client, admin_headers, unique_email):
-    body = {"name": "Walk In", "email": unique_email, "password": "Strong@12345",
-            "confirm_password": "Strong@12345", "role": "SALES_AGENT", "consent": True, "tenant": "lalita"}
-    created = client.post("/api/v1/auth/register", json=body)
-    assert created.status_code == 201, created.text
-    data = created.json()["data"]
-    assert data["tokens"] is None and data["pending_activation"] is True
-    assert data["user"]["status"] == "PENDING"
-
-    # cannot sign in yet
-    attempt = client.post("/api/v1/auth/login", json={"email": unique_email, "password": "Strong@12345"})
-    assert attempt.status_code in (401, 403)
-    assert "activate" in attempt.text.lower()
-
-    # that organisation's admin is told, and only an admin can activate
-    queue = client.get("/api/v1/notifications", headers=admin_headers).json()["data"]
-    assert any("awaiting activation" in n["title"].lower() for n in queue)
-    activated = client.patch(f"/api/v1/users/{data['user']['id']}", headers=admin_headers, json={"status": "ACTIVE"})
-    assert activated.status_code == 200, activated.text
-    ok = client.post("/api/v1/auth/login", json={"email": unique_email, "password": "Strong@12345"})
-    assert ok.status_code == 200, ok.text
-
-
-def test_invited_user_can_keep_their_session_and_activates_by_choosing_a_password(client, admin_headers, unique_email):
-    """Admin-created users sign in with a temporary password: refresh must work, and changing it activates them."""
-    temp = "Temp#Pass2026"
+def test_invited_user_can_keep_their_session_and_activates_by_choosing_a_password(client, admin_headers, unique_email, unique_phone):
+    """Admin-created users sign in with the starting password: refresh must work, and changing it activates them."""
+    temp = starting_password("Invited Person", unique_phone)
     created = client.post("/api/v1/users", headers=admin_headers, json={
-        "name": "Invited Person", "email": unique_email, "role": "ACCOUNTS", "temporary_password": temp,
+        "name": "Invited Person", "email": unique_email, "role": "ACCOUNTS", "phone": unique_phone,
     })
     assert created.status_code in (200, 201), created.text
     assert created.json()["data"]["status"] == "INVITED"
@@ -253,18 +199,19 @@ def test_invited_user_can_keep_their_session_and_activates_by_choosing_a_passwor
     assert me.json()["data"]["user"]["status"] == "ACTIVE"
 
 
-def test_password_reset_email_is_sent_and_link_works(client, admin_headers, unique_email, monkeypatch):
+def test_password_reset_email_is_sent_and_link_works(client, admin_headers, unique_email, unique_phone, monkeypatch):
     from app.services import mailer
 
     sent: list[tuple[str, str, str]] = []
     monkeypatch.setattr("app.controllers.auth_controller.send_mail", lambda to, subject, body: sent.append((to, subject, body)))
     client.post("/api/v1/users", headers=admin_headers, json={
-        "name": "Forgetful", "email": unique_email, "role": "ACCOUNTS", "temporary_password": "Temp#Pass2026",
+        "name": "Forgetful", "email": unique_email, "role": "ACCOUNTS", "phone": unique_phone,
     })
+    temp = starting_password("Forgetful", unique_phone)
     # activate by choosing a password first (invited -> active)
-    login = client.post("/api/v1/auth/login", json={"email": unique_email, "password": "Temp#Pass2026"}).json()["data"]["tokens"]
+    login = client.post("/api/v1/auth/login", json={"email": unique_email, "password": temp}).json()["data"]["tokens"]
     client.post("/api/v1/auth/password/change", headers={"Authorization": f"Bearer {login['access_token']}"},
-                json={"current_password": "Temp#Pass2026", "new_password": "Original#Pass26", "confirm_password": "Original#Pass26"})
+                json={"current_password": temp, "new_password": "Original#Pass26", "confirm_password": "Original#Pass26"})
 
     response = client.post("/api/v1/auth/password/forgot", json={"email": unique_email})
     assert response.status_code == 200
@@ -282,3 +229,89 @@ def test_password_reset_email_is_sent_and_link_works(client, admin_headers, uniq
     assert client.post("/api/v1/auth/login", json={"email": unique_email, "password": "Reset#Pass2026a"}).status_code == 200
     assert client.post("/api/v1/auth/password/reset", json={"token": token, "new_password": "Another#Pass2026b"}).status_code in (400, 401, 422)
     assert mailer.reset_link("abc").endswith("/reset-password?token=abc")
+
+
+def test_starting_password_rule_and_it_is_never_returned(client, admin_headers, unique_email):
+    from app.core.passwords import initial_password
+
+    assert initial_password("Sanjay Patel", "98765 43210") == "sanj43210"
+    assert initial_password("Om Rao", "+91 90000 12345") == "omra12345"
+    created = client.post("/api/v1/users", headers=admin_headers, json={
+        "name": "Sanjay Patel", "email": unique_email, "role": "ACCOUNTS", "phone": "9876543210"})
+    assert created.status_code == 201, created.text
+    assert "sanj43210" not in created.text and "password" not in created.text.lower().replace("must_change_password", "")
+    login = client.post("/api/v1/auth/login", json={"email": unique_email, "password": "sanj43210"})
+    assert login.status_code == 200 and login.json()["data"]["user"]["must_change_password"] is True
+    # a name with fewer than four letters, or a missing mobile, cannot get a starting password
+    assert client.post("/api/v1/users", headers=admin_headers, json={
+        "name": "Al", "email": "al-" + unique_email, "role": "ACCOUNTS", "phone": "9876543210"}).status_code == 422
+    assert client.post("/api/v1/users", headers=admin_headers, json={
+        "name": "No Phone", "email": "np-" + unique_email, "role": "ACCOUNTS"}).status_code == 422
+
+
+def test_admin_can_reset_a_users_password_to_the_starting_password(client, admin_headers, agent_headers, unique_email):
+    created = client.post("/api/v1/users", headers=admin_headers, json={
+        "name": "Reset Probe", "email": unique_email, "role": "ACCOUNTS", "phone": "9876511111"})
+    assert created.status_code == 201, created.text
+    user_id = created.json()["data"]["id"]
+    start = starting_password("Reset Probe", "9876511111")
+    session = client.post("/api/v1/auth/login", json={"email": unique_email, "password": start}).json()["data"]["tokens"]
+    headers = {"Authorization": f"Bearer {session['access_token']}"}
+    changed = client.post("/api/v1/auth/password/change", headers=headers, json={
+        "current_password": start, "new_password": "Mine#Secret2026", "confirm_password": "Mine#Secret2026"})
+    assert changed.status_code == 200
+    assert client.post("/api/v1/auth/login", json={"email": unique_email, "password": start}).status_code == 401
+
+    # only an admin may reset; nothing about the password comes back
+    assert client.post(f"/api/v1/users/{user_id}/reset-password", headers=agent_headers).status_code == 403
+    reset = client.post(f"/api/v1/users/{user_id}/reset-password", headers=admin_headers)
+    assert reset.status_code == 200, reset.text
+    assert start not in reset.text and "Mine#Secret2026" not in reset.text
+    assert client.post("/api/v1/auth/login", json={"email": unique_email, "password": "Mine#Secret2026"}).status_code == 401
+    again = client.post("/api/v1/auth/login", json={"email": unique_email, "password": start})
+    assert again.status_code == 200 and again.json()["data"]["user"]["must_change_password"] is True
+
+    # an admin cannot reset their own password this way, nor a platform account
+    me = client.get("/api/v1/auth/me", headers=admin_headers).json()["data"]["user"]
+    assert client.post(f"/api/v1/users/{me['id']}/reset-password", headers=admin_headers).status_code in (400, 409, 422)
+
+
+def test_forgot_password_reports_when_mail_is_not_configured_and_never_leaks_accounts(client, unique_email):
+    known = client.post("/api/v1/auth/password/forgot", json={"email": "admin@nmtsolution.demo"}).json()
+    unknown = client.post("/api/v1/auth/password/forgot", json={"email": unique_email}).json()
+    assert known["message"] == unknown["message"]
+    assert known["data"]["delivery"] == unknown["data"]["delivery"] == "unavailable"  # no SMTP_HOST in tests
+
+
+def test_reset_mail_is_actually_sent_over_smtp(monkeypatch):
+    from app.core.config import settings
+    from app.services import mailer
+
+    sent = []
+
+    class FakeSMTP:
+        def __init__(self, host, port, timeout=None):
+            sent.append(("connect", host, port))
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *exc):
+            return False
+
+        def starttls(self, context=None):
+            sent.append(("starttls",))
+
+        def login(self, user, password):
+            sent.append(("login", user))
+
+        def send_message(self, message):
+            sent.append(("message", message["To"], message["Subject"], message.get_content()))
+
+    monkeypatch.setattr(settings, "SMTP_HOST", "smtp.example.test")
+    monkeypatch.setattr(settings, "SMTP_USER", "mailer")
+    monkeypatch.setattr(mailer.smtplib, "SMTP", FakeSMTP)
+    assert mailer.send_mail("user@example.test", "Reset your password", f"Open {mailer.reset_link('tok123')}") is True
+    kinds = [item[0] for item in sent]
+    assert kinds == ["connect", "starttls", "login", "message"]
+    assert "/reset-password?token=tok123" in sent[-1][3]

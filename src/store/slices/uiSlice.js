@@ -26,8 +26,6 @@ const initialState = {
   crudPage: PAGES.OVERVIEW,
   editRecord: null,
   userEdit: null,
-  /** One-time login details for a freshly created team member (shown once, never stored). */
-  userCredential: null,
 };
 
 const uiSlice = createSlice({
@@ -58,9 +56,6 @@ const uiSlice = createSlice({
       state.bookingPreset = null;
       state.editRecord = null;
       state.userEdit = null;
-    },
-    userCredentialShown(state, action) {
-      state.userCredential = action.payload;
     },
     toastPushed(state, action) {
       state.toast = action.payload;
@@ -105,6 +100,6 @@ const uiSlice = createSlice({
 export const {
   pageChanged, sidebarToggled, modalOpened, modalClosed, toastPushed, toastCleared,
   searchChanged, periodChanged, projectChanged, tabChanged, filterChanged,
-  customerSelected, billOpened, bookingPrintSet, agentInfoSet, userCredentialShown,
+  customerSelected, billOpened, bookingPrintSet, agentInfoSet,
 } = uiSlice.actions;
 export default uiSlice.reducer;

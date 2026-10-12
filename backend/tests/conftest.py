@@ -50,16 +50,20 @@ ROLE_CREDENTIALS = {
     "SALES_MANAGER": "manager@nmtsolution.demo",
     "SALES_AGENT": "agent@nmtsolution.demo",
     "ACCOUNTS": "accounts@nmtsolution.demo",
-    "MANAGEMENT": "management@nmtsolution.demo",
     "CUSTOMER": "customer@nmtsolution.demo",
 }
 
 
 @pytest.fixture(scope="session", autouse=True)
 def _database() -> None:
-    """Create schema + demo data once per test session."""
+    """Create the schema and load the test fixture dataset once per session."""
     assert settings.DB_DIALECT == "sqlite", "tests must never touch the MySQL database"
-    bootstrap_database(seed_demo=True)
+    bootstrap_database()
+    from app.db.session import session_scope
+    from tests.support.seed import seed_all
+
+    with session_scope() as session:
+        seed_all(session)
     yield
     dispose_engine()
 
@@ -127,6 +131,13 @@ def super_admin_headers(client) -> dict[str, str]:
 @pytest.fixture()
 def unique_email() -> str:
     return f"user-{uuid.uuid4().hex[:8]}@example.demo"
+
+
+def starting_password(name: str, phone: str) -> str:
+    """What the server sets for an account someone else created (first 4 letters + last 5 digits)."""
+    from app.core.passwords import initial_password
+
+    return initial_password(name, phone)
 
 
 @pytest.fixture()

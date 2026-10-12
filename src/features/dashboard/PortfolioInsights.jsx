@@ -1,5 +1,5 @@
 import React from 'react';
-import { Download, Building, Landmark, TrendingUp, FileSpreadsheet } from 'lucide-react';
+import { Building, Landmark, TrendingUp } from 'lucide-react';
 import { parseAmt } from '../../utils';
 import { compactINR } from '../../utils/dashboardStats';
 
@@ -12,10 +12,10 @@ const quarterOf = (d) => `${d.getFullYear()}-Q${Math.floor(d.getMonth() / 3) + 1
 const stage = (absorption) => (absorption >= 75 ? 'Cash Cow' : absorption >= 50 ? 'Steady Sales' : absorption >= 20 ? 'Growth Phase' : 'Launch Phase');
 
 /**
- * Executive view — a read-only roll-up of the tenant's own projects, plots, bookings and receipts.
+ * Portfolio roll-up for the administrator — a read-only summary of the tenant's own projects, plots, bookings and receipts.
  * (Margins/EBITDA need cost data the ERP does not hold, so they are not shown.)
  */
-export function ManagementDashboard({ go, notify, projects = [], plots = [], bookings = [], receipts = [] }) {
+export function PortfolioInsights({ go, projects = [], plots = [], bookings = [], receipts = [] }) {
   const matrix = projects.map((p) => {
     const mine = plots.filter((x) => x[8] === p[0]);
     const units = mine.length || parseAmt(p[2]);
@@ -54,19 +54,7 @@ export function ManagementDashboard({ go, notify, projects = [], plots = [], boo
   const pending = bookings.filter((b) => b[7] === 'Pending Approval').length;
 
   return (
-    <div className="role-dashboard management-dash">
-      <div className="role-welcome management-welcome">
-        <div>
-          <span className="eyebrow"><i className="live-dot" /> EXECUTIVE BOARDROOM · PORTFOLIO VIEW</span>
-          <h2>Portfolio Health &amp; Cash Realisation</h2>
-          <p>Gross development value, cash realised, inventory absorption and collection by development — from live records.</p>
-        </div>
-        <div className="welcome-actions">
-          <button className="button button-white" onClick={() => go('Reports')}><FileSpreadsheet size={13} /> Reports</button>
-          <button className="button button-primary" onClick={() => go('Reports')}><Download size={13} /> Export Data</button>
-        </div>
-      </div>
-
+    <div className="role-dashboard management-dash portfolio-insights">
       <div className="mini-stats four">
         <div className="mini-stat">
           <small>PORTFOLIO GDV</small>

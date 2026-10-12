@@ -6,7 +6,7 @@ from decimal import ROUND_HALF_UP, Decimal
 
 from sqlalchemy.orm import Session
 
-from app.core.constants import COMMISSION_SLABS, TDS_RATE, AuditAction, Permission
+from app.core.constants import TDS_RATE, AuditAction, Permission
 from app.core.context import ActorContext, PaginationContext
 from app.core.exceptions import BusinessRuleError, PermissionDeniedError
 from app.core.responses import Paginated
@@ -18,14 +18,11 @@ from app.services.base_service import BaseService
 MONEY = Decimal("0.01")
 
 
-def commission_rate_for(deals_closed: int, override: Decimal | None = None) -> Decimal:
-    """Slab table in one place: 10+ deals → 2%, 5+ → 1.8%, else 1.5%."""
+def commission_rate_for(override: Decimal | None, default: Decimal) -> Decimal:
+    """The agent's own rate; the organisation's default rate when the agent has none."""
     if override is not None and override > 0:
         return Decimal(override)
-    for threshold, rate in COMMISSION_SLABS:
-        if deals_closed >= threshold:
-            return Decimal(str(rate))
-    return Decimal(str(COMMISSION_SLABS[-1][1]))
+    return default
 
 
 def split_commission(deal_value: Decimal, rate: Decimal, tds_rate: float | Decimal = TDS_RATE) -> tuple[Decimal, Decimal, Decimal]:
@@ -111,9 +108,10 @@ class CommissionService(BaseService[Commission]):
         agent = self.agents.get(booking.agent_id)
         if agent is None:
             raise BusinessRuleError("Booking references an unknown agent")
-        deals = self.agents.leaderboard(limit=100)  # includes computed deal counts
-        deals_closed = next((row["deals"] for row in deals if row["id"] == agent.id), 0)
-        rate = commission_rate_for(deals_closed, Decimal(agent.commission_rate))
+        from app.services.org_settings import setting_text
+
+        default_rate = Decimal(setting_text(self.db, "tax", "defaultCommission")) / 100
+        rate = commission_rate_for(Decimal(agent.commission_rate), default_rate)
         gross, tds, net = split_commission(Decimal(booking.final_price), rate, self._tds_rate())
 
         commission = Commission(

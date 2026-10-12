@@ -43,7 +43,7 @@ class InvoiceCreate(SafeText):
     booking_id: int = Field(gt=0, description="Bill is raised against a plot booking")
     issue_date: date | None = None
     due_date: date | None = None
-    gst_rate: Decimal = Field(default=Decimal("0.18"))
+    gst_rate: Decimal | None = None   # blank = the organisation's default GST rate
     discount_amount: Decimal = Field(default=Decimal("0"), ge=0)
     notes: str | None = Field(default=None, max_length=2000)
     terms: str | None = Field(default=None, max_length=2000)
@@ -52,6 +52,8 @@ class InvoiceCreate(SafeText):
     @field_validator("gst_rate", mode="before")
     @classmethod
     def _rate(cls, value):
+        if value is None or value == "":
+            return None
         rate = to_decimal(value)
         if rate not in INVOICE_GST_RATES:
             allowed = ", ".join(str(r) for r in INVOICE_GST_RATES)

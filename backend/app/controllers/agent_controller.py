@@ -8,7 +8,7 @@ from fastapi import Depends, Query
 
 from app.core.constants import AuditAction, Permission
 from app.core.dependencies import ActorDep, DbDep, PaginationDep, require
-from app.core.exceptions import PermissionDeniedError
+from app.core.exceptions import BusinessRuleError, PermissionDeniedError
 from app.core.responses import success
 from app.repositories.booking_repository import BookingRepository
 from app.repositories.customer_repository import CustomerRepository
@@ -127,6 +127,23 @@ class AgentService(BaseService):
         return self.serialise(agent)
 
 
+    def delete_agent(self, agent_id: int) -> None:
+        """Remove an agent who has no deals; one with history is deactivated instead."""
+        self._authorise("delete")
+        agent = self.agents.get_or_404(agent_id)
+        from sqlalchemy import func, select
+
+        from app.models.booking import Booking
+
+        deals = self.db.execute(select(func.count(Booking.id)).where(
+            Booking.agent_id == agent.id, Booking.is_deleted.is_(False))).scalar_one()
+        if deals:
+            raise BusinessRuleError(f"{agent.name} has {deals} booking(s) — set the agent to inactive instead of deleting")
+        self.agents.delete(agent, actor=self.actor.name)
+        self._audit(AuditAction.DELETE, agent, summary="Agent deleted")
+        self.db.commit()
+
+
 def get_agent_service(db: DbDep, actor: ActorDep) -> AgentService:
     return AgentService(db, actor)
 
@@ -157,6 +174,11 @@ def create_agent(payload: AgentCreate, service: AgentServiceDep) -> dict:
 
 def update_agent(agent_id: int, payload: AgentUpdate, service: AgentServiceDep) -> dict:
     return success(service.update_agent(agent_id, payload), "Agent updated")
+
+
+def delete_agent(agent_id: int, service: AgentServiceDep) -> dict:
+    service.delete_agent(agent_id)
+    return success(None, "Agent deleted")
 
 
 def lookup_agent(

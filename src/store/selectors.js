@@ -7,7 +7,7 @@ import { createSelector } from '@reduxjs/toolkit';
 import { ROLES } from '../constants/roles';
 import { NAV_BADGES, PAGE_META, PAGES } from '../constants/navigation';
 import { agentKey } from '../utils/names';
-import { roleConfigs } from '../data/seedData';
+import { roleConfigs } from '../data/appConfig';
 
 export const selectAuth = (state) => state.auth;
 export const selectDomain = (state) => state.domain;
@@ -57,7 +57,7 @@ export const selectScopedData = createSelector(
     const isAgentRole = role === ROLES.SALES_AGENT;
     const isCustomerRole = role === ROLES.CUSTOMER;
     const live = mode === 'live';
-    // Offline preview matches the sample roster by name ("Sanjay Patel" -> "S. Patel"). Against the
+    // Without a server session the agent is matched by name. Against the
     // real API the server has already limited every list to this person, so nothing is re-filtered
     // here (a login name never has to equal the agent record's name).
     const liveAgentName = (domain.bookings.find((b) => b[8] && b[8] !== '—')?.[8])
@@ -162,6 +162,6 @@ export const selectBillingSummary = createSelector([selectScopedData], ({ invoic
 
 export const selectTenants = (state) => state.tenants.items;
 export const selectTenantsMeta = createSelector(
-  [(state) => state.tenants.status, (state) => state.tenants.error, (state) => state.tenants.credential],
-  (status, error, credential) => ({ loading: status === 'loading', error, credential }),
+  [(state) => state.tenants.status, (state) => state.tenants.error],
+  (status, error) => ({ loading: status === 'loading', error }),
 );

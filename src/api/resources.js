@@ -48,7 +48,6 @@ export const actions = {
   login: (body) => request(ENDPOINTS.auth.login, { method: 'POST', body, auth: false }),
   logout: (body) => authedRequest(ENDPOINTS.auth.logout, { method: 'POST', body }),
   me: () => authedRequest(ENDPOINTS.auth.me),
-  register: (body) => request(ENDPOINTS.auth.register, { method: 'POST', body, auth: false }),
   changePassword: (body) => authedRequest(ENDPOINTS.auth.changePassword, { method: 'POST', body }),
   approveBooking: (id, body) => authedRequest(ENDPOINTS.bookings.approve(id), { method: 'POST', body }),
   rejectBooking: (id, body) => authedRequest(ENDPOINTS.bookings.reject(id), { method: 'POST', body }),
@@ -89,6 +88,13 @@ actions.resetPassword = (token, newPassword) => request('/auth/password/reset', 
 /** Organisation settings (company / bank / tax) shared by every user of the organisation. */
 actions.orgSettings = () => authedRequest('/organisation/settings');
 actions.saveOrgSettings = (section, values) => authedRequest(`/organisation/settings/${section}`, { method: 'PUT', body: { values } });
+
+/** Deployment name for the sign-in page (public). */
+actions.branding = () => request('/branding', { auth: false });
+
+actions.roleMatrix = () => authedRequest('/roles/matrix');
+
+actions.resetUserPassword = (id) => authedRequest(`${ENDPOINTS.users.item(id)}/reset-password`, { method: 'POST', body: {} });
 
 actions.setRegistryStage = (bookingId, body) => authedRequest(`${ENDPOINTS.bookings.item(bookingId)}/registry`, { method: 'POST', body });
 

@@ -9,9 +9,8 @@ Full-stack ERP for plot inventory, bookings, collections and commissions:
 | Infra | Docker, nginx, Terraform (AWS), GitHub Actions | [`infra/`](infra), [`deploy/`](deploy), [`.github/`](.github) |
 | Ops | Security register, DR runbook, privacy programme | [`docs/`](docs) |
 
-The frontend keeps working **offline in demo mode** (seeded data, browser
-storage) and switches to the live API automatically once `/api/v1` answers —
-so the same UI serves as a client demo and as the production console.
+The frontend is a thin client over `/api/v1`: there is no offline or sample mode, so every
+number, name and record it shows comes from the signed-in organisation's data.
 
 ---
 
@@ -27,7 +26,7 @@ cd backend
 python -m venv .venv && . .venv/bin/activate
 pip install -r requirements-dev.txt
 cp .env.example .env                 # fill SECRET_KEY / INDEX_PEPPER / FIELD_ENCRYPTION_KEY
-python -m app.db.init_db             # schema + demo seed (SQLite by default)
+python -m app.db.init_db             # schema only (SQLite by default) — no data is loaded
 uvicorn app.main:app --reload
 ```
 
@@ -41,18 +40,12 @@ docker compose up --build
 `make help` lists every developer task (`make dev`, `make test`, `make verify`,
 `make security`, `make seed`, …).
 
-### Demo sign-in (development seed only)
+### First sign-in
 
-| Role | E-mail | Password |
-| --- | --- | --- |
-| Super admin (platform owner — no tenant) | `superadmin@nmtsolution.demo` | `Demo@12345` |
-| Admin — *Lalita Realestate Infra* tenant | `admin@nmtsolution.demo` | `Demo@12345` |
-| Admin — *Skyline Realty* tenant | `admin@skyline.demo` | `Demo@12345` |
-| Sales manager | `manager@nmtsolution.demo` | `Demo@12345` |
-| Sales agent | `agent@nmtsolution.demo` | `Demo@12345` |
-| Accounts | `accounts@nmtsolution.demo` | `Demo@12345` |
-| Management | `management@nmtsolution.demo` | `Demo@12345` |
-| Customer portal | `customer@nmtsolution.demo` | `Demo@12345` |
+There is no sample data and there are no default accounts. After `python -m app.db.init_db`, create the
+platform owner with `python -m app.db.create_platform_admin --name … --email … --phone …`. The owner creates
+organisations (each with an administrator); administrators create their users; agents add customers
+(each customer also gets a portal login from their e-mail and a starting password).
 
 The customer portal is read-only: it exposes only that customer's bookings,
 invoices (bills), receipts, dues, registry status and documents.
@@ -65,7 +58,7 @@ The platform hosts many organisations ("tenants"); each one is fully isolated.
 
 * **Super admin = platform owner.** Has no tenant and a separate **Platform
   Console** (Overview + Tenants): create an organisation together with its first
-  administrator (a one-time password is shown once), edit plan and seat limit,
+  administrator (their starting password is set from the name and mobile and is never displayed), edit plan and seat limit,
   suspend / reactivate (every user of the tenant is locked out on their very next
   request), add admins, reset an admin's password. The super admin can **not**
   read any tenant's projects, bookings, customers or payments (`403`).
@@ -82,7 +75,7 @@ The platform hosts many organisations ("tenants"); each one is fully isolated.
 * **Upgrading an existing database:** `alembic upgrade head` (revision
   `d4e8a1c2f3b5`) creates the default tenant `lalita`, moves all existing rows
   into it and turns existing `SUPER_ADMIN` accounts into platform accounts. Take
-  a backup first. Self-registration now requires the organisation's `tenant` slug.
+  a backup first. There is no self-registration: the Super Admin creates organisations, admins create their users, and agents add customers.
 
 ---
 
@@ -211,7 +204,7 @@ make security               # bandit + pip-audit + npm audit
 cd backend
 alembic upgrade head        # apply migrations
 alembic upgrade head --sql  # review the MySQL DDL without a database
-python -m app.db.seed       # reload demo data
+python -m app.db.create_platform_admin --name "…" --email … --phone …   # first platform owner
 ```
 
 ## Compliance notes
@@ -225,5 +218,4 @@ python -m app.db.seed       # reload demo data
   (`docs/BACKUP_AND_DR.md`).
 * Vulnerability disclosure policy: [`SECURITY.md`](SECURITY.md).
 
-_Illustrative demo data only; no real customer records are stored in this
-repository._
+_The repository contains no sample or customer data; automated tests build their own throw-away fixtures._

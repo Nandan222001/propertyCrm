@@ -9,7 +9,6 @@ import {
   Sparkles, Check, CheckCircle, Printer, MessageCircle
 } from 'lucide-react';
 import { parseAmt, fmtINR, amountInWords, agentKey, todayLabel, openWhatsApp, waLink, isAdmin, canCreateBooking, canApprove, canCreateCustomer, canRecordPayment, canManageBills, isCustomer, isPendingStatus } from '../../utils';
-import { projects, agents, seedUsers } from '../../data/seedData';
 
 import { Table } from '../../components/common/DataTable';
 import { Badge } from '../../components/common/Badge';
@@ -17,9 +16,13 @@ import { Mini } from '../../components/common/StatTile';
 import { ProjectModal } from './ProjectModal';
 import { PlotViewModal, ProjectViewModal } from './ProjectViews';
 import { PlotMap3D } from '../../features/plots/PlotMap3D';
+import { EditPlotModal } from './EditPlotModal';
+import { ConfirmDialog } from '../../components/common/ConfirmDialog';
 import { RoleContextBanner } from '../../components/layout/RoleContextBanner';
 
-export function Projects({ plots, search, project, filter, F, tab, TB, notify, projects, role, onBook, onSaveProject }) {
+export function Projects({ plots, search, project, filter, F, tab, TB, notify, projects, role, onBook, onSaveProject, onDeleteProject, onDeletePlot, onEditPlot }) {
+  const [editingPlot, setEditingPlot] = useState(null);
+  const [removing, setRemoving] = useState(null); // { kind: 'project' | 'plot', row }
   const [editing, setEditing] = useState(undefined); // undefined = closed, null = new, row = edit
   const [viewPlot, setViewPlot] = useState(null);
   const [viewProject, setViewProject] = useState(null);
@@ -48,6 +51,12 @@ export function Projects({ plots, search, project, filter, F, tab, TB, notify, p
       <button className="icon-action" onClick={() => setViewPlot(p)} title="View Specs">
         <Eye size={14} />
       </button>
+      {canManage && onEditPlot && typeof p[9] === 'number' && (
+        <button className="icon-action" onClick={() => setEditingPlot(p)} title="Edit plot details"><Edit2 size={14} /></button>
+      )}
+      {canManage && onDeletePlot && p[5] === 'AVAILABLE' && typeof p[9] === 'number' && (
+        <button className="icon-action danger" onClick={() => setRemoving({ kind: 'plot', row: p })} title="Delete plot"><Trash2 size={14} /></button>
+      )}
       {canBook && p[5] === 'AVAILABLE' && (
         <button className="button button-primary small-btn" onClick={() => onBook(p)} title="Book this plot">
           {role === 'SALES AGENT' ? 'Reserve' : 'Book'}
@@ -79,7 +88,7 @@ export function Projects({ plots, search, project, filter, F, tab, TB, notify, p
           {canManage && (
             <button
               className="button button-primary small-btn" style={{ marginLeft: 'auto' }}
-              onClick={() => { TB('Projects'); setEditing(null); }}
+              onClick={() => setEditing(null)}
             >
               <Plus size={12} /> Add Project
             </button>
@@ -105,6 +114,9 @@ export function Projects({ plots, search, project, filter, F, tab, TB, notify, p
                 <div className="table-actions-cell" key={p[0]}>
                   <button className="icon-action" title="View project" onClick={() => setViewProject(p)}><Eye size={14} /></button>
                   {canManage && <button className="icon-action" title="Edit project" onClick={() => setEditing(p)}><Edit2 size={14} /></button>}
+                  {canManage && onDeleteProject && typeof p[6] === 'number' && (
+                    <button className="icon-action danger" title="Delete project" onClick={() => setRemoving({ kind: 'project', row: p })}><Trash2 size={14} /></button>
+                  )}
                 </div>,
               ])}
           />
@@ -126,12 +138,26 @@ export function Projects({ plots, search, project, filter, F, tab, TB, notify, p
           onEdit={canManage ? setEditing : undefined}
         />
       )}
+      {editingPlot && <EditPlotModal plot={editingPlot} close={() => setEditingPlot(null)} save={onEditPlot} />}
+      {removing && (
+        <ConfirmDialog
+          title={`Delete ${removing.kind}`}
+          message={removing.kind === 'project'
+            ? `Delete project ${removing.row[0]} and its unsold plots? Projects with held, booked or sold plots cannot be deleted.`
+            : `Delete plot ${removing.row[0]} (${removing.row[8]})? Only available plots can be deleted.`}
+          onConfirm={() => (removing.kind === 'project' ? onDeleteProject(removing.row) : onDeletePlot(removing.row))}
+          onCancel={() => setRemoving(null)}
+        />
+      )}
       {editing !== undefined && (
         <ProjectModal
           editing={editing}
           projects={projects}
           close={() => setEditing(undefined)}
-          save={onSaveProject}
+          save={(form, row) => {
+            onSaveProject(form, row);
+            if (!row) TB('Projects');   // after saving, show the new project in the master list
+          }}
         />
       )}
     </>

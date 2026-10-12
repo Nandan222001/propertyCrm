@@ -9,7 +9,6 @@ import {
   Sparkles, Check, CheckCircle, Printer, MessageCircle
 } from 'lucide-react';
 import { parseAmt, fmtINR, amountInWords, agentKey, todayLabel, openWhatsApp, waLink, isAdmin, canCreateBooking, canApprove, canCreateCustomer, canRecordPayment, canManageBills, isCustomer, isPendingStatus } from '../../utils';
-import { projects, agents, seedUsers } from '../../data/seedData';
 
 export function RecordModal({ kind, close, save, context, initial, role }) {
   const record = kind === 'record';
@@ -21,11 +20,11 @@ export function RecordModal({ kind, close, save, context, initial, role }) {
 
   const fields = kind === 'user' ? [
     ['name', 'Full Name', 'text', 'Enter full name'],
-    ['email', 'Email Address', 'email', 'name@company.com'],
-    ['phone', 'Mobile Number', 'tel', '+91 98765 43210'],
+    ['email', 'Email Address', 'email', 'E-mail address'],
+    ['phone', kind === 'user' && !initial ? 'Mobile Number (required — last 5 digits form the starting password)' : 'Mobile Number', 'tel', '10-digit mobile number'],
     ['title', 'Job title (optional)', 'text', 'e.g. Senior Property Consultant'],
-    ['role', 'Role', 'select', ['ADMIN', 'SALES MANAGER', 'SALES AGENT', 'ACCOUNTS', 'MANAGEMENT']],
-    ['agent_code', 'Agent code (sales agents)', 'text', 'e.g. AG-031 — links the login to an agent record'],
+    ['role', 'Role', 'select', ['ADMIN', 'SALES MANAGER', 'SALES AGENT', 'ACCOUNTS']],
+    ['agent_code', 'Agent code (sales agents)', 'text', 'Agent code — links the login to an agent record'],
     ['status', 'Account Status', 'select', ['Active', 'Pending', 'Invited', 'Suspended']]
   ] : record ? [
     ['name', 'Name / Title', 'text', 'e.g. Master record or phase'],

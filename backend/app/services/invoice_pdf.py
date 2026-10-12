@@ -59,7 +59,7 @@ class _InvoicePDF:
         self.buffer = io.BytesIO()
         self.pdf = canvas.Canvas(self.buffer, pagesize=A4)
         self.pdf.setTitle(f"Tax invoice {self.invoice['invoice_number']}")
-        self.pdf.setAuthor(payload["company"].get("name", "Lalita Realestate Infra"))
+        self.pdf.setAuthor(payload["company"].get("name") or "")
         self.pdf.setSubject("Tax invoice / bill")
         self.y = PAGE_H - MARGIN
         self.page = 1
@@ -390,7 +390,8 @@ class _InvoicePDF:
         self._hr()
         baseline = self.y - 34
         self._text(MARGIN + 6, baseline, "Customer signature", size=8, color=MUTED)
-        self._text(PAGE_W - MARGIN - 6, baseline, "For Lalita Realestate Infra — Authorised signatory",
+        owner = self.payload["company"].get("name")
+        self._text(PAGE_W - MARGIN - 6, baseline, f"For {owner} — Authorised signatory" if owner else "Authorised signatory",
                    size=8, color=MUTED, align="right")
         self._text(MARGIN + 6, baseline - 12, "________________________", size=8, color=MUTED)
         self._text(PAGE_W - MARGIN - 6, baseline - 12, "________________________", size=8,

@@ -35,7 +35,7 @@ def test_role_notification_is_not_visible_to_other_roles(
 
 def test_customer_never_sees_a_staff_notification_that_mentions_them(client, admin_headers, customer_headers):
     """The seeded 'Payment overdue' alert is for Accounts; its customer must not receive it."""
-    customers = client.get("/api/v1/customers", headers=admin_headers).json()["data"]
+    customers = client.get("/api/v1/customers?page_size=200", headers=admin_headers).json()["data"]
     me = _me(client, customer_headers)
     mine = next(c for c in customers if c["id"] == me["customer_id"])
     client.post(
@@ -98,10 +98,10 @@ def test_agent_linked_only_by_code_still_gets_decision_notifications(client, adm
     email = f"codelinked-{unique_email}"
     created = client.post("/api/v1/users", headers=admin_headers, json={
         "name": "Code Linked", "email": email, "role": "SALES_AGENT",
-        "temporary_password": "Temp#Pass2026", "agent_code": code,
+        "phone": "9876500005", "agent_code": code,
     })
     assert created.status_code in (200, 201), created.text
-    token = client.post("/api/v1/auth/login", json={"email": email, "password": "Temp#Pass2026"})
+    token = client.post("/api/v1/auth/login", json={"email": email, "password": "code00005"})
     assert token.status_code == 200, token.text
     agent_headers = {"Authorization": f"Bearer {token.json()['data']['tokens']['access_token']}"}
     customer = client.post("/api/v1/customers", headers=agent_headers, json={

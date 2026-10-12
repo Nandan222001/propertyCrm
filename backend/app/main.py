@@ -7,7 +7,7 @@ Start-up order matters and is deliberate:
 3. middleware stack (request id → security headers → HTTPS → body size → rate limit);
 4. trusted hosts + explicit CORS allowlist;
 5. routers with a decorated OpenAPI schema (envelope + error models documented);
-6. lifecycle hooks: DB connectivity check, optional demo seeding in non-production.
+6. lifecycle hooks: DB connectivity check, schema bootstrap in local/test.
 """
 
 from __future__ import annotations
@@ -63,7 +63,7 @@ def create_app() -> FastAPI:
         title=settings.APP_NAME,
         version=settings.APP_VERSION,
         description=(
-            "REST API for the Lalita Realestate Infra ERP.\n\n"
+            f"REST API for {settings.BRAND_NAME}.\n\n"
             "**Security model** — JWT bearer access tokens (short lived) plus rotating refresh "
             "tokens stored as digests; RBAC enforced per route and per row; PII encrypted at rest "
             "and masked in responses unless the caller holds `pii:reveal`; every mutation audited."
@@ -72,7 +72,7 @@ def create_app() -> FastAPI:
         redoc_url="/redoc" if settings.docs_enabled else None,
         openapi_url="/openapi.json" if settings.docs_enabled else None,
         openapi_tags=_openapi_tags(),
-        contact={"name": "Lalita Realestate Infra", "email": "it@nmtsolution.demo"},
+        contact={"name": settings.BRAND_NAME, **({"email": settings.SUPPORT_EMAIL} if settings.SUPPORT_EMAIL else {})},
         license_info={"name": "Proprietary"},
         servers=[{"url": settings.API_V1_PREFIX, "description": settings.ENVIRONMENT}],
     )
@@ -125,7 +125,7 @@ def create_app() -> FastAPI:
             if settings.ENVIRONMENT in {"local", "test"}:
                 from app.db.init_db import bootstrap_database
 
-                bootstrap_database(seed_demo=settings.ENVIRONMENT == "local")
+                bootstrap_database()
         except Exception as exc:
             logger.error("Startup database check failed: %s", exc, extra={"event": "startup.db_failed"})
 

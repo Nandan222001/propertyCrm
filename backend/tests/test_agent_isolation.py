@@ -78,9 +78,17 @@ def test_customer_sees_only_own_documents_and_bookings(client, customer_headers)
     assert _rows(client, "/api/v1/agents", customer_headers) == []
 
 
-def test_management_oversight_sees_all_commissions(client):
+def test_management_role_no_longer_exists(client):
+    from app.core.constants import Role
+
+    assert "MANAGEMENT" not in {r.value for r in Role}
+    tokens = client.post("/api/v1/auth/login", json={"email": "management@nmtsolution.demo", "password": "Demo@12345"})
+    assert tokens.status_code in (401, 403, 422)
     from tests.conftest import auth_headers
 
-    management = auth_headers(client, "MANAGEMENT")
     admin = auth_headers(client, "ADMIN")
-    assert len(_rows(client, "/api/v1/commissions", management)) == len(_rows(client, "/api/v1/commissions", admin)) > 0
+    created = client.post("/api/v1/users", headers=admin, json={
+        "name": "Board Member", "email": "board@nmtsolution.demo", "role": "MANAGEMENT",
+        "phone": "9876500004",
+    })
+    assert created.status_code in (400, 422)

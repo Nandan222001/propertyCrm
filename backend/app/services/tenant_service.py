@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import re
 import secrets
-import string
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
@@ -17,6 +16,7 @@ from sqlalchemy.orm import Session
 from app.core.constants import AuditAction, Permission, Role, TenantStatus, UserStatus
 from app.core.context import ActorContext, PaginationContext
 from app.core.exceptions import BusinessRuleError, ConflictError, NotFoundError, PermissionDeniedError
+from app.core.passwords import initial_password
 from app.core.responses import Paginated, paginate
 from app.core.security import hash_password
 from app.db.base import utcnow
@@ -47,21 +47,6 @@ USAGE_MODELS = (
 )
 
 
-def generate_password(length: int = 14) -> str:
-    """Strong one-time password that always satisfies the password policy."""
-    symbols = "!@#$%^&*-_=+"
-    pool = string.ascii_letters + string.digits + symbols
-    while True:
-        candidate = "".join([
-            secrets.choice(string.ascii_uppercase), secrets.choice(string.ascii_lowercase),
-            secrets.choice(string.digits), secrets.choice(symbols),
-            *(secrets.choice(pool) for _ in range(length - 4)),
-        ])
-        chars = list(candidate)
-        secrets.SystemRandom().shuffle(chars)
-        return "".join(chars)
-
-
 def slugify(name: str) -> str:
     slug = re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-")[:48].strip("-")
     return slug if len(slug) >= 2 else f"org-{secrets.token_hex(2)}"
@@ -87,6 +72,8 @@ class TenantService:
             stmt = select(model.tenant_id, func.count(model.id)).where(model.tenant_id.in_(tenant_ids))
             if soft:
                 stmt = stmt.where(model.is_deleted.is_(False))
+            if model is User:
+                stmt = stmt.where(User.role != Role.CUSTOMER.value)   # customer logins are not staff seats
             rows = self.db.execute(stmt.group_by(model.tenant_id).execution_options(all_tenants=True)).all()
             for tenant_id, total in rows:
                 usage[tenant_id][field] = int(total)
@@ -182,13 +169,13 @@ class TenantService:
             n += 1
         return slug
 
-    def _new_admin(self, tenant: Tenant, data: TenantAdminIn) -> tuple[User, str | None]:
+    def _new_admin(self, tenant: Tenant, data: TenantAdminIn) -> User:
         from app.repositories.user_repository import UserRepository
 
         email = data.email.lower().strip()
         if UserRepository(self.db).get_by_email(email):
             raise ConflictError("A user with this e-mail already exists")
-        password = data.temporary_password or generate_password()
+        password = initial_password(data.name, data.phone)
         user = User(
             name=data.name, email=email, phone=data.phone, role=Role.ADMIN.value,
             title="Administrator", status=UserStatus.ACTIVE.value,
@@ -197,7 +184,7 @@ class TenantService:
         )
         self.db.add(user)
         self.db.flush()
-        return user, (None if data.temporary_password else password)
+        return user
 
     def create(self, payload: TenantCreate) -> TenantProvisioned:
         self._require(Permission.TENANT_MANAGE)
@@ -210,11 +197,10 @@ class TenantService:
         )
         self.db.add(tenant)
         self.db.flush()
-        admin, generated = self._new_admin(tenant, payload.admin)
+        admin = self._new_admin(tenant, payload.admin)
         self._audit(AuditAction.TENANT_CREATED, tenant, f"Created tenant {tenant.name} ({tenant.slug})",
                     after={"plan": tenant.plan, "max_users": tenant.max_users, "admin": admin.email})
-        return TenantProvisioned(tenant=self.serialise(tenant), admin=TenantAdminResponse.model_validate(admin),
-                                 initial_password=generated)
+        return TenantProvisioned(tenant=self.serialise(tenant), admin=TenantAdminResponse.model_validate(admin))
 
     def update(self, tenant_id: int, payload: TenantUpdate) -> Tenant:
         self._require(Permission.TENANT_MANAGE)
@@ -275,11 +261,10 @@ class TenantService:
     def add_admin(self, tenant_id: int, data: TenantAdminIn) -> TenantProvisioned:
         self._require(Permission.TENANT_MANAGE)
         tenant = self.get(tenant_id)
-        admin, generated = self._new_admin(tenant, data)
+        admin = self._new_admin(tenant, data)
         self._audit(AuditAction.TENANT_ADMIN_ADDED, tenant, f"Added admin {admin.email} to {tenant.name}",
                     after={"admin": admin.email})
-        return TenantProvisioned(tenant=self.serialise(tenant), admin=TenantAdminResponse.model_validate(admin),
-                                 initial_password=generated)
+        return TenantProvisioned(tenant=self.serialise(tenant), admin=TenantAdminResponse.model_validate(admin))
 
     def reset_admin_password(self, tenant_id: int, user_id: int) -> TenantProvisioned:
         self._require(Permission.TENANT_MANAGE)
@@ -290,8 +275,7 @@ class TenantService:
         ).scalars().first()
         if user is None:
             raise NotFoundError("Admin not found in this tenant")
-        password = generate_password()
-        user.password_hash = hash_password(password)
+        user.password_hash = hash_password(initial_password(user.name, user.phone))
         user.must_change_password = True
         user.password_changed_at = utcnow()
         user.failed_login_attempts = 0
@@ -301,8 +285,7 @@ class TenantService:
         self.db.flush()
         self._audit(AuditAction.TENANT_UPDATED, tenant, f"Reset password for {user.email}",
                     after={"admin": user.email})
-        return TenantProvisioned(tenant=self.serialise(tenant), admin=TenantAdminResponse.model_validate(user),
-                                 initial_password=password)
+        return TenantProvisioned(tenant=self.serialise(tenant), admin=TenantAdminResponse.model_validate(user))
 
     # ------------------------------------------------------------------ helpers
     def _audit(self, action: AuditAction, tenant: Tenant, summary: str, *, before=None, after=None) -> None:

@@ -67,9 +67,6 @@ jobs:
       - name: Apply migrations (Alembic)
         run: alembic upgrade head
 
-      - name: Seed demo data
-        run: python -m app.db.seed
-
       - name: Verify migrations are reversible
         run: |
           alembic downgrade base

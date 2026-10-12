@@ -17,7 +17,6 @@ from __future__ import annotations
 import time
 from datetime import timedelta
 
-from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
@@ -26,7 +25,6 @@ from app.core.context import ActorContext
 from app.core.exceptions import (
     AccountLockedError,
     AuthenticationError,
-    ConflictError,
     NotFoundError,
     ValidationError,
 )
@@ -51,7 +49,6 @@ from app.repositories.user_repository import (
 from app.schemas.auth import (
     ChangePasswordRequest,
     LoginRequest,
-    RegisterRequest,
     SessionUser,
     TokenPair,
 )
@@ -188,56 +185,6 @@ class AuthService:
             action=AuditAction.LOGOUT, resource="auth", resource_id=actor.public_id or "",
             summary="Signed out", actor=actor,
         )
-
-    # ------------------------------------------------------------ registration
-    def register(self, payload: RegisterRequest, *, ip: str | None, user_agent: str | None) -> dict:
-        email = payload.email.lower().strip()
-        tenant = self.db.execute(
-            select(Tenant).where(Tenant.slug == payload.tenant.strip().lower())
-        ).scalars().first()
-        if tenant is None or not tenant.is_active:
-            raise ValidationError("Unknown or inactive organisation", code="invalid_tenant")
-        if self.users.get_by_email(email):
-            raise ConflictError("An account with this e-mail already exists")
-        if settings.CONSENT_REQUIRED and not payload.consent:
-            raise ValidationError("Please accept the privacy notice to continue", code="consent_required")
-
-        user = User(
-            name=payload.name,
-            email=email,
-            phone=payload.phone,
-            role=payload.role.value,
-            title=payload.title,
-            # Anyone who knows the organisation code can ask for an account; nobody gets in until
-            # an administrator of that organisation activates it.
-            status=UserStatus.PENDING.value,
-            password_hash=hash_password(payload.password),
-            password_changed_at=utcnow(),
-            consent_given_at=utcnow() if payload.consent else None,
-            tenant_id=tenant.id,
-        )
-        self.users.create(user)
-        self.audit.security_event(
-            "auth.register",
-            f"New {payload.role.value} account created",
-            severity="info",
-            actor=ActorContext(user_id=user.id, tenant_id=user.tenant_id, name=user.name, email=email, role=user.role,
-                               ip_address=ip, user_agent=user_agent),
-        )
-        self.audit.log(action=AuditAction.CREATE, resource="user", resource_id=user.public_id,
-                       summary="Self-registration", actor=ActorContext(user_id=user.id, tenant_id=user.tenant_id, name=user.name,
-                                                                       email=email, role=user.role))
-        # Tell that organisation's admins (and only them) that a request is waiting.
-        from app.models.audit import Notification
-
-        self.db.add(Notification(
-            title="Account awaiting activation",
-            body=f"{payload.name} ({payload.role.value.replace('_', ' ').title()}) asked to join. "
-                 "Activate or remove them under User & role management.",
-            category="APPROVAL", severity="info", audience_role=Role.ADMIN.value, tenant_id=tenant.id,
-        ))
-        self.db.flush()
-        return {"user": self.session_user(user), "tokens": None, "pending_activation": True}
 
     # ----------------------------------------------------------- password ops
     def change_password(self, actor: ActorContext, payload: ChangePasswordRequest) -> None:

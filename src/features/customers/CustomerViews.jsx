@@ -1,7 +1,9 @@
-import React from 'react';
-import { Eye, Printer, MessageCircle, Download, FileText, Check, X as XIcon, Plus } from 'lucide-react';
-import { COMPANY, REGISTRY_STEPS } from '../../data/seedData';
-import { parseAmt, fmtINR, openWhatsApp, isAdmin, canCreateCustomer, canApprove } from '../../utils';
+import React, { useState } from 'react';
+import { Eye, Printer, MessageCircle, Download, FileText, Check, X as XIcon, Plus, Edit2, Trash2 } from 'lucide-react';
+import { ConfirmDialog } from '../../components/common/ConfirmDialog';
+import { EditCustomerModal } from './EditCustomerModal';
+import { COMPANY, REGISTRY_STEPS } from '../../data/appConfig';
+import { parseAmt, fmtINR, openWhatsApp, isAdmin, canCreateCustomer, canApprove, canEditCustomer, canDeleteCustomer } from '../../utils';
 
 const statusClass = (s) => {
   const t = String(s).toLowerCase();
@@ -28,7 +30,9 @@ function Table({ headers, rows, empty = 'Nothing to show' }) {
 }
 
 // ------------------------------------------------------------ customers list
-export function CustomersPage({ customers, bookings, role, search, project, onOpen, onAdd, onApprove, onReject, onWhatsApp }) {
+export function CustomersPage({ customers, bookings, role, search, project, onOpen, onAdd, onApprove, onReject, onWhatsApp, onEdit, onDelete }) {
+  const [editing, setEditing] = useState(null);
+  const [removing, setRemoving] = useState(null);
   const rows = customers.filter(c => {
     // A customer belongs to a project if it was added for it, or has a booking in it.
     const inProject = project === 'All projects'
@@ -69,6 +73,12 @@ export function CustomersPage({ customers, bookings, role, search, project, onOp
             <div className="row-actions">
               <button className="icon-action" title="Open profile" onClick={() => onOpen(c)}><Eye size={14} /></button>
               <button className="icon-action wa-icon" title="WhatsApp" onClick={() => onWhatsApp(c)}><MessageCircle size={14} /></button>
+              {onEdit && canEditCustomer(role) && typeof c.id === 'number' && (
+                <button className="icon-action" title="Edit customer" onClick={() => setEditing(c)}><Edit2 size={14} /></button>
+              )}
+              {onDelete && canDeleteCustomer(role, c) && typeof c.id === 'number' && (
+                <button className="icon-action danger" title="Delete customer" onClick={() => setRemoving(c)}><Trash2 size={14} /></button>
+              )}
               {canApprove(role) && c.status === 'Pending Approval' && (
                 <>
                   <button className="button button-primary small-btn" onClick={() => onApprove(c)}><Check size={12} /> Approve</button>
@@ -79,6 +89,15 @@ export function CustomersPage({ customers, bookings, role, search, project, onOp
           ])}
         />
       </div>
+      {editing && <EditCustomerModal customer={editing} close={() => setEditing(null)} save={onEdit} />}
+      {removing && (
+        <ConfirmDialog
+          title="Delete customer"
+          message={`Delete ${removing.name}? Their file is removed from the directory. This is blocked while they have an active booking.`}
+          onConfirm={() => onDelete(removing)}
+          onCancel={() => setRemoving(null)}
+        />
+      )}
     </>
   );
 }

@@ -1,8 +1,8 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Eye, Edit2, X, Check, Plus } from 'lucide-react';
-import { fmtINR } from '../../utils';
+import { Eye, Edit2, X, Check, Plus, Trash2 } from 'lucide-react';
+import { ConfirmDialog } from '../../components/common/ConfirmDialog';
+import { fmtINR, parseAmt } from '../../utils';
 import { isAdmin } from '../../utils/permissions';
-import { agents as seedAgents } from '../../data/seedData';
 import { api, actions, hasSession } from '../../api';
 
 import { Table } from '../../components/common/DataTable';
@@ -11,7 +11,7 @@ import { Mini } from '../../components/common/StatTile';
 import { Avatar } from '../../components/common/Avatar';
 import { RoleContextBanner } from '../../components/layout/RoleContextBanner';
 
-const SEES_RATES = ['ADMIN', 'MANAGEMENT', 'ACCOUNTS', 'SALES MANAGER'];
+const SEES_RATES = ['ADMIN', 'ACCOUNTS', 'SALES MANAGER'];
 const pct = (rate) => `${Number((Number(rate) * 100).toFixed(2))}%`;
 
 /** Edit every agent field (admin only; the API enforces it too). */
@@ -110,9 +110,9 @@ function AddAgentModal({ suggestedCode, close, save }) {
         </div>
         <div className="form-grid">
           <label>Full name<input value={form.name} onChange={set('name')} autoFocus placeholder="Rahul Verma" /></label>
-          <label>Agent code<input value={form.code} onChange={set('code')} placeholder="AG-031" /></label>
-          <label>Mobile<input value={form.phone} onChange={set('phone')} inputMode="tel" placeholder="98765 43210" /></label>
-          <label>Email<input value={form.email} onChange={set('email')} type="email" placeholder="agent@company.com" /></label>
+          <label>Agent code<input value={form.code} onChange={set('code')} placeholder="Agent code" /></label>
+          <label>Mobile<input value={form.phone} onChange={set('phone')} inputMode="tel" placeholder="10-digit mobile number" /></label>
+          <label>Email<input value={form.email} onChange={set('email')} type="email" placeholder="E-mail address" /></label>
           <label>Commission rate (%)<input value={form.rate} onChange={set('rate')} inputMode="decimal" /></label>
         </div>
         {error && <p className="form-error">{error}</p>}
@@ -125,13 +125,14 @@ function AddAgentModal({ suggestedCode, close, save }) {
   );
 }
 
-export function Agents({ search, notify, role, onView }) {
+export function Agents({ search, notify, role, onView, bookings = [], project = 'All projects' }) {
   const live = hasSession();
   const canEditRate = isAdmin(role) && live;
   const showRate = live && SEES_RATES.includes(role);
   const [rows, setRows] = useState(null);       // null while loading (live mode)
   const [editing, setEditing] = useState(null);
   const [adding, setAdding] = useState(false);
+  const [removing, setRemoving] = useState(null);
 
   const load = useCallback(async () => {
     try {
@@ -181,9 +182,15 @@ export function Agents({ search, notify, role, onView }) {
   };
 
   // Offline preview keeps the sample table; a live tenant only ever sees its own agents.
+  const inProject = bookings.filter((b) => b[2] === project && !['Pending Approval', 'Rejected', 'Cancelled'].includes(b[7]));
+  const forProject = (r) => {
+    if (project === 'All projects') return r;
+    const mine = inProject.filter((b) => b[8] === r.name);
+    return { ...r, deals: mine.length, sales: mine.reduce((t, b) => t + parseAmt(b[5]), 0), collected: mine.reduce((t, b) => t + parseAmt(b[6]), 0) };
+  };
   const view = live
-    ? (rows || []).map((r) => ({ ...r, commission: Math.round(r.sales * r.rate) }))
-    : seedAgents.map((a) => ({ name: a[0], code: a[1], deals: a[2], sales: a[3], collected: a[4], commission: a[5], rate: null }));
+    ? (rows || []).map(forProject).sort((x, y) => y.sales - x.sales).map((r) => ({ ...r, commission: Math.round(r.sales * r.rate) }))
+    : [];
   const shown = view.filter((r) => [r.name, r.code].join(' ').toLowerCase().includes(search.toLowerCase()));
   const money = (v) => (live ? `₹${fmtINR(v)}` : `₹${v}`);
   const totalSales = view.reduce((s, r) => s + (live ? r.sales : 0), 0);
@@ -196,10 +203,10 @@ export function Agents({ search, notify, role, onView }) {
       <RoleContextBanner role={role} page="Agents" />
 
       <div className="mini-stats four">
-        <Mini title="ACTIVE SALES AGENTS" value={live ? view.length : '14'} color="green-text" />
-        <Mini title="BOOKINGS" value={live ? view.reduce((s, r) => s + r.deals, 0) : '23'} />
-        <Mini title="SALES VALUE" value={live ? `₹${fmtINR(totalSales)}` : '₹3.84 Cr'} />
-        <Mini title="COMMISSION POOL" value={live ? `₹${fmtINR(pool)}` : '₹7.68 L'} color="amber-text" />
+        <Mini title="ACTIVE SALES AGENTS" value={live ? view.length : '—'} color="green-text" />
+        <Mini title="BOOKINGS" value={live ? view.reduce((s, r) => s + r.deals, 0) : '—'} />
+        <Mini title="SALES VALUE" value={live ? `₹${fmtINR(totalSales)}` : '—'} />
+        <Mini title="COMMISSION POOL" value={live ? `₹${fmtINR(pool)}` : '—'} color="amber-text" />
       </div>
 
       <div className="panel section-panel">
@@ -235,12 +242,28 @@ export function Agents({ search, notify, role, onView }) {
                     <Edit2 size={14} />
                   </button>
                 )}
+                {canEditRate && (
+                  <button className="icon-action danger" title="Delete agent" onClick={() => setRemoving(r)}>
+                    <Trash2 size={14} />
+                  </button>
+                )}
               </div>,
             ])}
           />
         )}
       </div>
       {adding && <AddAgentModal suggestedCode={nextCode()} close={() => setAdding(false)} save={addAgent} />}
+      {removing && (
+        <ConfirmDialog
+          title="Delete agent"
+          message={`Delete ${removing.name} (${removing.code})? Agents with bookings cannot be deleted — set them to inactive instead.`}
+          onConfirm={async () => {
+            try { await api.agents.remove(removing.id); notify(`Agent ${removing.name} deleted`); await load(); return ''; }
+            catch (error) { return error.message || 'Could not delete the agent.'; }
+          }}
+          onCancel={() => setRemoving(null)}
+        />
+      )}
       {editing && <EditAgentModal agent={editing} close={() => setEditing(null)} save={saveAgent} />}
     </>
   );

@@ -6,7 +6,7 @@ import { Table } from '../../components/common/DataTable';
 import { Pager, usePaged } from '../../components/common/Pager';
 import { PLAN_LABEL, platformStats, seatUsage } from '../../utils/tenants';
 import { TenantModal } from './TenantModal';
-import { CredentialModal, SuspendModal } from './TenantDialogs';
+import { SuspendModal } from './TenantDialogs';
 
 const fmtDate = (iso) => (iso ? new Date(iso).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '—');
 const STATUS_FILTERS = ['All', 'ACTIVE', 'SUSPENDED'];
@@ -24,21 +24,24 @@ function SeatBar({ tenant }) {
 }
 
 function AddAdminForm({ onAdd }) {
-  const [form, setForm] = useState({ name: '', email: '', phone: '', temporary_password: '' });
+  const [form, setForm] = useState({ name: '', email: '', phone: '' });
   const [error, setError] = useState('');
   const set = (key) => (e) => setForm({ ...form, [key]: e.target.value });
   const submit = async (e) => {
     e.preventDefault();
     if (form.name.trim().length < 2) { setError('Name is required'); return; }
     if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(form.email.trim())) { setError('Enter a valid e-mail'); return; }
+    if (form.name.replace(/[^A-Za-z]/g, '').length < 4) { setError('The name needs at least four letters (they form the starting password)'); return; }
+    if (form.phone.replace(/\D/g, '').length < 10) { setError('Enter the 10-digit mobile number (its last five digits form the starting password)'); return; }
     setError('');
-    if (await onAdd(form)) setForm({ name: '', email: '', phone: '', temporary_password: '' });
+    if (await onAdd(form)) setForm({ name: '', email: '', phone: '' });
   };
   return (
     <form onSubmit={submit} noValidate>
       <div className="form-grid">
         <label>Name<input value={form.name} onChange={set('name')} /></label>
         <label>E-mail<input type="email" value={form.email} onChange={set('email')} /></label>
+        <label>Mobile<input value={form.phone} onChange={set('phone')} inputMode="tel" /></label>
       </div>
       {error && <p role="alert" style={{ color: '#d92d20', margin: '6px 0 0' }}>{error}</p>}
       <div className="modal-actions" style={{ marginTop: 8 }}>
@@ -121,7 +124,7 @@ function TenantDetail({ tenant, close, onEdit, onSuspend, onActivate, onAddAdmin
  * usage counts here — never a tenant's customers, bookings or payments.
  */
 export function TenantsPage({
-  tenants, search, credential, loading, error,
+  tenants, search, loading, error,
   onSave, onSuspend, onActivate, onAddAdmin, onResetPassword, onOpenDetail, onDismissCredential,
 }) {
   const [filter, setFilter] = useState('All');
@@ -204,7 +207,6 @@ export function TenantsPage({
         />
       )}
       {suspending && <SuspendModal tenant={suspending} close={() => setSuspending(null)} confirm={onSuspend} />}
-      {credential && <CredentialModal credential={credential} close={onDismissCredential} />}
     </>
   );
 }

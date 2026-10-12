@@ -6,7 +6,7 @@
  */
 import { ApiUnavailableError, actions, api, setTokens, clearTokens } from '../api';
 import { ROLES, toUiRole } from '../constants/roles';
-import { COMPANY, roleConfigs } from '../data/seedData';
+import { COMPANY, roleConfigs } from '../data/appConfig';
 import { amountInWords, fmtINR, parseAmt } from '../utils/money';
 import { todayLabel } from '../utils/date';
 import { BOOKING_STATUS, PAYMENT_STATUS, PLOT_STATUS } from '../utils/status';
@@ -16,7 +16,6 @@ import { loadTenants } from './tenantThunks';
 import { projectApiPayload, projectFromApi, projectRowFromForm } from '../utils/projects';
 import { adaptWorkspace, adaptCustomer, REGISTRY_CODE } from '../utils/liveAdapters';
 import { notificationsLoaded, notificationPatched } from './slices/notificationsSlice';
-import { generatePassword } from '../utils/tenants';
 import { setRemoteSettings } from '../utils/settings';
 import { clientAudit } from '../utils/security';
 import {
@@ -24,23 +23,20 @@ import {
 } from './slices/authSlice';
 import {
   crudRowRemoved, crudRowUpserted, followUpSet, registryStatusSet, paymentStatusSet, projectSaved, rowPatched, rowRemoved, rowUpserted,
-  workspaceDemo, workspaceFailed, workspaceHydrated, workspaceLoading,
+  workspaceFailed, workspaceHydrated, workspaceLoading,
 } from './slices/domainSlice';
 import {
   computeTotals, itemsPayload, nextInvoiceNumber,
 } from '../utils/billing';
 import { buildInvoicePdf, downloadPdfBytes } from '../utils/pdf';
-import { modalClosed, toastPushed, userCredentialShown } from './slices/uiSlice';
+import { modalClosed, toastPushed } from './slices/uiSlice';
 
 /** Toast helper — every page calls `notify(...)` through this one action. */
 export const notify = (message) => toastPushed(message);
 
 // --------------------------------------------------------------- session
-/**
- * Sign in. Tries the real API; when the backend is unreachable (offline demo),
- * falls back to the role-based local session so the workspace still opens.
- */
-export const signIn = ({ email, password, role }) => async (dispatch) => {
+/** Sign in against the server. There is no offline or sample session: if it cannot be reached, say so. */
+export const signIn = ({ email, password }) => async (dispatch) => {
   try {
     const { data } = await actions.login({ email, password });
     setTokens(data?.tokens);
@@ -49,20 +45,14 @@ export const signIn = ({ email, password, role }) => async (dispatch) => {
     dispatch(toastPushed(`Welcome back, ${user.name || email}.`));
     clientAudit('auth.login', { mode: 'live', role: user.role });
     await dispatch(hydrateWorkspace());
-    return;
   } catch (error) {
-    if (!(error instanceof ApiUnavailableError)) {
-      dispatch(authError(error.message));
-      clientAudit('auth.login_failed', { code: error.code });
-      throw error;
-    }
+    const failure = error instanceof ApiUnavailableError
+      ? Object.assign(new Error('Cannot reach the server. Please check your connection and try again.'), { code: 'unavailable' })
+      : error;
+    dispatch(authError(failure.message));
+    clientAudit('auth.login_failed', { code: failure.code });
+    throw failure;
   }
-  // Fallback: local role-based session when offline.
-  const resolvedRole = role || ROLES.ADMIN;
-  const user = roleConfigs[resolvedRole]?.defaultUser
-    || { name: `${resolvedRole} User`, email, role: resolvedRole };
-  dispatch(signedIn({ role: resolvedRole, user: { ...user, email: email || user.email } }));
-  dispatch(toastPushed(`Workspace session opened as ${user.name} (${resolvedRole}).`));
 };
 
 export const signOut = () => async (dispatch, getState) => {
@@ -79,7 +69,7 @@ const HIDDEN_COLLECTIONS = {
   CUSTOMER: ['customers'],
 };
 
-/** Hydrate every collection the UI needs; silently stays in demo mode. */
+/** Hydrate every collection the UI needs from the API. */
 export const hydrateWorkspace = ({ silent = false } = {}) => async (dispatch, getState) => {
   // The platform owner has no business data: their workspace is the tenant list.
   if (getState().auth.role === ROLES.SUPER_ADMIN) {
@@ -100,18 +90,13 @@ export const hydrateWorkspace = ({ silent = false } = {}) => async (dispatch, ge
       load('invoices', api.invoices), load('agents', api.agents),
     ]);
     dispatch(workspaceHydrated(adaptWorkspace({ projects, plots, bookings, customers, ledger, receipts, invoices, agents })));
-    dispatch(usersLoaded([]));                                   // never show the sample roster for a real organisation
+    dispatch(usersLoaded([]));                                   // the team list is loaded below for roles allowed to see it
     try { setRemoteSettings((await actions.orgSettings()).data); } catch { /* keep defaults; printing still works */ }
     if (['ADMIN', 'SALES MANAGER'].includes(getState().auth.role)) dispatch(loadUsers());
   } catch (error) {
-    if (error instanceof ApiUnavailableError) {
-      dispatch(workspaceDemo(''));            // offline preview: keep the demo dataset
-    } else {
-      // Signed in to a real tenant but the data failed to load: show nothing (never demo
-      // records belonging to nobody) and say why.
-      dispatch(workspaceFailed(error.message));
-      dispatch(toastPushed(`Could not load your workspace: ${error.message}`));
-    }
+    // Signed in but the data failed to load: show nothing and say why.
+    dispatch(workspaceFailed(error.message));
+    dispatch(toastPushed(`Could not load your workspace: ${error.message}`));
   }
 };
 
@@ -148,6 +133,47 @@ export const saveProject = (form, editing = null) => async (dispatch, getState) 
     dispatch(toastPushed(`Saved locally — sync failed: ${error.message}`));
   }
 };
+
+// ---------------------------------------------- edit / delete (Actions column)
+/** Run an API write, then reload the workspace. Resolves '' on success or the server's message. */
+const writeThenRefresh = (call, success) => async (dispatch, getState) => {
+  if (getState().auth.mode !== 'live') return 'Editing and deleting are available when connected to the server.';
+  try {
+    await call();
+    await dispatch(hydrateWorkspace({ silent: true }));
+    dispatch(toastPushed(success));
+    return '';
+  } catch (error) {
+    return error.message || 'The server refused this change.';
+  }
+};
+
+export const updateCustomerLive = (customer, changes) => writeThenRefresh(
+  () => api.customers.update(customer.id, changes), `Customer ${changes.name || customer.name} updated`);
+export const deleteCustomerLive = (customer) => writeThenRefresh(
+  () => api.customers.remove(customer.id), `Customer ${customer.name} deleted`);
+export const updateBookingLive = (booking, changes) => writeThenRefresh(
+  () => api.bookings.update(booking[10], changes), `Booking ${booking[0]} updated`);
+export const deleteBookingLive = (booking) => writeThenRefresh(
+  () => api.bookings.remove(booking[10]), `Booking ${booking[0]} deleted · plot ${booking[3]} is free again`);
+export const deleteProjectLive = (project) => writeThenRefresh(
+  () => api.projects.remove(project[6]), `Project ${project[0]} deleted`);
+export const updatePlotLive = (plot, changes) => writeThenRefresh(
+  () => api.plots.update(plot[9], changes), `Plot ${plot[0]} updated`);
+export const deletePlotLive = (plot) => writeThenRefresh(
+  () => api.plots.remove(plot[9]), `Plot ${plot[0]} deleted`);
+export const resetUserPasswordLive = (user) => async (dispatch, getState) => {
+  if (getState().auth.mode !== 'live' || typeof user.id !== 'number') return 'Password reset is available when connected to the server.';
+  try {
+    await actions.resetUserPassword(user.id);
+    dispatch(toastPushed(`${user.name}'s password was reset to the starting password. They must change it at next sign-in.`));
+    return '';
+  } catch (error) {
+    return error.message || 'Could not reset the password.';
+  }
+};
+export const deleteAgentLive = (agent) => writeThenRefresh(
+  () => api.agents.remove(agent.id), `Agent ${agent.name} deleted`);
 
 // --------------------------------------------------------------- bookings
 /** Live booking: the server decides the status (approver => confirmed, agent => pending) and the plot hold. */
@@ -275,7 +301,10 @@ export const createCustomer = (form) => async (dispatch, getState) => {
       });
       dispatch(rowUpserted({ key: 'customers', row: adaptCustomer(response.data) }));
       dispatch(modalClosed());
-      dispatch(toastPushed(`Customer ${form.name} sent to admin for approval`));
+      const login = response.data.portal_login || '';
+      dispatch(toastPushed(`Customer ${form.name} sent to admin for approval. Portal ${login.startsWith('login created')
+        ? 'login created: their e-mail + a starting password (first 4 letters of the name + last 5 digits of the mobile), not displayed.'
+        : login || 'login not created.'}`));
     } catch (error) {
       dispatch(toastPushed(`Could not add customer: ${error.message}`));
     }
@@ -712,7 +741,7 @@ export const loadUsers = () => async (dispatch) => {
   }
 };
 
-/** Create / edit a team member against the real API; a new member gets a one-time password. */
+/** Create / edit a team member against the real API; a new member gets a starting password built from their name and mobile (never shown). */
 const saveUserLive = (record) => async (dispatch, getState) => {
   const editing = getState().ui.userEdit || getState().ui.editRecord;
   const base = {
@@ -724,10 +753,11 @@ const saveUserLive = (record) => async (dispatch, getState) => {
       await api.users.update(editing.id, { ...base, status: String(record.status || '').toUpperCase() || undefined });
       dispatch(toastPushed(`Team member ${record.name} updated`));
     } else {
-      const password = generatePassword();
-      await api.users.create({ ...base, email: record.email, temporary_password: password });
-      dispatch(userCredentialShown({ name: record.name, email: record.email, password }));
-      dispatch(toastPushed(`Team member ${record.name} added`));
+      const letters = String(record.name || '').normalize('NFKD').replace(/[^A-Za-z]/g, '');
+      if (letters.length < 4) { dispatch(toastPushed('Enter a name with at least four letters — the starting password uses them.')); return; }
+      if (String(record.phone || '').replace(/\D/g, '').length < 10) { dispatch(toastPushed('Enter the 10-digit mobile number — the starting password uses its last five digits.')); return; }
+      await api.users.create({ ...base, phone: record.phone, email: record.email });
+      dispatch(toastPushed(`Team member ${record.name} added. Their starting password is the first 4 letters of the name + last 5 digits of the mobile (not displayed); they must change it at first sign-in.`));
     }
     dispatch(modalClosed());
     await dispatch(loadUsers());
@@ -780,47 +810,6 @@ export const deleteRecord = (record) => async (dispatch, getState) => {
 // --------------------------------------------------------------- helpers
 export const openCustomerDetail = (customer) => (dispatch) => {
   dispatch({ type: 'ui/customerSelected', payload: customer });
-};
-
-/**
- * Self-registration. Against the real API the request is only *recorded*: an administrator of that
- * organisation must activate the account before anyone can sign in. Offline it keeps the sample flow.
- */
-export const registerAccount = (account) => async (dispatch) => {
-  try {
-    const response = await actions.register({
-      name: account.name, email: account.email, phone: account.phone || undefined,
-      password: account.password, confirm_password: account.confirmPassword,
-      role: toApiRole(account.role), title: account.title || undefined,
-      consent: true, tenant: String(account.org || '').trim().toLowerCase(),
-    });
-    return { pending: true, message: response.message };
-  } catch (error) {
-    if (error instanceof ApiUnavailableError) {
-      dispatch(registerCustomerAccount(account));
-      return { local: true };
-    }
-    return { error: error.message };
-  }
-};
-
-/** Offline sample flow: creates the customer file + session locally. */
-export const registerCustomerAccount = (account) => (dispatch) => {
-  dispatch(rowUpserted({
-    key: 'customers',
-    row: {
-      id: `CUS-${String(Date.now()).slice(-4)}`,
-      name: account.name,
-      mobile: (account.phone || '').replace(/\D/g, '').slice(-10),
-      email: account.email,
-      address: '',
-      agent: '',
-      status: 'Pending Approval',
-      createdAt: todayLabel(),
-    },
-  }));
-  dispatch(signedIn({ role: ROLES.CUSTOMER, user: { ...account, customerName: account.name, role: ROLES.CUSTOMER } }));
-  dispatch(toastPushed(`Welcome, ${account.name}! Your customer workspace is ready.`));
 };
 
 export { sessionFailed };

@@ -11,7 +11,7 @@ import React, { useMemo, useState } from 'react';
 import {
   X, ChevronRight, Plus, Trash2, Download, Send, CheckCircle2, Ban, IndianRupee,
 } from 'lucide-react';
-import { COMPANY } from '../../data/seedData';
+import { COMPANY } from '../../data/appConfig';
 import {
   amountInWords, fmtINR, parseAmt, computeTotals, GST_OPTIONS, invoiceDate,
   INVOICE_STATUS_LABEL, itemsPayload,

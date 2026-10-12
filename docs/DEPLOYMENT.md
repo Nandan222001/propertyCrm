@@ -4,7 +4,7 @@
 
 | Environment | Purpose | Database | API docs | Notes |
 | --- | --- | --- | --- | --- |
-| local | developer laptop | SQLite (`backend/var/demo.sqlite3`) or Docker MySQL | enabled | demo seed, permissive hosts |
+| local | developer laptop | SQLite (`backend/var/demo.sqlite3`) or Docker MySQL | enabled | permissive hosts |
 | test | CI | MySQL 8.4 service container / in-process SQLite | enabled | `ENVIRONMENT=test`, fixtures only |
 | staging | pre-production | managed MySQL, TLS | disabled | production-like, synthetic data |
 | production | live | Multi-AZ RDS MySQL 8.4, TLS + `verify_identity` | disabled | HSTS, wildcard CORS rejected at startup |
@@ -21,7 +21,8 @@ cd backend
 python -m venv .venv && . .venv/bin/activate
 pip install -r requirements-dev.txt
 cp .env.example .env              # fill SECRET_KEY / INDEX_PEPPER / FIELD_ENCRYPTION_KEY
-python -m app.db.init_db          # create schema + seed demo data (SQLite by default)
+python -m app.db.init_db          # create the schema (SQLite by default) — no data is loaded
+python -m app.db.create_platform_admin --name "Your Name" --email you@example.com --phone 9XXXXXXXXX
 uvicorn app.main:app --reload --port 8000
 ```
 
@@ -33,20 +34,16 @@ python -c "import secrets; print(secrets.token_urlsafe(36))"                    
 python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
 ```
 
-### Demo accounts (seeded, development only)
+### First sign-in
 
-| Role | E-mail | Password |
-| --- | --- | --- |
-| Super admin | `superadmin@nmtsolution.demo` | `Demo@12345` |
-| Admin | `admin@nmtsolution.demo` | `Demo@12345` |
-| Sales manager | `manager@nmtsolution.demo` | `Demo@12345` |
-| Sales agent | `agent@nmtsolution.demo` | `Demo@12345` |
-| Accounts | `accounts@nmtsolution.demo` | `Demo@12345` |
-| Management | `management@nmtsolution.demo` | `Demo@12345` |
-| Customer portal | `customer@nmtsolution.demo` | `Demo@12345` |
+The application ships with **no sample data and no default accounts**. Create the platform owner once
+(`python -m app.db.create_platform_admin …`, shown above; it asks for a password). Then:
 
-> Demo passwords are seeded **only** in local/test (`ENVIRONMENT in {local,test}`)
-> and the seeder refuses to run in production without `ALLOW_PROD_SEED=1`.
+1. The platform owner signs in and creates an organisation together with its administrator
+   (Tenants → Add organisation).
+2. That administrator creates the organisation's other users; agents add customers.
+3. Anyone created by someone else starts with a password built from their name and mobile number
+   (first four letters + last five digits, never displayed) and must change it at first sign-in.
 
 ## 3. Database provisioning (MySQL)
 

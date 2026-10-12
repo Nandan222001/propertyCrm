@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from decimal import Decimal
 
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.constants import AuditAction, Permission, PlotStatus
@@ -80,6 +81,20 @@ class ProjectService(BaseService[Project]):
         self._audit(AuditAction.UPDATE, project, summary="Project updated")
         return project
 
+    def delete_project(self, project_id: int) -> Project:
+        self._authorise("delete")
+        project = self.projects.get_or_404(project_id)
+        in_use = self.db.execute(select(func.count(Plot.id)).where(
+            Plot.project_id == project.id, Plot.is_deleted.is_(False),
+            Plot.status != PlotStatus.AVAILABLE.value)).scalar_one()
+        if in_use:
+            raise BusinessRuleError(f"{in_use} plot(s) in this project are on hold, booked or sold — it cannot be deleted")
+        for plot in self.db.execute(select(Plot).where(Plot.project_id == project.id, Plot.is_deleted.is_(False))).scalars():
+            plot.soft_delete(self.actor.name)
+        self.projects.delete(project, actor=self.actor.name)
+        self._audit(AuditAction.DELETE, project, before=self._snapshot(project), summary="Project deleted")
+        return project
+
     def portfolio(self) -> list[dict]:
         """Project list + per-status plot counts in two queries total."""
         return [
@@ -105,6 +120,15 @@ class PlotService(BaseService[Plot]):
 
     def paginate(self, page: PaginationContext) -> Paginated[Plot]:
         return self.list(page)
+
+    def delete_plot(self, plot_id: int) -> Plot:
+        self._authorise("delete")
+        plot = self.plots.get_or_404(plot_id)
+        if plot.status != PlotStatus.AVAILABLE.value:
+            raise BusinessRuleError("Only an available plot can be deleted — it is currently " + plot.status.lower())
+        self.plots.delete(plot, actor=self.actor.name)
+        self._audit(AuditAction.DELETE, plot, before=self._snapshot(plot), summary="Plot deleted")
+        return plot
 
     def serialise(self, plot: Plot) -> PlotResponse:
 

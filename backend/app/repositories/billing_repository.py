@@ -41,7 +41,7 @@ class InvoiceRepository(BaseRepository[Invoice]):
         return None
 
     def next_number(self, *, year: int) -> str:
-        """``INV-YYYY-NNNN`` — monotonic per calendar year, seeded after demo data."""
+        """``INV-YYYY-NNNN`` — monotonic per calendar year."""
         like = f"INV-{year}-%"
         current = self.db.execute(
             select(func.max(Invoice.invoice_number)).where(Invoice.invoice_number.like(like))

@@ -12,21 +12,6 @@ export const slugify = (name) => {
 const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 const SLUG_RE = /^[a-z0-9](?:[a-z0-9-]{0,46}[a-z0-9])?$/;
 
-/** Strong one-time password (14 chars: upper, lower, digit, symbol) — demo mode only. */
-export function generatePassword() {
-  const sets = ['ABCDEFGHJKLMNPQRSTUVWXYZ', 'abcdefghijkmnpqrstuvwxyz', '23456789', '!@#$%^&*-_=+'];
-  const all = sets.join('');
-  const bytes = new Uint32Array(14);
-  (globalThis.crypto || window.crypto).getRandomValues(bytes);
-  const chars = sets.map((set, i) => set[bytes[i] % set.length]);
-  for (let i = sets.length; i < 14; i += 1) chars.push(all[bytes[i] % all.length]);
-  for (let i = chars.length - 1; i > 0; i -= 1) {
-    const j = bytes[i] % (i + 1);
-    [chars[i], chars[j]] = [chars[j], chars[i]];
-  }
-  return chars.join('');
-}
-
 export const seatUsage = (tenant) => {
   const used = tenant.usage?.users ?? 0;
   const pct = tenant.max_users ? Math.min(100, Math.round((used / tenant.max_users) * 100)) : 0;
@@ -56,12 +41,8 @@ export function validateTenant(form, { tenants = [], editing = null } = {}) {
     const admin = form.admin;
     if (admin.name.trim().length < 2) return 'Administrator name is required';
     if (!EMAIL_RE.test(admin.email.trim())) return 'Administrator e-mail is not valid';
-    if (admin.temporary_password) {
-      const p = admin.temporary_password;
-      if (p.length < 10 || !/[A-Z]/.test(p) || !/[a-z]/.test(p) || !/\d/.test(p) || !/[^A-Za-z0-9]/.test(p)) {
-        return 'Password needs 10+ characters with upper, lower, a digit and a symbol (or leave blank to generate one)';
-      }
-    }
+    if (admin.name.replace(/[^A-Za-z]/g, '').length < 4) return 'Administrator name needs at least four letters (they form the starting password)';
+    if (String(admin.phone || '').replace(/\D/g, '').length < 10) return 'Administrator mobile must be a 10-digit number (its last five digits form the starting password)';
   }
   return '';
 }
@@ -78,7 +59,7 @@ export const blankTenantForm = (tenant) => (tenant ? {
 } : {
   name: '', slug: '', plan: 'STANDARD', max_users: '25',
   contact_name: '', contact_email: '', contact_phone: '', notes: '',
-  admin: { name: '', email: '', phone: '', temporary_password: '' },
+  admin: { name: '', email: '', phone: '' },
 });
 
 /** KPI roll-up used by the platform dashboard and the Tenants page tiles. */

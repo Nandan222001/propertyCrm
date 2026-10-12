@@ -15,11 +15,10 @@ from app.schemas.auth import (
     ForgotPasswordRequest,
     LoginRequest,
     RefreshRequest,
-    RegisterRequest,
     ResetPasswordRequest,
 )
 from app.services.auth_service import AuthService
-from app.services.mailer import reset_link, send_mail
+from app.services.mailer import mail_enabled, reset_link, send_mail
 from app.services.rbac_service import RBACService
 
 COMMON_ERROR_RESPONSES = {
@@ -54,11 +53,6 @@ def logout(request: Request, actor: ActorDep, service: AuthServiceDep,
            payload: RefreshRequest | None = None) -> dict:
     service.logout(payload.refresh_token if payload else None, actor)
     return success(None, "Signed out")
-
-
-def register(payload: RegisterRequest, request: Request, service: AuthServiceDep) -> dict:
-    result = service.register(payload, ip=client_ip(request), user_agent=request.headers.get("user-agent"))
-    return success(result, "Account request received — an administrator must activate it before you can sign in")
 
 
 def me(user: CurrentUserDep, db: DbDep) -> dict:
@@ -99,8 +93,9 @@ def forgot_password(payload: ForgotPasswordRequest, request: Request, service: A
         )
     # Never reveal whether the address exists. In non-production the token is
     # also returned to make local testing possible.
-    body: dict = {"delivery": "email"}
-    if token and not settings.is_production:
+    # ``delivery`` describes the server (not the account), so it cannot be used to probe addresses.
+    body: dict = {"delivery": "email" if mail_enabled() else "unavailable"}
+    if token and not settings.is_production and not mail_enabled():
         body["debug_token"] = token
     return success(body, "If the address exists, a reset link has been sent")
 

@@ -1,10 +1,8 @@
-"""Idempotent demo seed mirroring the SPA's illustrative dataset.
+"""Fixture dataset for the automated tests ONLY.
 
-Safety rules:
-* refuses to run in production unless ``ALLOW_PROD_SEED`` is set;
-* never overwrites existing rows (checks by unique key first);
-* demo passwords come from ``SEED_DEMO_PASSWORD`` and must satisfy the password
-  policy — they are development credentials, documented as such.
+The application ships with no sample data and nothing here is ever loaded by it: the test
+suite builds this dataset in a throw-away SQLite database so workflows (bookings, billing,
+commissions, tenancy) have realistic rows to run against.
 """
 
 from __future__ import annotations
@@ -16,7 +14,6 @@ from decimal import Decimal
 from sqlalchemy.orm import Session
 
 from app.core.constants import (
-    COMPANY,
     ApprovalStatus,
     BookingStatus,
     InvoiceStatus,
@@ -38,6 +35,14 @@ from app.models.property import Document, Plot, Project
 from app.models.tenant import Tenant
 from app.models.user import User
 
+COMPANY = {
+    "name": "Lalita Realestate Infra",
+    "address": "Head Office, Mumbai, Maharashtra",
+    "gstin": "27AAACL1234K1ZV",
+    "phone": "+91 98765 00001",
+    "email": "accounts@nmtsolution.demo",
+}
+
 DEMO_PASSWORD = os.getenv("SEED_DEMO_PASSWORD", "Demo@12345")
 
 PROJECT_SEED = [
@@ -52,7 +57,6 @@ USER_SEED = [
     ("Meera Kumar", "manager@nmtsolution.demo", Role.SALES_MANAGER, "VP of Sales & Strategy"),
     ("Sanjay Patel", "agent@nmtsolution.demo", Role.SALES_AGENT, "Senior Property Consultant"),
     ("Neha Desai", "accounts@nmtsolution.demo", Role.ACCOUNTS, "Head of Treasury & Billing"),
-    ("Vikramaditya Birla", "management@nmtsolution.demo", Role.MANAGEMENT, "Managing Director"),
 ]
 
 AGENT_SEED = [
@@ -671,13 +675,3 @@ def seed_all(session: Session) -> None:
         f"Seeded {len(users)} users, {len(projects)} projects, {len(plots)} plots, "
         f"{len(customers)} customers, {len(bookings)} bookings, {invoice_count} invoices"
     )
-
-
-if __name__ == "__main__":  # pragma: no cover
-    from app.core.config import settings as _settings
-    from app.db.session import session_scope
-
-    if _settings.is_production and not os.getenv("ALLOW_PROD_SEED"):
-        raise SystemExit("Refusing to seed demo data in production (set ALLOW_PROD_SEED=1 to override)")
-    with session_scope() as _session:
-        seed_all(_session)

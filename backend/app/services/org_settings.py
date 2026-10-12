@@ -23,11 +23,13 @@ from app.services.company_profile import company_profile
 SECTIONS: dict[str, dict[str, int]] = {
     "company": {"name": 160, "address": 400, "gstin": 15, "phone": 24, "email": 190},
     "bank": {"bankName": 120, "accountName": 160, "accountNumber": 18, "ifsc": 11, "upi": 80},
-    "tax": {"receiptPrefix": 6, "defaultGst": 6, "tdsRate": 6, "dueDays": 4},
+    "tax": {"receiptPrefix": 6, "defaultGst": 6, "tdsRate": 6, "dueDays": 4, "holdDays": 3,
+            "installmentDays": 3, "defaultCommission": 6},
 }
 DEFAULTS = {
     "bank": {"bankName": "", "accountName": "", "accountNumber": "", "ifsc": "", "upi": ""},
-    "tax": {"receiptPrefix": "RCT", "defaultGst": "0.18", "tdsRate": "5", "dueDays": "15"},
+    "tax": {"receiptPrefix": "RCT", "defaultGst": "0.18", "tdsRate": "5", "dueDays": "15", "holdDays": "7",
+            "installmentDays": "30", "defaultCommission": "2"},
 }
 PATTERNS = {
     ("company", "gstin"): r"^\d{2}[A-Z]{5}\d{4}[A-Z][A-Z\d]Z[A-Z\d]$",
@@ -37,6 +39,9 @@ PATTERNS = {
     ("tax", "receiptPrefix"): r"^[A-Za-z]{2,6}$",
     ("tax", "tdsRate"): r"^\d{1,2}(\.\d+)?$",
     ("tax", "dueDays"): r"^\d{1,3}$",
+    ("tax", "holdDays"): r"^\d{1,3}$",
+    ("tax", "installmentDays"): r"^\d{1,3}$",
+    ("tax", "defaultCommission"): r"^\d{1,2}(\.\d+)?$",
     ("company", "email"): r"^[^@\s]+@[^@\s]+\.[^@\s]+$",
 }
 _CONTROL = re.compile(r"[\x00-\x1f<>]")
@@ -85,3 +90,15 @@ def get_value(db: Session, key: str, default: str) -> str:
     """One setting of the current organisation (the ORM tenant filter scopes the lookup)."""
     row = db.execute(select(AppSetting.value).where(AppSetting.key == key)).scalars().first()
     return row if row else default
+
+
+def setting_text(db: Session, section: str, field: str) -> str:
+    """One organisation setting, falling back to the documented default."""
+    return get_value(db, f"{section}.{field}", DEFAULTS[section][field])
+
+
+def setting_int(db: Session, section: str, field: str) -> int:
+    try:
+        return int(float(setting_text(db, section, field)))
+    except ValueError:
+        return int(float(DEFAULTS[section][field]))

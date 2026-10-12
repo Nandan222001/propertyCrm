@@ -9,11 +9,10 @@ import {
   Sparkles, Check, CheckCircle, Printer, MessageCircle
 } from 'lucide-react';
 import { parseAmt, fmtINR, amountInWords, agentKey, todayLabel, openWhatsApp, waLink, isAdmin, canCreateBooking, canApprove, canCreateCustomer, canRecordPayment, canManageBills, isCustomer, isPendingStatus } from '../../utils';
-import { projects, agents, seedUsers } from '../../data/seedData';
 
 import { RoleContextBanner } from '../../components/layout/RoleContextBanner';
 import { PAGES } from '../../constants/navigation';
-import { getSettings, saveSettingsSection, resetSettingsSection, setRemoteSettings, usesRemoteSettings } from '../../utils/settings';
+import { DEFAULT_SETTINGS, getSettings, saveSettingsSection, resetSettingsSection, setRemoteSettings, usesRemoteSettings } from '../../utils/settings';
 import { actions } from '../../api';
 import { clientAudit } from '../../utils/security';
 
@@ -34,7 +33,7 @@ const MODULES = [
     fields: [
       ['name', 'Company name', 'text', '', required('Company name')],
       ['address', 'Registered address', 'text', '', required('Address')],
-      ['gstin', 'GSTIN', 'text', '27AAACL1234K1ZV', pattern(/^\d{2}[A-Z]{5}\d{4}[A-Z][A-Z\d]Z[A-Z\d]$/i, 'Enter a valid 15-character GSTIN')],
+      ['gstin', 'GSTIN', 'text', '15-character GSTIN', pattern(/^\d{2}[A-Z]{5}\d{4}[A-Z][A-Z\d]Z[A-Z\d]$/i, 'Enter a valid 15-character GSTIN')],
       ['phone', 'Phone', 'text', '+91 …', pattern(/^[+\d][\d\s-]{6,}$/, 'Enter a valid phone number')],
       ['email', 'Accounts e-mail', 'email', '', pattern(/^[^@\s]+@[^@\s]+\.[^@\s]+$/, 'Enter a valid e-mail')],
     ],
@@ -49,9 +48,12 @@ const MODULES = [
       ['defaultGst', 'Default GST rate on new invoices', 'select', '', null, GST_CHOICES],
       ['tdsRate', 'TDS on commission (%)', 'number', '5', range(0, 30, 'TDS rate')],
       ['dueDays', 'Invoice payment terms (days)', 'number', '15', range(1, 365, 'Payment terms')],
+      ['holdDays', 'Plot hold while a booking awaits approval (days)', 'number', '7', range(1, 365, 'Hold period')],
+      ['installmentDays', 'Default gap to the next instalment (days)', 'number', '30', range(1, 365, 'Instalment gap')],
+      ['defaultCommission', 'Commission rate for agents without their own (%)', 'number', '2', range(0.1, 25, 'Commission rate')],
     ],
-    summary: (v) => `Prefix ${v.receiptPrefix} · GST ${Number(v.defaultGst) * 100}% · TDS ${v.tdsRate}% · ${v.dueDays} days`,
-    note: 'Used by new receipts, new invoices, issue due dates and the TDS report.',
+    summary: (v) => `Prefix ${v.receiptPrefix} · GST ${Number(v.defaultGst) * 100}% · TDS ${v.tdsRate}% · ${v.dueDays} days · hold ${v.holdDays} days`,
+    note: 'Used by new receipts, invoices, due dates, plot holds, instalment reminders, commissions and the TDS report.',
   },
   {
     key: 'bank', title: 'Banking & payment gateways', icon: Wallet,
@@ -60,8 +62,8 @@ const MODULES = [
       ['bankName', 'Bank name', 'text', '', null],
       ['accountName', 'Account holder name', 'text', '', null],
       ['accountNumber', 'Account number', 'text', '', pattern(/^\d{9,18}$/, 'Account number must be 9–18 digits')],
-      ['ifsc', 'IFSC', 'text', 'HDFC0001234', pattern(/^[A-Z]{4}0[A-Z0-9]{6}$/i, 'Enter a valid IFSC (e.g. HDFC0001234)')],
-      ['upi', 'UPI ID', 'text', 'name@bank', pattern(/^[\w.-]+@[\w-]+$/, 'Enter a valid UPI ID')],
+      ['ifsc', 'IFSC', 'text', 'IFSC code', pattern(/^[A-Z]{4}0[A-Z0-9]{6}$/i, 'Enter a valid 11-character IFSC code')],
+      ['upi', 'UPI ID', 'text', 'UPI ID', pattern(/^[\w.-]+@[\w-]+$/, 'Enter a valid UPI ID')],
     ],
     summary: (v) => (v.bankName ? `${v.bankName} · ${v.ifsc || 'no IFSC'}` : 'Not configured'),
     note: 'Printed on payment receipts so customers know where to pay.',
@@ -112,8 +114,7 @@ function SettingsModal({ module, close, onSaved }) {
     try {
       if (usesRemoteSettings()) {
         const defaults = module.key === 'company' ? { name: getSettings().company.name, address: '', gstin: '', phone: '', email: '' }
-          : module.key === 'tax' ? { receiptPrefix: 'RCT', defaultGst: '0.18', tdsRate: '5', dueDays: '15' }
-            : { bankName: '', accountName: '', accountNumber: '', ifsc: '', upi: '' };
+          : { ...DEFAULT_SETTINGS[module.key] };
         await persist(module.key, defaults);
       } else {
         resetSettingsSection(module.key);

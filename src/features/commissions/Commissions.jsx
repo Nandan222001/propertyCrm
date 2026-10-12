@@ -48,15 +48,6 @@ function CommissionSlip({ row, close }) {
   );
 }
 
-/** Commission register (shared with the TDS & payroll report). */
-export const COMMISSION_ROWS = [
-    ['M. Kumar', 'Green Meadows', 'A-012', '18,40,000', '2.0%', '36,800', 'APPROVED'],
-    ['S. Patel', 'Green Meadows', 'C-078', '25,20,000', '2.0%', '50,400', 'PAYABLE'],
-    ['R. Gupta', 'Silver Oaks', 'B-104', '12,60,000', '1.5%', '18,900', 'PAID'],
-    ['A. Khan', 'Green Meadows', 'A-101', '9,60,000', '2.0%', '19,200', 'PROCESSING'],
-    ['N. Bose', 'Park View', 'C-031', '24,75,000', '2.0%', '49,500', 'ON HOLD']
-];
-
 const STATUS_LABEL = (status) => String(status || '').replace(/_/g, ' ');
 const crLakh = (n) => (n >= 10000000 ? `₹${(n / 10000000).toFixed(2)} Cr` : n >= 100000 ? `₹${(n / 100000).toFixed(2)} L` : `₹${fmtINR(n)}`);
 
@@ -99,7 +90,7 @@ function PayoutModal({ row, close, save }) {
   );
 }
 
-export function Commissions({ search, notify, role, bookings = [] }) {
+export function Commissions({ search, notify, role, bookings = [], project = 'All projects' }) {
   const live = hasSession();
   const [viewing, setViewing] = useState(null);
   const [paying, setPaying] = useState(null);
@@ -132,7 +123,7 @@ export function Commissions({ search, notify, role, bookings = [] }) {
   };
 
   // The server already returns only the commissions this role may see (an agent: their own).
-  const data = live ? (rows || []) : COMMISSION_ROWS;
+  const data = (live ? (rows || []) : []).filter((r) => project === 'All projects' || r[1] === project);
   const sum = (filter) => data.filter(filter).reduce((t, r) => t + parseAmt(r[5]), 0);
   const stats = live
     ? [
@@ -141,8 +132,7 @@ export function Commissions({ search, notify, role, bookings = [] }) {
       ['READY FOR DISBURSAL', crLakh(sum((r) => r[6] === 'APPROVED')), 'indigo-text'],
       ['PENDING APPROVAL', crLakh(sum((r) => ['PAYABLE', 'PROCESSING'].includes(r[6]))), 'amber-text'],
     ]
-    : [['TOTAL COMMISSIONS', '₹7.68 L', ''], ['DISBURSED TO DATE', '₹4.82 L', 'green-text'],
-      ['READY FOR DISBURSAL', '₹1.92 L', 'indigo-text'], ['PENDING APPROVAL', '₹94,000', 'amber-text']];
+    : [['TOTAL COMMISSIONS', '—', ''], ['DISBURSED TO DATE', '—', ''], ['READY FOR DISBURSAL', '—', ''], ['PENDING APPROVAL', '—', '']];
 
   return (
     <>

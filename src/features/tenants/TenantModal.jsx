@@ -1,12 +1,11 @@
 import React, { useState } from 'react';
-import { Check, Eye, EyeOff, X } from 'lucide-react';
+import { Check, X } from 'lucide-react';
 import { PLAN_LABEL, TENANT_PLANS, blankTenantForm, slugify, validateTenant } from '../../utils/tenants';
 
 /** Create (editing = null) or edit an organisation. Creating also provisions its first administrator. */
 export function TenantModal({ editing, tenants, close, save }) {
   const [form, setForm] = useState(() => blankTenantForm(editing));
   const [slugTouched, setSlugTouched] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
 
@@ -47,7 +46,7 @@ export function TenantModal({ editing, tenants, close, save }) {
         <div className="form-grid">
           <label className="span-2">
             Organisation name *
-            <input value={form.name} onChange={onName} placeholder="e.g. Skyline Realty" autoFocus />
+            <input value={form.name} onChange={onName} placeholder="Organisation name" autoFocus />
           </label>
           {!editing && (
             <label>
@@ -56,7 +55,7 @@ export function TenantModal({ editing, tenants, close, save }) {
                 value={form.slug} placeholder="auto from name"
                 onChange={(e) => { setSlugTouched(true); setForm({ ...form, slug: e.target.value.toLowerCase() }); }}
               />
-              <small className="field-hint">Used when customers self-register. Cannot be changed later.</small>
+              <small className="field-hint">A short unique name for this organisation. Cannot be changed later.</small>
             </label>
           )}
           <label>
@@ -101,23 +100,13 @@ export function TenantModal({ editing, tenants, close, save }) {
                 <input type="email" value={form.admin.email} onChange={setAdmin('email')} />
               </label>
               <label>
-                Phone
+                Mobile *
                 <input value={form.admin.phone} onChange={setAdmin('phone')} />
               </label>
-              <label>
-                One-time password
-                <span style={{ display: 'flex', gap: 6 }}>
-                  <input
-                    style={{ flex: 1 }} type={showPassword ? 'text' : 'password'} autoComplete="new-password"
-                    value={form.admin.temporary_password} onChange={setAdmin('temporary_password')}
-                    placeholder="leave blank to generate"
-                  />
-                  <button type="button" className="icon-action" onClick={() => setShowPassword(!showPassword)} aria-label="Show password">
-                    {showPassword ? <EyeOff size={14} /> : <Eye size={14} />}
-                  </button>
-                </span>
-                <small className="field-hint">They must change it at first sign-in.</small>
-              </label>
+              <p className="field-hint" style={{ gridColumn: '1 / -1' }}>
+                Starting password: the first four letters of the name plus the last five digits of the mobile.
+                It is never shown to anyone, and they must change it at first sign-in.
+              </p>
             </div>
           </>
         )}

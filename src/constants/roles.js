@@ -6,14 +6,13 @@ export const ROLES = {
   SALES_MANAGER: 'SALES MANAGER',
   SALES_AGENT: 'SALES AGENT',
   ACCOUNTS: 'ACCOUNTS',
-  MANAGEMENT: 'MANAGEMENT',
   CUSTOMER: 'CUSTOMER',
 };
 
 /** Display order used by every role selector / role card grid. */
 export const ROLE_ORDER = [
   ROLES.SUPER_ADMIN, ROLES.ADMIN, ROLES.SALES_MANAGER,
-  ROLES.SALES_AGENT, ROLES.ACCOUNTS, ROLES.MANAGEMENT, ROLES.CUSTOMER,
+  ROLES.SALES_AGENT, ROLES.ACCOUNTS, ROLES.CUSTOMER,
 ];
 
 /** Roles allowed to approve agent-entered bookings/customers. */

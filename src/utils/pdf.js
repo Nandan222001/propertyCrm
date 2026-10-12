@@ -127,7 +127,7 @@ function paintInvoice(painter, payload) {
   const p = painter;
 
   /* header */
-  p.text(MARGIN, p.y, company.name || 'Lalita Realestate Infra', { size: 16, bold: true, color: ACCENT });
+  p.text(MARGIN, p.y, company.name || '', { size: 16, bold: true, color: ACCENT });
   p.y -= 13;
   for (const line of [company.address, `GSTIN: ${company.gstin || '—'}`, `Phone: ${company.phone || '—'} · ${company.email || '—'}`]) {
     if (line) { p.text(MARGIN, p.y, line, { size: 8, color: MUTED }); p.y -= 10.5; }

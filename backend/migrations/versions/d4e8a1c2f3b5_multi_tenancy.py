@@ -24,8 +24,8 @@ down_revision = "c7d31f0a4b6e"
 branch_labels = None
 depends_on = None
 
-DEFAULT_TENANT_SLUG = "lalita"
-DEFAULT_TENANT_NAME = "Lalita Realestate Infra"
+DEFAULT_TENANT_SLUG = "default"
+DEFAULT_TENANT_NAME = "Default organisation"
 
 #: Business data: every row must belong to a tenant.
 REQUIRED = (
@@ -89,11 +89,15 @@ def upgrade() -> None:
     op.create_index("ix_tenants_slug", "tenants", ["slug"], unique=True)
     op.create_index("ix_tenants_status", "tenants", ["status"])
 
-    # The default tenant adopts every existing row.
+    # Rows that pre-date multi-tenancy are adopted by a default tenant. A database with no such rows
+    # (a fresh install) gets no tenant at all: organisations are created by the platform owner.
+    legacy = " OR ".join(f"EXISTS (SELECT 1 FROM {table})" for table in REQUIRED)
+    legacy += " OR EXISTS (SELECT 1 FROM users WHERE role <> 'SUPER_ADMIN')"
     op.execute(
         sa.text(
             "INSERT INTO tenants (public_id, name, slug, status, plan, max_users) "
-            f"VALUES ('TEN-DEFAULT0001', '{DEFAULT_TENANT_NAME}', '{DEFAULT_TENANT_SLUG}', 'ACTIVE', 'ENTERPRISE', 1000)"
+            f"SELECT 'TEN-DEFAULT0001', '{DEFAULT_TENANT_NAME}', '{DEFAULT_TENANT_SLUG}', 'ACTIVE', 'ENTERPRISE', 1000 "
+            f"FROM (SELECT 1 AS one) AS marker WHERE {legacy}"
         )
     )
 

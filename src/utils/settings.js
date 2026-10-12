@@ -3,9 +3,8 @@
  * Persisted in localStorage and read at the point of use (thunks, reports,
  * print sheets) so a saved change takes effect immediately.
  */
-import { COMPANY } from '../data/seedData';
+import { COMPANY } from '../data/appConfig';
 
-const COMPANY_SAMPLE = { ...COMPANY };
 import { readJson, writeJson } from './storage';
 
 /** Which organisation the signed-in user belongs to (null offline / for the sample company). */
@@ -16,15 +15,16 @@ export function setSettingsTenant(next) {
   if (!same) applyCompany();
 }
 
-// Only the seeded sample company ('lalita') keeps the sample letterhead; any other organisation
-// starts from its own name with blank address / GSTIN / phone / email until it fills them in.
-const isSample = () => !tenant || tenant.slug === 'lalita';
-const defaultCompany = () => (isSample() ? { ...COMPANY_SAMPLE } : { name: tenant.name, address: '', gstin: '', phone: '', email: '' });
-const settingsKey = () => (tenant && !isSample() ? `admin_settings:${tenant.slug}` : 'admin_settings');
+// Every organisation starts from its own name with blank address / GSTIN / phone / email until it fills them in.
+const defaultCompany = () => ({ name: tenant?.name || '', address: '', gstin: '', phone: '', email: '' });
+const settingsKey = () => (tenant ? `admin_settings:${tenant.slug}` : 'admin_settings');
 
 export const DEFAULT_SETTINGS = {
-  company: { ...COMPANY },
-  tax: { receiptPrefix: 'RCT', defaultGst: '0.18', tdsRate: '5', dueDays: '15' },
+  company: { name: '', address: '', gstin: '', phone: '', email: '' },
+  tax: {
+    receiptPrefix: 'RCT', defaultGst: '0.18', tdsRate: '5', dueDays: '15',
+    holdDays: '7', installmentDays: '30', defaultCommission: '2',
+  },
   bank: { bankName: '', accountName: '', accountNumber: '', ifsc: '', upi: '' },
 };
 

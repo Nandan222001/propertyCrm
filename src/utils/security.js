@@ -33,7 +33,7 @@ export function clientAudit(event, detail = {}) {
 
 const readTrail = () => {
   try {
-    return JSON.parse(window.localStorage.getItem(`lalita_erp:${AUDIT_KEY}`) || 'null');
+    return JSON.parse(window.localStorage.getItem(`erp:${AUDIT_KEY}`) || 'null');
   } catch {
     return [];
   }

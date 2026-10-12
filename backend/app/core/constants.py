@@ -23,7 +23,6 @@ class Role(StrEnum):
     SALES_MANAGER = "SALES_MANAGER"
     SALES_AGENT = "SALES_AGENT"
     ACCOUNTS = "ACCOUNTS"
-    MANAGEMENT = "MANAGEMENT"
     CUSTOMER = "CUSTOMER"
 
 
@@ -147,7 +146,9 @@ ROLE_PERMISSIONS: dict[Role, frozenset[Permission]] = {
         {
             Permission.PROJECT_VIEW, Permission.PLOT_VIEW,
             Permission.BOOKING_VIEW_OWN, Permission.BOOKING_CREATE,
+            Permission.BOOKING_UPDATE, Permission.BOOKING_DELETE,
             Permission.CUSTOMER_VIEW_OWN, Permission.CUSTOMER_CREATE, Permission.CUSTOMER_UPDATE,
+            Permission.CUSTOMER_DELETE,
             Permission.COMMISSION_VIEW, Permission.DASHBOARD_VIEW,
             Permission.DOCUMENT_VIEW, Permission.NOTIFICATION_VIEW,
         }
@@ -165,15 +166,6 @@ ROLE_PERMISSIONS: dict[Role, frozenset[Permission]] = {
             Permission.PII_REVEAL,
         }
     ),
-    Role.MANAGEMENT: frozenset(
-        {
-            Permission.PROJECT_VIEW, Permission.PLOT_VIEW,
-            Permission.BOOKING_VIEW_ALL, Permission.CUSTOMER_VIEW_ALL, Permission.PAYMENT_VIEW_ALL,
-            Permission.INVOICE_VIEW_ALL,
-            Permission.COMMISSION_VIEW, Permission.REPORT_VIEW, Permission.REPORT_EXPORT,
-            Permission.DASHBOARD_VIEW, Permission.DOCUMENT_VIEW, Permission.NOTIFICATION_VIEW,
-        }
-    ),
     Role.CUSTOMER: frozenset(
         {
             Permission.PROJECT_VIEW, Permission.PLOT_VIEW, Permission.BOOKING_VIEW_OWN,
@@ -185,13 +177,13 @@ ROLE_PERMISSIONS: dict[Role, frozenset[Permission]] = {
 
 #: Roles that are allowed to reach staff-only surfaces (everything but the portal).
 STAFF_ROLES = frozenset(
-    {Role.SUPER_ADMIN, Role.ADMIN, Role.SALES_MANAGER, Role.SALES_AGENT, Role.ACCOUNTS, Role.MANAGEMENT}
+    {Role.SUPER_ADMIN, Role.ADMIN, Role.SALES_MANAGER, Role.SALES_AGENT, Role.ACCOUNTS}
 )
 
 
 class UserStatus(StrEnum):
     ACTIVE = "ACTIVE"
-    PENDING = "PENDING"   # self-registered: cannot sign in until an administrator activates the account
+    PENDING = "PENDING"   # legacy state: cannot sign in until an administrator activates the account
     INVITED = "INVITED"
     SUSPENDED = "SUSPENDED"
     LOCKED = "LOCKED"
@@ -288,19 +280,9 @@ class DocumentKind(StrEnum):
 
 
 #: Indian number formatting / commission and tax defaults (single source for services).
-COMMISSION_SLABS: tuple[tuple[int, float], ...] = ((10, 0.02), (5, 0.018), (0, 0.015))
 TDS_RATE = 0.05
 GST_RATE = 0.18
-COMPANY = {
-    "name": "Lalita Realestate Infra",
-    "address": "Head Office, Mumbai, Maharashtra",
-    "gstin": "27AAACL1234K1ZV",
-    "phone": "+91 98765 00001",
-    "email": "accounts@nmtsolution.demo",
-}
 
-#: Billing defaults: numbering starts after the seeded range, invoices are due
-#: 15 days after issue, and GST splits into CGST + SGST halves (intra-state).
-INVOICE_SEQUENCE_START = 100
-INVOICE_PAYMENT_TERM_DAYS = 15
+#: Billing: invoice numbers start at 0001 each year; GST splits into CGST + SGST halves (intra-state).
+INVOICE_SEQUENCE_START = 0
 INVOICE_GST_RATES = (Decimal("0"), Decimal("0.05"), Decimal("0.12"), Decimal("0.18"))

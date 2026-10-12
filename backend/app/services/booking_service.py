@@ -195,7 +195,7 @@ class BookingService(BaseService[Booking]):
         )
         self.bookings.create(booking)
         self._transition_plot(plot, status, customer_id=customer.id, agent_id=agent_id,
-                              hold_days=7 if not approved else None)
+                              hold_days=None if approved else self._hold_days())
         self.history.record(
             booking_id=booking.id, from_status=None, to_status=status,
             actor_id=self.actor.user_id, actor_label=self.actor.name,
@@ -239,6 +239,8 @@ class BookingService(BaseService[Booking]):
     # --------------------------------------------------------------- update
     def update_booking(self, booking_id: int, payload: BookingUpdate) -> Booking:
         booking = self.get(booking_id, scope_clause=self.scope_clause())
+        if not self.actor.can(Permission.BOOKING_APPROVE) and booking.status != BookingStatus.PENDING_APPROVAL.value:
+            raise PermissionDeniedError("Only bookings still awaiting approval can be edited by you")
         # Price revisions are an approval-level capability.
         price_changed = payload.final_price is not None and payload.final_price != booking.final_price
         if price_changed and not self.actor.can(Permission.BOOKING_APPROVE):
@@ -258,6 +260,32 @@ class BookingService(BaseService[Booking]):
         self._audit("crud.update", booking, before=before,
                     after={"final_price": str(booking.final_price), "status": booking.status},
                     summary="Booking updated")
+        return booking
+
+    def delete_booking(self, booking_id: int) -> Booking:
+        """Remove a booking that never turned into money; otherwise it must be cancelled, not erased."""
+        from sqlalchemy import func, select
+
+        from app.models.billing import Invoice
+        from app.models.payment import Payment
+
+        self._authorise("delete")
+        booking = self.get(booking_id, scope_clause=self.scope_clause())
+        if not self.actor.can(Permission.BOOKING_APPROVE) and booking.status != BookingStatus.PENDING_APPROVAL.value:
+            raise PermissionDeniedError("You can only remove a booking that is still awaiting approval")
+        if booking.status in (BookingStatus.AGREEMENT.value, BookingStatus.REGISTERED.value):
+            raise BusinessRuleError("A booking at agreement or registration stage cannot be deleted")
+        money = self.db.execute(select(func.count(Payment.id)).where(
+            Payment.booking_id == booking.id, Payment.is_deleted.is_(False))).scalar_one()
+        bills = self.db.execute(select(func.count(Invoice.id)).where(
+            Invoice.booking_id == booking.id, Invoice.is_deleted.is_(False))).scalar_one()
+        if money or bills:
+            raise BusinessRuleError("This booking has payments or invoices — cancel it instead of deleting it")
+        if booking.status in (BookingStatus.PENDING_APPROVAL.value, BookingStatus.CONFIRMED.value):
+            self._transition_plot(self.plots.get_or_404(booking.plot_id), BookingStatus.CANCELLED.value,
+                                  customer_id=None, agent_id=booking.agent_id)
+        self.bookings.delete(booking, actor=self.actor.name)
+        self._audit("crud.delete", booking, before={"status": booking.status}, summary="Booking deleted")
         return booking
 
     # ------------------------------------------------------------- workflow
@@ -381,9 +409,14 @@ class BookingService(BaseService[Booking]):
                     after={"registry_stage": stage}, summary=f"Registry stage {previous} → {stage}")
         return booking
 
-    def release_expired_holds(self, *, grace_days: int = 7) -> int:
+    def _hold_days(self) -> int:
+        from app.services.org_settings import setting_int
+
+        return setting_int(self.db, "tax", "holdDays")
+
+    def release_expired_holds(self, *, grace_days: int | None = None) -> int:
         """Scheduled job: release plots whose approval hold has lapsed."""
-        cutoff = self.bookings.now() - timedelta(days=grace_days)
+        cutoff = self.bookings.now() - timedelta(days=grace_days if grace_days is not None else self._hold_days())
         stale = [
             booking for booking in self.bookings.pending_approval()
             if booking.created_at <= cutoff

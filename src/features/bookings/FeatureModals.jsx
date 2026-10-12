@@ -1,6 +1,5 @@
 import React, { useMemo, useState } from 'react';
 import { X, ChevronRight } from 'lucide-react';
-import { projects as seedProjects, agents } from '../../data/seedData';
 import { hasSession } from '../../api';
 import { parseAmt, fmtINR, isAdmin } from '../../utils';
 
@@ -31,10 +30,10 @@ const Field = ({ label, children, hint, wide }) => (
 );
 
 // ---------------------------------------------------------------- booking
-export function BookingModal({ role, agentName, customers, plots, projects = seedProjects, close, save, preset }) {
-  // The agents this tenant really has (taken from its own customers); the sample roster only offline.
+export function BookingModal({ role, agentName, customers, plots, projects = [], close, save, preset }) {
+  // The agents this tenant really has (taken from its own customers).
   const fromCustomers = [...new Set(customers.map((c) => c.agent).filter(Boolean))].sort();
-  const agentOptions = fromCustomers.length ? fromCustomers : agents.map((a) => a[0]);
+  const agentOptions = fromCustomers;
   const agentMode = role === 'SALES AGENT';
   // Live data is already limited to the agent's own customers by the server; offline we match by name.
   const myCustomers = customers.filter(c => c.status === 'Approved' && (!agentMode || hasSession() || c.agent === agentName));
@@ -195,8 +194,8 @@ export function CustomerModal({ agentName, customers, projects = [], defaultProj
       <form onSubmit={submit}>
         <div className="form-grid">
           <Field label="Full name"><input name="name" required placeholder="Neha Kapoor" /></Field>
-          <Field label="Mobile (WhatsApp)"><input name="mobile" required inputMode="tel" placeholder="98765 43210" /></Field>
-          <Field label="Email"><input name="email" type="email" required placeholder="name@email.com" /></Field>
+          <Field label="Mobile (WhatsApp)"><input name="mobile" required inputMode="tel" placeholder="10-digit mobile number" /></Field>
+          <Field label="Email"><input name="email" type="email" required placeholder="E-mail address" /></Field>
           <Field label="Sales agent"><input value={agentName} readOnly /></Field>
           {projects.length > 0 && (
             <Field label="Project">

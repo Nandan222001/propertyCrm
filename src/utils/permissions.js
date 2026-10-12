@@ -16,6 +16,11 @@ export const isCustomer = (role) => role === ROLES.CUSTOMER;
 export const canCreateBooking = (role) => isAdmin(role) || role === ROLES.SALES_AGENT;
 export const canApprove = (role) => isAdmin(role);
 export const canCreateCustomer = (role) => role === ROLES.SALES_AGENT;
+/** Edit / remove from the Actions column. The server enforces the same rules (and scopes an agent to their own rows). */
+export const canEditCustomer = (role) => isAdmin(role) || role === ROLES.SALES_AGENT || role === ROLES.SALES_MANAGER;
+export const canDeleteCustomer = (role, customer) => isAdmin(role) || (role === ROLES.SALES_AGENT && customer?.status !== 'Approved');
+export const canEditBooking = (role, booking) => isAdmin(role) || ([ROLES.SALES_AGENT].includes(role) && booking?.[7] === 'Pending Approval');
+export const canDeleteBooking = canEditBooking;
 export const canRecordPayment = (role) => isAdmin(role) || role === ROLES.ACCOUNTS;
 export const canManageBills = (role) => isAdmin(role) || role === ROLES.ACCOUNTS;
 export const canManageUsers = (role) => isAdmin(role);
@@ -27,7 +32,7 @@ export const canCancelInvoice = canCreateInvoice;
 export const canPayInvoice = (role) => isAdmin(role) || role === ROLES.ACCOUNTS;
 /** Everyone who can open the Billing page can read the book / download PDFs. */
 export const canViewBilling = (role) => isAdmin(role)
-  || [ROLES.ACCOUNTS, ROLES.MANAGEMENT, ROLES.SALES_MANAGER, ROLES.CUSTOMER].includes(role);
+  || [ROLES.ACCOUNTS, ROLES.SALES_MANAGER, ROLES.CUSTOMER].includes(role);
 
 /** Permission strings the backend enforces, exposed for feature-level gating. */
 export const PERMISSIONS = {
@@ -51,7 +56,6 @@ const ROLE_PERMISSIONS = {
   [ROLES.SALES_MANAGER]: [PERMISSIONS.BOOKING_CREATE, PERMISSIONS.BOOKING_APPROVE, PERMISSIONS.CUSTOMER_CREATE, PERMISSIONS.INVOICE_VIEW_ALL],
   [ROLES.SALES_AGENT]: [PERMISSIONS.BOOKING_CREATE, PERMISSIONS.CUSTOMER_CREATE],
   [ROLES.ACCOUNTS]: [PERMISSIONS.PAYMENT_CREATE, PERMISSIONS.INVOICE_CREATE, PERMISSIONS.INVOICE_UPDATE, PERMISSIONS.INVOICE_ISSUE, PERMISSIONS.INVOICE_CANCEL, PERMISSIONS.INVOICE_VIEW_ALL],
-  [ROLES.MANAGEMENT]: [PERMISSIONS.INVOICE_VIEW_ALL],
   [ROLES.CUSTOMER]: [PERMISSIONS.INVOICE_VIEW_OWN],
 };
 

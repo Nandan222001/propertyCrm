@@ -65,7 +65,7 @@ def update_project(project_id: int, payload: ProjectUpdate, service: ProjectServ
 
 
 def delete_project(project_id: int, service: ProjectServiceDep) -> dict:
-    service.delete(project_id)
+    service.delete_project(project_id)
     return success(None, "Project deleted")
 
 
@@ -91,7 +91,7 @@ def set_plot_status(plot_id: int, payload: PlotStatusUpdate, service: PlotServic
 
 
 def delete_plot(plot_id: int, service: PlotServiceDep) -> dict:
-    service.delete(plot_id)
+    service.delete_plot(plot_id)
     return success(None, "Plot deleted")
 
 

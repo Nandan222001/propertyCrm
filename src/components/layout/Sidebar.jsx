@@ -8,7 +8,7 @@ export function Sidebar({
   session, onNavigate, onClose, onProjectChange, onLogout, onChangePassword,
 }) {
   const [pickerOpen, setPickerOpen] = useState(false);
-  const [brandFirst, ...brandWords] = (tenantName || 'Lalita Realestate Infra').split(' ');
+  const [brandFirst, ...brandWords] = (tenantName || '').split(' ');
   const brandRest = brandWords.join(' ');
   const pick = (value) => { onProjectChange(value); setPickerOpen(false); };
   const renderItems = (items) => items.map((name) => {

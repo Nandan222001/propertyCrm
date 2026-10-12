@@ -48,10 +48,10 @@ security: ## Local security gate: SAST, dependency audit, secret scan
 migrate: ## Apply database migrations
 	cd backend && $(PY) -m alembic upgrade head
 
-seed: ## Create the schema and load demo data
+seed: ## Create the (empty) local schema
 	cd backend && ENVIRONMENT=local DB_DIALECT=sqlite SQLITE_PATH=var/demo.sqlite3 $(PY) -m app.db.init_db
 
-db-reset: ## Delete the local SQLite database and reseed it
+db-reset: ## Delete the local SQLite database and recreate it empty
 	rm -f backend/var/demo.sqlite3 && $(MAKE) seed
 
 build: ## Production build of the SPA

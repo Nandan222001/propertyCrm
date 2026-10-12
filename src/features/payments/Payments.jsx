@@ -9,7 +9,6 @@ import {
   Sparkles, Check, CheckCircle, Printer, MessageCircle
 } from 'lucide-react';
 import { parseAmt, fmtINR, amountInWords, agentKey, todayLabel, openWhatsApp, waLink, isAdmin, canCreateBooking, canApprove, canCreateCustomer, canRecordPayment, canManageBills, isCustomer, isPendingStatus } from '../../utils';
-import { projects, agents, seedUsers } from '../../data/seedData';
 
 import { Table } from '../../components/common/DataTable';
 import { Badge } from '../../components/common/Badge';

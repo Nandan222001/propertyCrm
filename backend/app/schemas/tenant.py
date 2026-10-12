@@ -8,7 +8,7 @@ from datetime import datetime
 from pydantic import Field, field_validator
 
 from app.core.constants import TenantPlan, TenantStatus
-from app.core.validators import normalise_mobile, validate_email, validate_password
+from app.core.validators import normalise_mobile, validate_email
 from app.schemas.common import ORMModel, RequestModel, SafeText
 
 SLUG_RE = re.compile(r"^[a-z0-9](?:[a-z0-9-]{0,46}[a-z0-9])?$")
@@ -29,9 +29,8 @@ class TenantAdminIn(RequestModel):
 
     name: str = Field(min_length=2, max_length=120)
     email: str = Field(max_length=254)
-    phone: str | None = Field(default=None, max_length=20)
-    #: Optional — when omitted a strong one-time password is generated and returned once.
-    temporary_password: str | None = Field(default=None, min_length=8, max_length=128)
+    #: Required: the starting password is built from the name and this number (never displayed).
+    phone: str = Field(min_length=10, max_length=20)
 
     @field_validator("email")
     @classmethod
@@ -40,13 +39,8 @@ class TenantAdminIn(RequestModel):
 
     @field_validator("phone")
     @classmethod
-    def _phone(cls, value: str | None) -> str | None:
-        return normalise_mobile(value) if value else None
-
-    @field_validator("temporary_password")
-    @classmethod
-    def _password(cls, value: str | None) -> str | None:
-        return validate_password(value) if value else None
+    def _phone(cls, value: str) -> str:
+        return normalise_mobile(value)
 
 
 class TenantCreate(SafeText):
@@ -141,8 +135,7 @@ class TenantAdminResponse(ORMModel):
 
 
 class TenantProvisioned(ORMModel):
-    """Create/add-admin result. ``initial_password`` is shown exactly once."""
+    """Create / add-admin / reset result. The starting password is never part of any response."""
 
     tenant: TenantResponse
     admin: TenantAdminResponse
-    initial_password: str | None = None

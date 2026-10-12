@@ -4,7 +4,7 @@ import { KeyRound, X } from 'lucide-react';
 const STRONG = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,128}$/;
 
 /**
- * Change my password. `forced` = first sign-in with a one-time password: it cannot be dismissed
+ * Change my password. `forced` = first sign-in with the starting password: it cannot be dismissed
  * until a new password is chosen. The server signs everyone out afterwards.
  */
 export function ChangePasswordDialog({ forced = false, onSubmit, close }) {
@@ -15,7 +15,7 @@ export function ChangePasswordDialog({ forced = false, onSubmit, close }) {
 
   const submit = async (e) => {
     e.preventDefault();
-    if (!form.current) return setError('Enter your current (one-time) password.');
+    if (!form.current) return setError('Enter your current (starting) password.');
     if (!STRONG.test(form.next)) return setError('Use at least 8 characters with upper and lower case letters, a digit and a symbol.');
     if (form.next !== form.confirm) return setError('The new passwords do not match.');
     if (form.next === form.current) return setError('Choose a password different from the current one.');
@@ -32,7 +32,7 @@ export function ChangePasswordDialog({ forced = false, onSubmit, close }) {
           <div>
             <span className="modal-kicker"><KeyRound size={12} /> {forced ? 'SET YOUR OWN PASSWORD' : 'ACCOUNT SECURITY'}</span>
             <h2>{forced ? 'Choose a new password' : 'Change password'}</h2>
-            <p>{forced ? 'You signed in with a one-time password. Pick your own before continuing.' : 'You will be signed out everywhere and asked to sign in again.'}</p>
+            <p>{forced ? 'You signed in with your starting password. Pick your own before continuing.' : 'You will be signed out everywhere and asked to sign in again.'}</p>
           </div>
           {!forced && <button type="button" className="modal-close" onClick={close} aria-label="Close"><X size={16} /></button>}
         </div>

@@ -6,10 +6,11 @@ import {
   CalendarDays, Building2, House, Receipt, FileText, Clock3, CheckCircle2,
   AlertCircle, SlidersHorizontal, Send, Eye, Edit2, LockKeyhole, RefreshCw,
   FileSpreadsheet, MapPin, IndianRupee, Mail, Phone, Activity, Trash2, LogOut,
-  Sparkles, Check, CheckCircle, Printer, MessageCircle
+  Sparkles, Check, CheckCircle, Printer, MessageCircle, KeyRound
 } from 'lucide-react';
+import { ConfirmDialog } from '../../components/common/ConfirmDialog';
+import { actions } from '../../api';
 import { parseAmt, fmtINR, amountInWords, agentKey, todayLabel, openWhatsApp, waLink, isAdmin, canCreateBooking, canApprove, canCreateCustomer, canRecordPayment, canManageBills, isCustomer, isPendingStatus } from '../../utils';
-import { projects, agents, seedUsers } from '../../data/seedData';
 
 import { Table } from '../../components/common/DataTable';
 import { Badge } from '../../components/common/Badge';
@@ -17,14 +18,28 @@ import { Mini } from '../../components/common/StatTile';
 import { Avatar } from '../../components/common/Avatar';
 import { RoleContextBanner } from '../../components/layout/RoleContextBanner';
 
-export function Roles({ role, notify, users = [], create, edit, remove }) {
-  const matrix = [
-    ['ADMIN', '✓', '✓', '✓', '✓', '✓', '✓', '✓', '✓'],
-    ['SALES MANAGER', '●', '✓', '●', '✓', '●', '✓', '✓', '—'],
-    ['SALES AGENT', '—', '●', '—', '●', '—', '●', '●', '—'],
-    ['ACCOUNTS', '—', '—', '✓', '—', '✓', '✓', '✓', '—'],
-    ['MANAGEMENT', '—', '—', '—', '—', '—', '✓', '✓', '—']
-  ];
+export function Roles({ role, notify, users = [], create, edit, remove, resetPassword }) {
+  const [resetting, setResetting] = useState(null);
+  // The matrix is read from the server's own permission table, so it can never drift from what is enforced.
+  const [grants, setGrants] = useState(null);
+  useEffect(() => {
+    let live = true;
+    actions.roleMatrix().then((r) => { if (live) setGrants(r.data?.roles || []); }).catch(() => { if (live) setGrants([]); });
+    return () => { live = false; };
+  }, []);
+  const matrix = (grants || []).filter((r) => r.role !== 'SUPER_ADMIN').map((r) => {
+    const has = (p) => r.permissions.includes(p);
+    const level = (module, { single = false } = {}) => {
+      if (single ? has(`${module}:view`) : has(`${module}:view_all`)) return '✓';
+      return r.permissions.some((p) => p.startsWith(`${module}:`)) ? '●' : '—';
+    };
+    return [
+      r.label, level('plot', { single: true }), level('booking'), level('payment'), level('customer'),
+      level('commission', { single: true }), level('report', { single: true }), level('document', { single: true }),
+      has('user:manage') ? '✓' : '—',
+    ];
+  });
+  const inactive = users.filter((u) => !['Active', 'Invited'].includes(u.status)).length;
 
   return (
     <>
@@ -33,9 +48,9 @@ export function Roles({ role, notify, users = [], create, edit, remove }) {
       {/* Users Admin Table */}
       <div className="mini-stats four">
         <Mini title="PROVISIONED USERS" value={users.length} />
-        <Mini title="ACTIVE SESSIONS" value={users.filter(u => u.status === 'Active').length} color="green-text" />
-        <Mini title="SECURITY ROLES" value="6" />
-        <Mini title="COMPLIANCE STATUS" value="SOC-2 Ready" color="green-text" />
+        <Mini title="ACTIVE ACCOUNTS" value={users.filter(u => u.status === 'Active').length} color="green-text" />
+        <Mini title="ROLES IN USE" value={new Set(users.map((u) => u.role)).size} />
+        <Mini title="SUSPENDED / LOCKED" value={inactive} color={inactive ? 'amber-text' : 'green-text'} />
       </div>
 
       <section className="panel section-panel users-panel">
@@ -61,6 +76,11 @@ export function Roles({ role, notify, users = [], create, edit, remove }) {
               <button className="icon-action" title="Edit user" onClick={() => edit(u)}>
                 <Edit2 size={14} />
               </button>
+              {resetPassword && typeof u.id === 'number' && (
+                <button className="icon-action" title="Reset password" onClick={() => setResetting(u)}>
+                  <KeyRound size={14} />
+                </button>
+              )}
               <button className="icon-action delete-action" title="Delete user" onClick={() => remove(u)}>
                 <Trash2 size={14} />
               </button>
@@ -68,6 +88,16 @@ export function Roles({ role, notify, users = [], create, edit, remove }) {
           ])}
         />
       </section>
+
+      {resetting && (
+        <ConfirmDialog
+          title="Reset password"
+          message={`Reset ${resetting.name}'s password to their starting password (first 4 letters of the name + last 5 digits of the mobile)? Every session they have is signed out and they must choose a new password when they next sign in. The password is not displayed.`}
+          confirmLabel="Reset password"
+          onConfirm={() => resetPassword(resetting)}
+          onCancel={() => setResetting(null)}
+        />
+      )}
 
       {/* Permissions Matrix */}
       <div className="panel section-panel" style={{ marginTop: 14 }}>
@@ -78,6 +108,7 @@ export function Roles({ role, notify, users = [], create, edit, remove }) {
           </div>
         </div>
 
+        {grants === null && <p className="empty-note">Loading permissions…</p>}
         <Table
           headers={['ROLE', 'ALL PLOTS', 'BOOKINGS', 'PAYMENTS', 'CUSTOMERS', 'COMMISSIONS', 'REPORTS', 'DOCS', 'ADMIN']}
           rows={matrix.map(row => row.map((x, i) => i === 0 ? <b>{x}</b> : (

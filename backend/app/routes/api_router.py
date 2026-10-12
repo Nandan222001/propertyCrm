@@ -29,6 +29,7 @@ PUBLIC_PATHS = (
     "/health",
     "/ready",
     "/metrics",
+    "/branding",
 )
 
 api_router = APIRouter()

@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Search, X, MessageCircle } from 'lucide-react';
-import { COMPANY, agents } from '../../data/seedData';
+import { COMPANY } from '../../data/appConfig';
 import { api, hasSession } from '../../api';
 import { parseAmt, fmtINR, openWhatsApp } from '../../utils';
 
@@ -43,8 +43,7 @@ export function AgentLookup({ onPick }) {
   const matches = useMemo(() => {
     const t = q.trim().toLowerCase();
     if (!t) return [];
-    if (live) return found;
-    return agents.filter(a => a[0].toLowerCase().includes(t) || a[1].toLowerCase().includes(t));
+    return live ? found : [];
   }, [q, live, found]);
   return (
     <div className="agent-lookup">

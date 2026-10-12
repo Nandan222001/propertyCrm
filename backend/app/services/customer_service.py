@@ -2,22 +2,28 @@
 
 from __future__ import annotations
 
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.core.constants import ApprovalStatus, AuditAction, Permission, Role
+from app.core.constants import ApprovalStatus, AuditAction, BookingStatus, Permission, Role, UserStatus
 from app.core.context import ActorContext, PaginationContext
-from app.core.exceptions import BusinessRuleError, ConflictError, PermissionDeniedError
+from app.core.exceptions import BusinessRuleError, ConflictError, PermissionDeniedError, ValidationError
+from app.core.passwords import initial_password
 from app.core.responses import Paginated
+from app.core.security import hash_password
 from app.core.validators import mask_address, mask_email, mask_name, mask_phone
 from app.db.base import utcnow
+from app.models.booking import Booking
 from app.models.customer import Customer, CustomerConsent
 from app.models.property import Project
+from app.models.user import User
 from app.repositories.customer_repository import (
     CustomerConsentRepository,
     CustomerRepository,
     DataSubjectRequestRepository,
 )
 from app.repositories.finance_repository import AgentRepository
+from app.repositories.user_repository import AuthTokenRepository, UserRepository
 from app.schemas.customer import (
     CustomerCreate,
     CustomerDecision,
@@ -46,6 +52,8 @@ class CustomerService(BaseService[Customer]):
         self.consents = CustomerConsentRepository(db)
         self.requests = DataSubjectRequestRepository(db)
         self.agents = AgentRepository(db)
+        #: Plain-language result of the portal-login step of the last ``create_customer`` call.
+        self.portal_login = ""
 
     # ------------------------------------------------------------ scope hint
     def scope_clause(self):
@@ -163,10 +171,65 @@ class CustomerService(BaseService[Customer]):
             )
         self._audit(AuditAction.CREATE, customer, after={"status": customer.status, "agent_id": agent_id},
                     summary="Customer created (pending approval)")
+        self.portal_login = self._provision_portal_login(customer, payload.email, payload.phone)
         # Tell the approvers — and only them — that something is waiting for sign-off.
         emit(self.db, title="Customer awaiting approval",
              body=f"{customer.name} was added by {self.actor.name} and needs admin approval.",
              category="APPROVAL", audience_role=Role.ADMIN.value)
+        return customer
+
+    # ---------------------------------------------------------- portal login
+    def _portal_user(self, customer: Customer) -> User | None:
+        return self.db.execute(
+            select(User).where(User.customer_id == customer.id, User.role == Role.CUSTOMER.value,
+                               User.is_deleted.is_(False))
+        ).scalars().first()
+
+    def _provision_portal_login(self, customer: Customer, email: str, phone: str) -> str:
+        """Give a new customer a sign-in: their e-mail + the starting password (never displayed)."""
+        email = email.lower().strip()
+        if UserRepository(self.db).get_by_email(email):
+            return "no login created: this e-mail already belongs to another account"
+        try:
+            password = initial_password(customer.name, phone)
+        except ValidationError as problem:
+            return f"no login created: {problem.message}"
+        self.db.add(User(
+            name=customer.name, email=email, phone=phone, role=Role.CUSTOMER.value,
+            title="Customer", status=UserStatus.INVITED.value, password_hash=hash_password(password),
+            must_change_password=True, password_changed_at=utcnow(), customer_id=customer.id,
+        ))
+        self.db.flush()
+        return "login created: e-mail + starting password (first 4 letters of the name + last 5 digits of the mobile)"
+
+    def _drop_portal_login(self, customer: Customer, *, suspend_only: bool = False) -> None:
+        user = self._portal_user(customer)
+        if user is None:
+            return
+        AuthTokenRepository(self.db).revoke_all_for_user(user.id)
+        if suspend_only:
+            user.status = UserStatus.SUSPENDED.value
+        else:
+            user.soft_delete(self.actor.name)
+        self.db.flush()
+
+    def delete_customer(self, customer_id: int) -> Customer:
+        """Remove a customer file. Agents may only remove their own, not-yet-approved entries."""
+        self._authorise("delete")
+        customer = self.get(customer_id, scope_clause=self.scope_clause())
+        if not self.actor.can(Permission.CUSTOMER_APPROVE) and customer.status == ApprovalStatus.APPROVED.value:
+            raise PermissionDeniedError("An approved customer can only be removed by an administrator")
+        live = self.db.execute(
+            select(func.count(Booking.id)).where(
+                Booking.customer_id == customer.id, Booking.is_deleted.is_(False),
+                Booking.status.notin_([BookingStatus.CANCELLED.value, BookingStatus.REJECTED.value]),
+            )
+        ).scalar_one()
+        if live:
+            raise BusinessRuleError("This customer still has active bookings — cancel or remove those first")
+        self.customers.delete(customer, actor=self.actor.name)
+        self._drop_portal_login(customer)
+        self._audit(AuditAction.DELETE, customer, before=self._snapshot(customer), summary="Customer removed")
         return customer
 
     def update_customer(self, customer_id: int, payload: CustomerUpdate) -> Customer:
@@ -200,6 +263,9 @@ class CustomerService(BaseService[Customer]):
                     )
                 )
         self.customers.update(customer, self.customers.prepare_pii(values))
+        portal = self._portal_user(customer)
+        if portal is not None and "email" in values and not UserRepository(self.db).get_by_email(values["email"]):
+            portal.email = values["email"].lower().strip()   # the customer signs in with their current e-mail
         self._audit(AuditAction.UPDATE, customer, summary="Customer updated")
         return customer
 
@@ -214,6 +280,12 @@ class CustomerService(BaseService[Customer]):
         customer.approved_by_id = self.actor.user_id if payload.status == ApprovalStatus.APPROVED else None
         customer.approved_at = utcnow() if payload.status == ApprovalStatus.APPROVED else None
         self.db.flush()
+        portal = self._portal_user(customer)
+        if portal is not None:
+            if payload.status == ApprovalStatus.REJECTED:
+                self._drop_portal_login(customer, suspend_only=True)
+            elif portal.status == UserStatus.SUSPENDED.value:
+                portal.status = UserStatus.INVITED.value if portal.must_change_password else UserStatus.ACTIVE.value
         self._audit(
             AuditAction.APPROVE if payload.status == ApprovalStatus.APPROVED else AuditAction.REJECT,
             customer,
@@ -239,6 +311,7 @@ class CustomerService(BaseService[Customer]):
         customer = self.customers.get_or_404(customer_id)
         before = {"name": customer.name, "status": customer.status}
         self.customers.anonymise(customer)
+        self._drop_portal_login(customer)
         self._audit(AuditAction.ERASURE, customer, before=before,
                     after={"anonymised_at": str(customer.anonymised_at)},
                     summary=f"Customer erased: {reason}")

@@ -217,3 +217,16 @@ def test_dependency_policy_pins_and_documents_holds() -> None:
     assert not unpinned, f"unpinned runtime dependencies: {unpinned}"
     assert "bcrypt==4.0.1" in requirements
     assert "passlib" in read("docs/DEPENDENCY_MANAGEMENT.md")
+
+
+def test_application_ships_without_sample_data_or_demo_loader():
+    """Nothing in ``app/`` may seed demo records; test fixtures live under ``tests/`` only."""
+    from pathlib import Path
+
+    app_dir = Path(__file__).resolve().parents[1] / "app"
+    assert not (app_dir / "db" / "seed.py").exists()
+    offenders = [
+        str(path.relative_to(app_dir)) for path in app_dir.rglob("*.py")
+        if any(marker in path.read_text(encoding="utf-8") for marker in ("seed_all", "DEMO_PASSWORD", "nmtsolution.demo"))
+    ]
+    assert not offenders, f"sample data referenced from the application code: {offenders}"

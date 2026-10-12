@@ -8,17 +8,16 @@ from typing import Any
 from pydantic import Field, field_validator
 
 from app.core.constants import Role, UserStatus
-from app.core.validators import normalise_mobile, validate_email, validate_password
+from app.core.validators import normalise_mobile, validate_email
 from app.schemas.common import ORMModel, SafeText, TimestampedResponse
 
 
 class UserCreate(SafeText):
     name: str = Field(min_length=2, max_length=120)
     email: str = Field(max_length=254)
-    phone: str | None = Field(default=None, max_length=20)
+    phone: str = Field(min_length=10, max_length=20)
     role: Role
     title: str | None = Field(default=None, max_length=120)
-    temporary_password: str = Field(min_length=8, max_length=128)
     agent_code: str | None = Field(default=None, max_length=16)
 
     @field_validator("email")
@@ -28,13 +27,8 @@ class UserCreate(SafeText):
 
     @field_validator("phone")
     @classmethod
-    def _phone(cls, value: str | None) -> str | None:
-        return normalise_mobile(value) if value else None
-
-    @field_validator("temporary_password")
-    @classmethod
-    def _password(cls, value: str) -> str:
-        return validate_password(value)
+    def _phone(cls, value: str) -> str:
+        return normalise_mobile(value)
 
 
 class UserUpdate(SafeText):

@@ -57,6 +57,11 @@ def unlock_user(user_id: int, service: UserServiceDep) -> dict:
     return success(service.serialise(user).model_dump(), "Account unlocked")
 
 
+def reset_user_password(user_id: int, service: UserServiceDep) -> dict:
+    service.reset_password(user_id)
+    return success(None, "Password reset to the starting password — the user must change it at next sign-in")
+
+
 def delete_user(user_id: int, service: UserServiceDep) -> dict:
     service.delete_user(user_id)
     return success(None, "Account deleted")

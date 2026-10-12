@@ -22,3 +22,11 @@ def ready(response: Response) -> dict:
 @router.get("/metrics", summary="Minimal Prometheus metrics")
 def metrics() -> Response:
     return controller.metrics()
+
+
+@router.get("/branding", summary="Deployment name shown on the sign-in page")
+def branding() -> dict:
+    from app.core.config import settings
+    from app.core.responses import success
+
+    return success({"name": settings.BRAND_NAME, "tagline": settings.BRAND_TAGLINE}, "Branding")

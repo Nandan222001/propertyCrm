@@ -1,4 +1,4 @@
-"""Database bootstrap: create tables from metadata and (optionally) seed demo data.
+"""Database bootstrap: create tables from metadata. No data is ever loaded.
 
 Used by ``python -m app.db.init_db`` and by the app lifespan in local/test.
 Production migrations are handled by Alembic (``alembic upgrade head``) — this
@@ -11,7 +11,7 @@ import logging
 
 from app.core.config import settings
 from app.core.logging import configure_logging
-from app.db.session import get_engine, session_scope
+from app.db.session import get_engine
 from app.models import Base  # importing registers all models
 
 logger = logging.getLogger(__name__)
@@ -22,21 +22,16 @@ def create_tables() -> None:
     logger.info("Schema ensured (%d tables)", len(Base.metadata.tables))
 
 
-def bootstrap_database(*, seed_demo: bool = False) -> None:
-    """Ensure schema exists, then seed a working dataset when asked."""
+def bootstrap_database() -> None:
+    """Ensure the schema exists. Organisations and users are created through the application."""
     create_tables()
-    if seed_demo:
-        from app.db.seed import seed_all
-
-        with session_scope() as session:
-            seed_all(session)
 
 
 def main() -> None:  # pragma: no cover - CLI entry point
     configure_logging()
     print(f"Bootstrapping {settings.DB_DIALECT} database '{settings.DB_NAME}' …")
-    bootstrap_database(seed_demo=settings.ENVIRONMENT in {"local", "test"})
-    print("Done. Sign in with an account from docs/DEPLOYMENT.md (demo passwords are dev-only).")
+    bootstrap_database()
+    print("Done. Create the first platform owner with: python -m app.db.create_platform_admin")
 
 
 if __name__ == "__main__":  # pragma: no cover

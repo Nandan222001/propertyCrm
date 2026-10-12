@@ -35,7 +35,19 @@ const { act } = await import('react');
 const { createRoot } = await import('react-dom/client');
 const { Provider } = await import('react-redux');
 const { MemoryRouter } = await import('react-router-dom');
-const { App, createStore, signedIn } = await import(pathToFileURL(outfile).href);
+const { App, createStore, signedIn, tenantsLoaded } = await import(pathToFileURL(outfile).href);
+
+// Fixture organisations (the app itself ships with none).
+const FIXTURES = [
+  ['Lalita Realestate Infra', 'lalita', 'ENTERPRISE', 100, 'ACTIVE'],
+  ['Skyline Realty', 'skyline', 'STANDARD', 25, 'ACTIVE'],
+  ['Horizon Developers', 'horizon', 'TRIAL', 5, 'SUSPENDED'],
+].map(([name, slug, plan, max_users, status], i) => ({
+  id: i + 1, public_id: `TEN-FIX${i + 1}`, name, slug, plan, max_users, status, contact_name: '', contact_email: '', contact_phone: '', notes: '',
+  suspended_at: status === 'SUSPENDED' ? '2026-09-20T08:00:00Z' : null, suspended_reason: status === 'SUSPENDED' ? 'Trial period ended' : null,
+  created_at: `2026-0${i + 3}-02T09:00:00Z`, usage: { users: 1, projects: 0, plots: 0, customers: 0, bookings: 0 },
+  admins: [{ id: (i + 1) * 100, name: `${name} Admin`, email: `admin@${slug}.test`, status: 'ACTIVE', must_change_password: false }],
+}));
 
 const failures = [];
 const check = (condition, message) => { console.log(`  ${condition ? '✓' : '✗'} ${message}`); if (!condition) failures.push(message); };
@@ -43,6 +55,7 @@ const check = (condition, message) => { console.log(`  ${condition ? '✓' : '�
 const mount = async (role, route) => {
   const store = createStore();
   store.dispatch(signedIn({ role, user: { name: `${role} Tester`, role, email: `${role}@test` } }));
+  if (!store.getState().tenants.items.length) store.dispatch(tenantsLoaded(FIXTURES));
   const host = document.createElement('div');
   document.body.appendChild(host);
   const root = createRoot(host);
@@ -98,18 +111,15 @@ await submit(ui.host.querySelector('.modal'));
 check(text(ui.host).includes('Administrator e-mail is not valid'), 'invalid administrator e-mail is rejected');
 await setValue(field(ui.host, 'E-mail *'), 'boss@testorg.demo');
 await setValue(field(ui.host, 'Name *'), 'Test Boss');
+await setValue(field(ui.host, 'Mobile *'), '9876543210');
 await setValue(field(ui.host, 'User seats'), '5');
 await submit(ui.host.querySelector('.modal'));
 const created = ui.store.getState().tenants.items.find((t) => t.name === 'Test Org');
 check(Boolean(created) && created.slug === 'test-org' && created.status === 'ACTIVE' && created.max_users === 5, 'tenant created (slug auto-derived, ACTIVE, 5 seats)');
 check(created?.admins?.[0]?.email === 'boss@testorg.demo', 'first administrator provisioned');
-const credential = ui.store.getState().tenants.credential;
-check(Boolean(credential?.password) && credential.password.length >= 14 && /[A-Z]/.test(credential.password) && /\d/.test(credential.password) && /[^A-Za-z0-9]/.test(credential.password),
-  'a strong one-time password was generated');
-check(text(ui.host).includes('One-time password') && text(ui.host).includes('boss@testorg.demo'), 'one-time password dialog is shown');
-check(!JSON.stringify(window.localStorage).includes(credential.password), 'the password is never written to storage');
-await click(byText(ui.host, 'button', 'I have saved it'));
-check(ui.store.getState().tenants.credential === null, 'credential cleared after acknowledgement');
+check(!('credential' in ui.store.getState().tenants), 'no one-time password is kept in state');
+check(!/One-time password|test43210/i.test(text(ui.host)), 'the starting password is not displayed anywhere');
+check(!JSON.stringify(window.localStorage).includes('test43210'), 'the password is never written to storage');
 check(text(ui.host).includes('Test Org'), 'new organisation appears in the table');
 
 // edit + seat guard
@@ -143,14 +153,13 @@ await click(row().querySelector('button[title="View organisation"]'));
 check(text(ui.host).includes('Administrators') && text(ui.host).includes('boss@testorg.demo'), 'detail lists administrators');
 await setValue(field(ui.host, 'Name'), 'Second Admin');
 await setValue(ui.host.querySelector('.modal input[type="email"]'), 'second@testorg.demo');
+await setValue(field(ui.host, 'Mobile'), '9123456789');
 await submit(ui.host.querySelector('.modal form'));
 t = ui.store.getState().tenants.items.find((x) => x.name === 'Test Org');
 check(t.admins.length === 2 && t.usage.users === 2, 'second administrator added (seat count updated)');
-check(Boolean(ui.store.getState().tenants.credential), 'one-time password issued for the new administrator');
-await click(byText(ui.host, 'button', 'I have saved it'));
+check(!/seco56789/i.test(text(ui.host)), 'the new administrator\'s starting password is not displayed');
 await click(byText(ui.host, 'button', 'Reset password'));
-check(Boolean(ui.store.getState().tenants.credential), 'reset password issues a fresh one-time password');
-await click(byText(ui.host, 'button', 'I have saved it'));
+check(!/seco56789/i.test(text(ui.host)), 'reset does not display a password either');
 
 // platform owner cannot reach business pages
 await ui.unmount();
@@ -179,7 +188,7 @@ await ui.unmount();
 
 // ------------------------------------------------------------ everyone else: no platform access
 console.log('tenant staff');
-for (const role of ['ADMIN', 'SALES MANAGER', 'SALES AGENT', 'ACCOUNTS', 'MANAGEMENT', 'CUSTOMER']) {
+for (const role of ['ADMIN', 'SALES MANAGER', 'SALES AGENT', 'ACCOUNTS', 'CUSTOMER']) {
   ui = await mount(role, '/tenants');
   const html = text(ui.host);
   check(!html.includes('Tenant Management') && !html.includes('Add Tenant'), `${role} cannot open /tenants`);
