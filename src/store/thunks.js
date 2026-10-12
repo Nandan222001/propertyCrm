@@ -4,11 +4,12 @@
  * mirrors the change through the REST API. Reads hydrate the same slices the
  * demo seed fills, which is why the app works both against MySQL and offline.
  */
-import { ApiUnavailableError, actions, api, setTokens, clearTokens } from '../api';
+import { ApiUnavailableError, actions, api, hasSession, setTokens, clearTokens } from '../api';
 import { ROLES, toUiRole } from '../constants/roles';
 import { COMPANY, roleConfigs } from '../data/appConfig';
 import { amountInWords, fmtINR, parseAmt } from '../utils/money';
 import { todayLabel } from '../utils/date';
+import { isValidMobile, normaliseMobile, MOBILE_HINT } from '../utils/phone';
 import { BOOKING_STATUS, PAYMENT_STATUS, PLOT_STATUS } from '../utils/status';
 import { nextReference, newId } from '../utils/id';
 import { getSettings } from '../utils/settings';
@@ -52,6 +53,31 @@ export const signIn = ({ email, password }) => async (dispatch) => {
     dispatch(authError(failure.message));
     clientAudit('auth.login_failed', { code: failure.code });
     throw failure;
+  }
+};
+
+/**
+ * After a page reload: confirm the stored session with the server before anything is shown or saved.
+ * A session that cannot be confirmed is dropped, so the app is never "signed in but offline".
+ */
+export const restoreSession = () => async (dispatch) => {
+  if (!hasSession()) {
+    dispatch(signedOut());
+    return false;
+  }
+  try {
+    const { data } = await actions.me();
+    const user = data?.user || data || {};
+    dispatch(sessionLoaded({ user, permissions: user.permissions }));
+    await dispatch(hydrateWorkspace());
+    return true;
+  } catch (error) {
+    clearTokens();
+    dispatch(signedOut());
+    dispatch(loginNoticeSet(error instanceof ApiUnavailableError
+      ? 'Cannot reach the server. Please sign in again once it is available.'
+      : 'Your session has ended. Please sign in again.'));
+    return false;
   }
 };
 
@@ -755,8 +781,8 @@ const saveUserLive = (record) => async (dispatch, getState) => {
     } else {
       const letters = String(record.name || '').normalize('NFKD').replace(/[^A-Za-z]/g, '');
       if (letters.length < 4) { dispatch(toastPushed('Enter a name with at least four letters — the starting password uses them.')); return; }
-      if (String(record.phone || '').replace(/\D/g, '').length < 10) { dispatch(toastPushed('Enter the 10-digit mobile number — the starting password uses its last five digits.')); return; }
-      await api.users.create({ ...base, phone: record.phone, email: record.email });
+      if (!isValidMobile(record.phone)) { dispatch(toastPushed(`${MOBILE_HINT} The starting password uses its last five digits.`)); return; }
+      await api.users.create({ ...base, phone: normaliseMobile(record.phone), email: record.email });
       dispatch(toastPushed(`Team member ${record.name} added. Their starting password is the first 4 letters of the name + last 5 digits of the mobile (not displayed); they must change it at first sign-in.`));
     }
     dispatch(modalClosed());

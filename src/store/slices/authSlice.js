@@ -32,6 +32,8 @@ const initialState = {
   loginNotice: '',
   /** Role string of the active session ('' = signed out). */
   session: readStoredRole('session'),
+  /** True while a session restored from this browser has not yet been confirmed by the server. */
+  needsVerification: Boolean(readStoredRole('session')),
   role: readStoredRole('role') || ROLES.ADMIN,
   users: [],
   currentUser: readJson('current_user', null) || defaultUserFor(ROLES.ADMIN),
@@ -53,6 +55,7 @@ const authSlice = createSlice({
       state.role = role;
       state.permissions = permissions;
       state.currentUser = user || defaultUserFor(role);
+      state.needsVerification = false;
       state.status = 'signedIn';
       state.error = '';
       clientAudit('auth.login', { role, mode: state.mode });
@@ -61,6 +64,7 @@ const authSlice = createSlice({
     sessionLoaded(state, action) {
       const { user, permissions = [] } = action.payload || {};
       state.mode = 'live';
+      state.needsVerification = false;
       state.status = 'signedIn';
       state.error = '';
       if (user) {
@@ -89,6 +93,7 @@ const authSlice = createSlice({
     },
     signedOut(state) {
       state.session = '';
+      state.needsVerification = false;
       state.permissions = [];
       state.currentUser = defaultUserFor(ROLES.ADMIN);
       state.role = ROLES.ADMIN;

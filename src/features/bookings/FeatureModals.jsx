@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { X, ChevronRight } from 'lucide-react';
 import { hasSession } from '../../api';
-import { parseAmt, fmtINR, isAdmin } from '../../utils';
+import { parseAmt, fmtINR, isAdmin, isValidMobile, normaliseMobile, MOBILE_HINT } from '../../utils';
 
 function Shell({ kicker, title, sub, close, children }) {
   return (
@@ -183,8 +183,8 @@ export function CustomerModal({ agentName, customers, projects = [], defaultProj
   function submit(e) {
     e.preventDefault();
     const d = Object.fromEntries(new FormData(e.currentTarget));
-    const mobile = d.mobile.replace(/\D/g, '').slice(-10);
-    if (mobile.length !== 10) return setError('Enter a valid 10-digit mobile number.');
+    if (!isValidMobile(d.mobile)) return setError(MOBILE_HINT);
+    const mobile = normaliseMobile(d.mobile);
     if (customers.some(c => c.mobile === mobile)) return setError('A customer with this mobile number already exists.');
     if (projects.length && !d.project) return setError('Choose the project this customer is for.');
     save({ name: d.name.trim(), mobile, email: d.email.trim(), address: d.address.trim(), agent: agentName, project: d.project || '' });
@@ -193,7 +193,7 @@ export function CustomerModal({ agentName, customers, projects = [], defaultProj
     <Shell kicker="ERP · CUSTOMERS" title="Add New Customer" sub="Only sales agents add customers. The admin approves every new customer." close={close}>
       <form onSubmit={submit}>
         <div className="form-grid">
-          <Field label="Full name"><input name="name" required placeholder="Neha Kapoor" /></Field>
+          <Field label="Full name"><input name="name" required placeholder="Full name" /></Field>
           <Field label="Mobile (WhatsApp)"><input name="mobile" required inputMode="tel" placeholder="10-digit mobile number" /></Field>
           <Field label="Email"><input name="email" type="email" required placeholder="E-mail address" /></Field>
           <Field label="Sales agent"><input value={agentName} readOnly /></Field>

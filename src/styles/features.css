@@ -291,3 +291,5 @@
 .button.danger-btn:hover:not(:disabled) { background: #b91c1c; border-color: #b91c1c; }
 .icon-action.danger { color: #dc2626; }
 .icon-action.danger:hover { background: #fee2e2; }
+
+.boot-screen { min-height: 100vh; display: grid; place-items: center; color: var(--text-muted, #64748b); font-size: 15px; }

@@ -35,7 +35,7 @@ const { act } = await import('react');
 const { createRoot } = await import('react-dom/client');
 const { Provider } = await import('react-redux');
 const { MemoryRouter } = await import('react-router-dom');
-const { App, createStore, signedIn, tenantsLoaded } = await import(pathToFileURL(outfile).href);
+const { App, createStore, signedIn, sessionLoaded, hydrateWorkspace } = await import(pathToFileURL(outfile).href);
 
 // Fixture organisations (the app itself ships with none).
 const FIXTURES = [
@@ -49,19 +49,63 @@ const FIXTURES = [
   admins: [{ id: (i + 1) * 100, name: `${name} Admin`, email: `admin@${slug}.test`, status: 'ACTIVE', must_change_password: false }],
 }));
 
+// A tiny stand-in for the platform API, so the console is exercised exactly as it runs against the server.
+let server = JSON.parse(JSON.stringify(FIXTURES));
+let nextId = 50;
+const reply = (status, body) => { const wire = JSON.stringify(body); return Promise.resolve({ ok: status < 400, status, statusText: String(status), json: async () => JSON.parse(wire) }); };   // like a real response: a copy
+const light = (t) => { const { admins, ...rest } = t; return rest; };
+const stubFetch = async (url, options = {}) => {
+  const path = String(url).replace(/^.*\/api\/v1/, '').split('?')[0];
+  const method = options.method || 'GET';
+  const body = options.body ? JSON.parse(options.body) : {};
+  const ok = (data) => reply(200, { success: true, data, meta: { page: 1, has_next: false }, request_id: 'x' });
+  let m;
+  if (path === '/tenants' && method === 'GET') return ok(server.map(light));
+  if (path === '/tenants' && method === 'POST') {
+    if (server.some((t) => t.slug === body.slug)) return reply(409, { success: false, error: { message: 'That slug is already taken' } });
+    const id = nextId++;
+    const tenant = { id, public_id: `TEN-NEW${id}`, ...body, status: 'ACTIVE', suspended_at: null, suspended_reason: null, created_at: new Date().toISOString(),
+      usage: { users: 1, projects: 0, plots: 0, customers: 0, bookings: 0 } };
+    delete tenant.admin;
+    const admin = { id: id * 100, name: body.admin.name, email: body.admin.email, status: 'ACTIVE', must_change_password: true };
+    tenant.admins = [admin];
+    server.push(tenant);
+    return reply(201, { success: true, data: { tenant: light(tenant), admin }, request_id: 'x' });
+  }
+  if ((m = path.match(/^\/tenants\/(\d+)$/))) {
+    const t = server.find((x) => x.id === Number(m[1]));
+    if (method === 'PATCH') Object.assign(t, body);
+    return ok(method === 'GET' ? t : light(t));
+  }
+  if ((m = path.match(/^\/tenants\/(\d+)\/suspend$/))) { const t = server.find((x) => x.id === Number(m[1])); Object.assign(t, { status: 'SUSPENDED', suspended_reason: body.reason, suspended_at: new Date().toISOString() }); return ok(light(t)); }
+  if ((m = path.match(/^\/tenants\/(\d+)\/activate$/))) { const t = server.find((x) => x.id === Number(m[1])); Object.assign(t, { status: 'ACTIVE', suspended_reason: null, suspended_at: null }); return ok(light(t)); }
+  if ((m = path.match(/^\/tenants\/(\d+)\/admins$/))) {
+    const t = server.find((x) => x.id === Number(m[1]));
+    const admin = { id: Date.now(), name: body.name, email: body.email, status: 'ACTIVE', must_change_password: true };
+    t.admins.push(admin); t.usage.users += 1;
+    return reply(201, { success: true, data: { tenant: light(t), admin }, request_id: 'x' });
+  }
+  if (/^\/tenants\/\d+\/admins\/\d+\/reset-password$/.test(path)) return ok({ ok: true });
+  return reply(404, { success: false, error: { message: `unexpected ${method} ${path}` } });
+};
+
+globalThis.fetch = stubFetch;
+
 const failures = [];
 const check = (condition, message) => { console.log(`  ${condition ? '✓' : '✗'} ${message}`); if (!condition) failures.push(message); };
 
 const mount = async (role, route) => {
   const store = createStore();
-  store.dispatch(signedIn({ role, user: { name: `${role} Tester`, role, email: `${role}@test` } }));
-  if (!store.getState().tenants.items.length) store.dispatch(tenantsLoaded(FIXTURES));
+  if (role === 'SUPER ADMIN') store.dispatch(sessionLoaded({ user: { name: 'Platform Owner', role: 'SUPER_ADMIN', email: 'owner@test' }, permissions: [] }));
+  else store.dispatch(signedIn({ role, user: { name: `${role} Tester`, role, email: `${role}@test` } }));
+  if (role === 'SUPER ADMIN') await act(async () => { await store.dispatch(hydrateWorkspace()); });   // same as sign-in
   const host = document.createElement('div');
   document.body.appendChild(host);
   const root = createRoot(host);
   await act(async () => {
     root.render(React.createElement(Provider, { store }, React.createElement(MemoryRouter, { initialEntries: [route] }, React.createElement(App))));
   });
+  await act(async () => { await new Promise((resolve) => setTimeout(resolve, 60)); });   // let the stand-in API answer
   return { store, host, unmount: () => act(async () => { root.unmount(); host.remove(); }) };
 };
 
@@ -78,7 +122,8 @@ const field = (host, labelText) => {
   if (!el) throw new Error(`form field not found: "${labelText}" (labels: ${[...host.querySelectorAll('label')].map((l) => l.textContent.trim().slice(0, 18)).join(' | ')})`);
   return el;
 };
-const submit = (form) => act(async () => { form.dispatchEvent(new window.Event('submit', { bubbles: true, cancelable: true })); });
+const settle = () => act(async () => { await new Promise((resolve) => setTimeout(resolve, 50)); });   // let the stand-in API answer
+const submit = async (form) => { await act(async () => { form.dispatchEvent(new window.Event('submit', { bubbles: true, cancelable: true })); }); await settle(); };
 const modal = (host) => host.querySelector('.modal-backdrop');
 
 // ------------------------------------------------------------------ platform admin
@@ -159,6 +204,7 @@ t = ui.store.getState().tenants.items.find((x) => x.name === 'Test Org');
 check(t.admins.length === 2 && t.usage.users === 2, 'second administrator added (seat count updated)');
 check(!/seco56789/i.test(text(ui.host)), 'the new administrator\'s starting password is not displayed');
 await click(byText(ui.host, 'button', 'Reset password'));
+await settle();
 check(!/seco56789/i.test(text(ui.host)), 'reset does not display a password either');
 
 // platform owner cannot reach business pages
@@ -183,7 +229,7 @@ console.log(`  (store now holds ${ui.store.getState().tenants.items.length} orga
 check(ui.host.querySelectorAll('tbody tr').length === 10, 'tenant table shows 10 rows per page');
 check(text(ui.host).includes('Page 1 of 2'), 'pagination controls shown');
 await click(ui.host.querySelector('button[aria-label="Next page"]'));
-check(ui.host.querySelectorAll('tbody tr').length === 5 && text(ui.host).includes('Page 2 of 2'), 'page 2 shows the remaining 5 of 15 organisations');
+check(ui.host.querySelectorAll('tbody tr').length === 6 && text(ui.host).includes('Page 2 of 2'), 'page 2 shows the remaining 6 of 16 organisations (the new one persisted on the server)');
 await ui.unmount();
 
 // ------------------------------------------------------------ everyone else: no platform access

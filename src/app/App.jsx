@@ -21,7 +21,7 @@ import {
 } from '../store/selectors';
 import { hasSession } from '../api';
 import {
-  createBooking, createCustomer, decideBooking, decideCustomer, deleteRecord, hydrateWorkspace,
+  createBooking, createCustomer, decideBooking, decideCustomer, deleteRecord, hydrateWorkspace, restoreSession,
   markReceiptShared, recordPayment, saveProject, setInvoiceStatus, setPaymentStatus, setNextDueDate, changeMyPassword, saveRecord, setFollowUp, updateCustomerLive, deleteCustomerLive, updateBookingLive, deleteBookingLive, deleteProjectLive, deletePlotLive, updatePlotLive, resetUserPasswordLive,
   setRegistryStatus, actionNotification, loadNotifications, signIn, signOut, saveInvoice, issueInvoice, cancelInvoice, payInvoice,
   shareInvoice, downloadInvoicePdf,
@@ -78,6 +78,8 @@ export function App() {
   const teamUsers = useAppSelector(selectUsers);
   const loginNotice = useAppSelector((state) => state.auth.loginNotice);
   const [changingPassword, setChangingPassword] = useState(false);
+  const needsVerification = useAppSelector((state) => state.auth.needsVerification);
+  const [verifying, setVerifying] = useState(needsVerification);
   const unread = auth.mode === 'live' ? notifications.items.filter((n) => !n.is_read).length : null;
   const scoped = useAppSelector(selectScopedData);
   const nav = useAppSelector(selectNavigation);
@@ -107,10 +109,12 @@ export function App() {
     }
   }, [location.pathname, allowedPages, dispatch, navigate, ui.page]);
 
-  // Restore a live session after a page reload (tokens live in sessionStorage).
+  // After a page reload the stored session is confirmed with the server first; until then nothing is
+  // shown or saved, so the app can never be "signed in" without being connected.
   useEffect(() => {
-    if (hasSession()) dispatch(hydrateWorkspace());
-  }, [dispatch]);
+    if (!needsVerification) return;
+    dispatch(restoreSession()).finally(() => setVerifying(false));
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Keep the approval queue fresh: customers/bookings sent by agents appear without a reload.
   useEffect(() => {
@@ -223,6 +227,7 @@ export function App() {
   }, [auth.session, auth.user?.tenantName]);
 
   /* ---------------------------------------------------------------- auth */
+  if (verifying) return <div className="boot-screen" role="status">Loading your workspace…</div>;
   if (!auth.session) {
     return (
       <LoginScreen

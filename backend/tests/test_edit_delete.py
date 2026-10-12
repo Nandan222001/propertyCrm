@@ -149,3 +149,47 @@ def test_admin_edits_plot_details_but_an_agent_cannot(client, admin_headers, age
     assert edited.status_code == 200, edited.text
     data = edited.json()["data"]
     assert data["layout"] == "Layout Z — Revised" and data["facing"] == "North" and float(data["price"]) == 2100000
+
+
+def test_new_agent_gets_a_login_and_existing_agents_can_be_given_one(client, admin_headers, unique_email):
+    from tests.conftest import starting_password
+
+    code = f"L{uuid.uuid4().hex[:5].upper()}"
+    created = client.post("/api/v1/agents", headers=admin_headers, json={
+        "name": "Login Agent", "code": code, "email": unique_email, "phone": "9876512340", "commission_rate": "0.02"})
+    assert created.status_code == 201, created.text
+    data = created.json()["data"]
+    assert data["has_login"] is True and data["login"].startswith("login created")
+    password = starting_password("Login Agent", "9876512340")
+    assert password not in created.text
+    login = client.post("/api/v1/auth/login", json={"email": unique_email, "password": password})
+    assert login.status_code == 200, login.text
+    user = login.json()["data"]["user"]
+    assert user["role"] == "SALES_AGENT" and user["must_change_password"] is True and user["agent_code"] == code
+    headers = {"Authorization": f"Bearer {login.json()['data']['tokens']['access_token']}"}
+    mine = client.get("/api/v1/agents", headers=headers).json()["data"]
+    assert [a["code"] for a in mine] == [code], "the new agent sees only their own record"
+
+    # an agent created without contact details has no login until they are added
+    bare = client.post("/api/v1/agents", headers=admin_headers, json={"name": "Bare Agent", "code": f"B{uuid.uuid4().hex[:5].upper()}"})
+    assert bare.json()["data"]["has_login"] is False and bare.json()["data"]["login"].startswith("no login created")
+    bare_id = bare.json()["data"]["id"]
+    assert client.post(f"/api/v1/agents/{bare_id}/login", headers=admin_headers).status_code in (400, 409, 422)
+    email2 = "second-" + unique_email
+    assert client.patch(f"/api/v1/agents/{bare_id}", headers=admin_headers, json={"email": email2, "phone": "9876512341"}).status_code == 200
+    made = client.post(f"/api/v1/agents/{bare_id}/login", headers=admin_headers)
+    assert made.status_code == 200, made.text
+    assert client.post("/api/v1/auth/login", json={"email": email2, "password": starting_password("Bare Agent", "9876512341")}).status_code == 200
+    assert client.post(f"/api/v1/agents/{bare_id}/login", headers=admin_headers).status_code in (400, 409, 422), "only once"
+
+
+def test_agent_is_not_created_when_the_login_cannot_be_built(client, admin_headers, unique_email):
+    code = f"X{uuid.uuid4().hex[:5].upper()}"
+    short = client.post("/api/v1/agents", headers=admin_headers, json={
+        "name": "Al", "code": code, "email": unique_email, "phone": "9876512342", "commission_rate": "0.02"})
+    assert short.status_code == 422, short.text
+    taken = client.post("/api/v1/agents", headers=admin_headers, json={
+        "name": "Dupe Agent", "code": code, "email": "admin@nmtsolution.demo", "phone": "9876512343"})
+    assert taken.status_code == 409, taken.text
+    codes = {a["code"] for a in client.get("/api/v1/agents?page_size=200", headers=admin_headers).json()["data"]}
+    assert code not in codes, "a failed login step must not leave a half-created agent behind"

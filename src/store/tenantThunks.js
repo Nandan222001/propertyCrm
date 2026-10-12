@@ -1,6 +1,6 @@
 /**
- * Platform console actions (SUPER ADMIN). Live mode talks to `/tenants`; demo mode
- * keeps the same shapes in the store so the console behaves identically offline.
+ * Platform console actions (SUPER ADMIN). Everything goes through `/tenants`: nothing is ever
+ * "saved" only in the browser, so a success message always means the server really stored it.
  * Passwords are never shown or stored: the server sets a starting password from the name and mobile.
  */
 import { api, actions } from '../api/resources';
@@ -13,6 +13,9 @@ import {
 } from './slices/tenantsSlice';
 
 const isLive = (getState) => getState().auth.mode === 'live';
+const NOT_CONNECTED = 'Not connected to the server, so nothing was saved. Please sign in again.';
+const failure = (error) => (error instanceof ApiUnavailableError
+  ? 'Cannot reach the server — nothing was saved.' : error.message);
 
 /** The list endpoint omits the admin list (the detail view loads it); keep what this tenant already has. */
 const mergeAdmins = (state, tenant) => {
@@ -28,7 +31,7 @@ export const loadTenants = () => async (dispatch, getState) => {
     const state = getState();
     dispatch(tenantsLoaded(response.data.map((t) => mergeAdmins(state, t))));
   } catch (error) {
-    dispatch(tenantsFailed(error instanceof ApiUnavailableError ? '' : error.message));
+    dispatch(tenantsFailed(failure(error)));
   }
 };
 
@@ -39,7 +42,7 @@ export const loadTenantDetail = (tenant) => async (dispatch, getState) => {
     const response = await api.tenants.get(tenant.id);
     dispatch(tenantUpserted(response.data));
   } catch (error) {
-    dispatch(toastPushed(`Could not load ${tenant.name}: ${error.message}`));
+    dispatch(toastPushed(`Could not load ${tenant.name}: ${failure(error)}`));
   }
 };
 
@@ -61,93 +64,71 @@ const adminBody = (admin) => ({
 
 const PASSWORD_NOTE = 'Starting password: first 4 letters of the name + last 5 digits of the mobile — it is never displayed, and they must change it at first sign-in.';
 
-/** Create (editing = null) or update a tenant. Returns true on success. */
-export const saveTenant = (form, editing = null) => async (dispatch, getState) => {
-  const live = isLive(getState);
+/** Run a server call; resolves true only when the server accepted it. */
+const run = (getState, dispatch, label, call, onDone) => (async () => {
+  if (!isLive(getState)) {
+    dispatch(toastPushed(NOT_CONNECTED));
+    return false;
+  }
   try {
-    if (editing) {
-      if (live) {
-        const response = await api.tenants.update(editing.id, apiBody(form));
-        dispatch(tenantUpserted(mergeAdmins(getState(), response.data)));
-      } else {
-        dispatch(tenantUpserted({ ...editing, ...apiBody(form), name: form.name.trim() }));
-      }
+    const result = await call();
+    onDone(result);
+    return true;
+  } catch (error) {
+    dispatch(toastPushed(`${label}: ${failure(error)}`));
+    return false;
+  }
+})();
+
+/** Create (editing = null) or update a tenant. Returns true on success. */
+export const saveTenant = (form, editing = null) => (dispatch, getState) => run(
+  getState, dispatch, 'Could not save',
+  async () => {
+    if (editing) return { editing: true, response: await api.tenants.update(editing.id, apiBody(form)) };
+    return {
+      editing: false,
+      response: await api.tenants.create({ ...apiBody(form), slug: form.slug.trim() || slugify(form.name), admin: adminBody(form.admin) }),
+    };
+  },
+  ({ editing: wasEdit, response }) => {
+    if (wasEdit) {
+      dispatch(tenantUpserted(mergeAdmins(getState(), response.data)));
       dispatch(toastPushed(`${form.name.trim()} updated`));
       clientAudit('tenant.updated', { id: editing.id });
-      return true;
-    }
-
-    if (live) {
-      const response = await api.tenants.create({
-        ...apiBody(form),
-        slug: form.slug.trim() || slugify(form.name),
-        admin: adminBody(form.admin),
-      });
+    } else {
       const { tenant, admin } = response.data;
       dispatch(tenantUpserted({ ...tenant, admins: [admin] }));
-    } else {
-      const state = getState().tenants.items;
-      const id = Math.max(0, ...state.map((t) => t.id)) + 1;
-      dispatch(tenantUpserted({
-        id, public_id: `TEN-${String(id).padStart(8, '0')}`, ...apiBody(form), name: form.name.trim(),
-        slug: form.slug.trim() || slugify(form.name), status: 'ACTIVE',
-        suspended_at: null, suspended_reason: null, created_at: new Date().toISOString(),
-        usage: { users: 1, projects: 0, plots: 0, customers: 0, bookings: 0 },
-        admins: [{ id: id * 100 + 1, name: form.admin.name.trim(), email: form.admin.email.trim().toLowerCase(), status: 'ACTIVE', must_change_password: true }],
-      }));
+      dispatch(toastPushed(`Organisation ${form.name.trim()} created. ${PASSWORD_NOTE}`));
+      clientAudit('tenant.created', { name: form.name.trim() });
     }
-    dispatch(toastPushed(`Organisation ${form.name.trim()} created. ${PASSWORD_NOTE}`));
-    clientAudit('tenant.created', { name: form.name.trim() });
-    return true;
-  } catch (error) {
-    dispatch(toastPushed(`Could not save: ${error.message}`));
-    return false;
-  }
-};
+  },
+);
 
-export const suspendTenant = (tenant, reason) => async (dispatch, getState) => {
-  try {
-    if (isLive(getState)) {
-      const response = await actions.suspendTenant(tenant.id, { reason });
-      dispatch(tenantUpserted(mergeAdmins(getState(), response.data)));
-    } else {
-      dispatch(tenantUpserted({ ...tenant, status: 'SUSPENDED', suspended_reason: reason, suspended_at: new Date().toISOString() }));
-    }
+export const suspendTenant = (tenant, reason) => (dispatch, getState) => run(
+  getState, dispatch, 'Could not suspend',
+  () => actions.suspendTenant(tenant.id, { reason }),
+  (response) => {
+    dispatch(tenantUpserted(mergeAdmins(getState(), response.data)));
     dispatch(toastPushed(`${tenant.name} suspended — all its users are locked out`));
     clientAudit('tenant.suspended', { id: tenant.id });
-    return true;
-  } catch (error) {
-    dispatch(toastPushed(`Could not suspend: ${error.message}`));
-    return false;
-  }
-};
+  },
+);
 
-export const activateTenant = (tenant) => async (dispatch, getState) => {
-  try {
-    if (isLive(getState)) {
-      const response = await actions.activateTenant(tenant.id);
-      dispatch(tenantUpserted(mergeAdmins(getState(), response.data)));
-    } else {
-      dispatch(tenantUpserted({ ...tenant, status: 'ACTIVE', suspended_reason: null, suspended_at: null }));
-    }
+export const activateTenant = (tenant) => (dispatch, getState) => run(
+  getState, dispatch, 'Could not reactivate',
+  () => actions.activateTenant(tenant.id),
+  (response) => {
+    dispatch(tenantUpserted(mergeAdmins(getState(), response.data)));
     dispatch(toastPushed(`${tenant.name} reactivated`));
     clientAudit('tenant.activated', { id: tenant.id });
-    return true;
-  } catch (error) {
-    dispatch(toastPushed(`Could not reactivate: ${error.message}`));
-    return false;
-  }
-};
+  },
+);
 
-export const addTenantAdmin = (tenant, form) => async (dispatch, getState) => {
-  try {
-    let admin;
-    if (isLive(getState)) {
-      const response = await actions.addTenantAdmin(tenant.id, adminBody(form));
-      admin = response.data.admin;
-    } else {
-      admin = { id: Date.now(), name: form.name.trim(), email: form.email.trim().toLowerCase(), status: 'ACTIVE', must_change_password: true };
-    }
+export const addTenantAdmin = (tenant, form) => (dispatch, getState) => run(
+  getState, dispatch, 'Could not add administrator',
+  () => actions.addTenantAdmin(tenant.id, adminBody(form)),
+  (response) => {
+    const { admin } = response.data;
     dispatch(tenantUpserted({
       ...tenant,
       admins: [...(tenant.admins || []), admin],
@@ -155,21 +136,14 @@ export const addTenantAdmin = (tenant, form) => async (dispatch, getState) => {
     }));
     dispatch(toastPushed(`Administrator ${admin.email} added to ${tenant.name}. ${PASSWORD_NOTE}`));
     clientAudit('tenant.admin_added', { id: tenant.id });
-    return true;
-  } catch (error) {
-    dispatch(toastPushed(`Could not add administrator: ${error.message}`));
-    return false;
-  }
-};
+  },
+);
 
-export const resetTenantAdminPassword = (tenant, admin) => async (dispatch, getState) => {
-  try {
-    if (isLive(getState)) await actions.resetTenantAdminPassword(tenant.id, admin.id);
+export const resetTenantAdminPassword = (tenant, admin) => (dispatch, getState) => run(
+  getState, dispatch, 'Could not reset password',
+  () => actions.resetTenantAdminPassword(tenant.id, admin.id),
+  () => {
     dispatch(toastPushed(`Password for ${admin.email} was reset to the starting password. They must change it at next sign-in.`));
     clientAudit('tenant.admin_password_reset', { id: tenant.id });
-    return true;
-  } catch (error) {
-    dispatch(toastPushed(`Could not reset password: ${error.message}`));
-    return false;
-  }
-};
+  },
+);

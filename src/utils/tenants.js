@@ -9,6 +9,8 @@ export const slugify = (name) => {
   return slug;
 };
 
+import { isValidMobile, MOBILE_HINT } from './phone';
+
 const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 const SLUG_RE = /^[a-z0-9](?:[a-z0-9-]{0,46}[a-z0-9])?$/;
 
@@ -42,7 +44,7 @@ export function validateTenant(form, { tenants = [], editing = null } = {}) {
     if (admin.name.trim().length < 2) return 'Administrator name is required';
     if (!EMAIL_RE.test(admin.email.trim())) return 'Administrator e-mail is not valid';
     if (admin.name.replace(/[^A-Za-z]/g, '').length < 4) return 'Administrator name needs at least four letters (they form the starting password)';
-    if (String(admin.phone || '').replace(/\D/g, '').length < 10) return 'Administrator mobile must be a 10-digit number (its last five digits form the starting password)';
+    if (!isValidMobile(admin.phone)) return `Administrator mobile: ${MOBILE_HINT} Its last five digits form the starting password.`;
   }
   return '';
 }

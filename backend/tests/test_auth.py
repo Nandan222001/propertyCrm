@@ -315,3 +315,23 @@ def test_reset_mail_is_actually_sent_over_smtp(monkeypatch):
     kinds = [item[0] for item in sent]
     assert kinds == ["connect", "starttls", "login", "message"]
     assert "/reset-password?token=tok123" in sent[-1][3]
+
+
+def test_starting_password_accepts_any_capitalisation_until_the_user_chooses_their_own(client, admin_headers, unique_email):
+    created = client.post("/api/v1/users", headers=admin_headers, json={
+        "name": "Meghana", "email": unique_email, "role": "ACCOUNTS", "phone": "8600359985"})
+    assert created.status_code == 201, created.text
+    for typed in ("megh59985", "Megh59985", "MEGH59985"):
+        assert client.post("/api/v1/auth/login", json={"email": unique_email, "password": typed}).status_code == 200, typed
+    assert client.post("/api/v1/auth/login", json={"email": unique_email, "password": "megh59986"}).status_code == 401
+    tokens = client.post("/api/v1/auth/login", json={"email": unique_email, "password": "Megh59985"}).json()["data"]["tokens"]
+    headers = {"Authorization": f"Bearer {tokens['access_token']}"}
+    # the forced "choose a password" step also accepts the capitalised current password
+    changed = client.post("/api/v1/auth/password/change", headers=headers, json={
+        "current_password": "Megh59985", "new_password": "Own#Secret2026", "confirm_password": "Own#Secret2026"})
+    assert changed.status_code == 200, changed.text
+    # after choosing their own password, case matters again
+    assert client.post("/api/v1/auth/login", json={"email": unique_email, "password": "own#secret2026"}).status_code == 401
+    assert client.post("/api/v1/auth/login", json={"email": unique_email, "password": "Own#Secret2026"}).status_code == 200
+    # and the old starting password no longer works in any capitalisation
+    assert client.post("/api/v1/auth/login", json={"email": unique_email, "password": "Megh59985"}).status_code == 401

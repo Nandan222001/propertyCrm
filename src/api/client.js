@@ -25,6 +25,23 @@ let accessToken = readSession(ACCESS_KEY, '');
 let refreshToken = readSession(REFRESH_KEY, '');
 let refreshInFlight = null;
 
+const FIELD_LABEL = {
+  phone: 'Mobile', email: 'E-mail', name: 'Name', code: 'Code', commission_rate: 'Commission rate', password: 'Password',
+  new_password: 'New password', pincode: 'Pincode', address: 'Address', city: 'City', gstin: 'GSTIN', pan_number: 'PAN',
+  final_price: 'Price', amount: 'Amount', price: 'Price', area_sqft: 'Area', plot_number: 'Plot number', slug: 'Slug',
+};
+const labelFor = (field) => FIELD_LABEL[field] || String(field || '').replace(/_/g, ' ').replace(/^./, (c) => c.toUpperCase());
+
+/** A readable message: for a validation failure, name each field the server rejected and why. */
+function describeError(error, response) {
+  const details = Array.isArray(error.details) ? error.details : [];
+  const named = details.filter((d) => d && d.field && d.message);
+  if (response.status === 422 && named.length) {
+    return named.map((d) => `${labelFor(String(d.field).split('.').pop())}: ${String(d.message).replace(/^(Value error|Assertion failed),?\s*/i, '')}`).join('; ');
+  }
+  return error.message || response.statusText || 'Request failed';
+}
+
 export class ApiError extends Error {
   constructor(message, { status = 0, code = 'request_failed', details = null, requestId = null } = {}) {
     super(message);
@@ -92,7 +109,7 @@ export async function request(path, { method = 'GET', body, params, auth = true,
     const payload = await response.json().catch(() => ({}));
     if (!response.ok) {
       const error = payload?.error || {};
-      throw new ApiError(error.message || response.statusText || 'Request failed', {
+      throw new ApiError(describeError(error, response), {
         status: response.status,
         code: error.code || `http_${response.status}`,
         details: error.details ?? null,

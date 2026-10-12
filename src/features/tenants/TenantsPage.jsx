@@ -5,6 +5,7 @@ import { Mini } from '../../components/common/StatTile';
 import { Table } from '../../components/common/DataTable';
 import { Pager, usePaged } from '../../components/common/Pager';
 import { PLAN_LABEL, platformStats, seatUsage } from '../../utils/tenants';
+import { isValidMobile, MOBILE_HINT } from '../../utils/phone';
 import { TenantModal } from './TenantModal';
 import { SuspendModal } from './TenantDialogs';
 
@@ -32,7 +33,7 @@ function AddAdminForm({ onAdd }) {
     if (form.name.trim().length < 2) { setError('Name is required'); return; }
     if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(form.email.trim())) { setError('Enter a valid e-mail'); return; }
     if (form.name.replace(/[^A-Za-z]/g, '').length < 4) { setError('The name needs at least four letters (they form the starting password)'); return; }
-    if (form.phone.replace(/\D/g, '').length < 10) { setError('Enter the 10-digit mobile number (its last five digits form the starting password)'); return; }
+    if (!isValidMobile(form.phone)) { setError(`${MOBILE_HINT} Its last five digits form the starting password.`); return; }
     setError('');
     if (await onAdd(form)) setForm({ name: '', email: '', phone: '' });
   };

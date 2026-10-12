@@ -50,6 +50,11 @@ def update_agent(agent_id: int, payload: AgentUpdate, service: controller.AgentS
     return controller.update_agent(agent_id, payload, service)
 
 
+@router.post("/{agent_id}/login", summary="Create a sign-in for an existing agent (e-mail + starting password)")
+def provision_agent_login(agent_id: int, service: controller.AgentServiceDep, _: MANAGE = None):
+    return controller.provision_agent_login(agent_id, service)
+
+
 @router.delete("/{agent_id}", summary="Delete an agent who has no bookings")
 def delete_agent(agent_id: int, service: controller.AgentServiceDep, _: MANAGE = None):
     return controller.delete_agent(agent_id, service)

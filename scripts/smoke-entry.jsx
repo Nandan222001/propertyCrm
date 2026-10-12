@@ -4,3 +4,5 @@ export { createStore } from '../src/store';
 export { signedIn, signedOut } from '../src/store/slices/authSlice';
 export { pageChanged } from '../src/store/slices/uiSlice';
 export { tenantsLoaded } from '../src/store/slices/tenantsSlice';
+export { sessionLoaded } from '../src/store/slices/authSlice';
+export { hydrateWorkspace } from '../src/store/thunks';

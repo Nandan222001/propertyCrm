@@ -105,16 +105,20 @@ class PaymentService(BaseService[Payment]):
     def ledger(self, page: PaginationContext) -> Paginated[PaymentLedgerRow]:
         """Ledger view: one row per booking with live balance (portal-safe)."""
         self._authorise("view")
+        # Row scope is applied in the query itself (never after paging): everyone with the all-payments
+        # permission sees every booking, a portal customer only their own, an agent only their own deals.
+        if self.actor.can(Permission.PAYMENT_VIEW_ALL):
+            booking_scope = None
+        elif self.actor.is_customer_portal:
+            booking_scope = self.bookings.scope_clause_for(agent_id=None, customer_id=self.actor.customer_id)
+        else:
+            booking_scope = self.bookings.scope_clause_for(agent_id=self.actor.agent_id, customer_id=None)
         bookings = self.bookings.paginate(
             page=page.page, page_size=page.page_size, search=page.search, sort=page.sort,
-            filters=page.filters, scope_clause=None,
+            filters=page.filters, scope_clause=booking_scope,
         )
         rows: list[PaymentLedgerRow] = []
         for booking in bookings.items:
-            if self.actor.is_customer_portal and booking.customer_id != self.actor.customer_id:
-                continue
-            if not self.actor.can(Permission.PAYMENT_VIEW_ALL) and booking.agent_id != self.actor.agent_id:
-                continue
             due = None
             latest = self.payments.list(filters={"booking_id": booking.id}, sort="received_on:desc", limit=1)
             if latest:

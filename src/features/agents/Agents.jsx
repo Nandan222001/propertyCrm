@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Eye, Edit2, X, Check, Plus, Trash2 } from 'lucide-react';
+import { Eye, Edit2, X, Check, Plus, Trash2, KeyRound } from 'lucide-react';
 import { ConfirmDialog } from '../../components/common/ConfirmDialog';
-import { fmtINR, parseAmt } from '../../utils';
+import { fmtINR, parseAmt, isValidMobile, normaliseMobile, MOBILE_HINT } from '../../utils';
 import { isAdmin } from '../../utils/permissions';
 import { api, actions, hasSession } from '../../api';
 
@@ -28,12 +28,12 @@ function EditAgentModal({ agent, close, save }) {
     const rate = Number(form.rate);
     if (form.name.trim().length < 2) return setError('Enter the agent\'s full name.');
     if (!/^[A-Za-z0-9-]{2,16}$/.test(form.code.trim())) return setError('Code: 2-16 letters, digits or dashes (e.g. AG-031).');
-    if (form.phone && form.phone.replace(/\D/g, '').slice(-10).length !== 10) return setError('Enter a valid 10-digit mobile number.');
+    if (form.phone && !isValidMobile(form.phone)) return setError(MOBILE_HINT);
     if (!Number.isFinite(rate) || rate <= 0 || rate > 25) return setError('Commission rate must be between 0.1% and 25%.');
     setBusy(true);
     const problem = await save(agent, {
       name: form.name.trim(), code: form.code.trim().toUpperCase(),
-      ...(form.phone ? { phone: form.phone.replace(/\D/g, '').slice(-10) } : {}),
+      ...(form.phone ? { phone: normaliseMobile(form.phone) } : {}),
       ...(form.email ? { email: form.email.trim() } : {}),
       commission_rate: rate / 100, is_active: form.active,
     });
@@ -85,12 +85,14 @@ function AddAgentModal({ suggestedCode, close, save }) {
     const rate = Number(form.rate);
     if (form.name.trim().length < 2) return setError('Enter the agent\'s full name.');
     if (!/^[A-Za-z0-9-]{2,16}$/.test(form.code.trim())) return setError('Code: 2-16 letters, digits or dashes (e.g. AG-031).');
-    if (form.phone && form.phone.replace(/\D/g, '').slice(-10).length !== 10) return setError('Enter a valid 10-digit mobile number.');
+    if (form.name.replace(/[^A-Za-z]/g, '').length < 4) return setError('The name needs at least four letters — they form the starting password.');
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(form.email.trim())) return setError('Enter the agent\'s e-mail — it is their sign-in.');
+    if (!isValidMobile(form.phone)) return setError(`${MOBILE_HINT} Its last five digits form the starting password.`);
     if (!Number.isFinite(rate) || rate <= 0 || rate > 25) return setError('Commission rate must be between 0.1% and 25%.');
     setBusy(true);
     const problem = await save({
       name: form.name.trim(), code: form.code.trim().toUpperCase(),
-      ...(form.phone ? { phone: form.phone.replace(/\D/g, '').slice(-10) } : {}),
+      ...(form.phone ? { phone: normaliseMobile(form.phone) } : {}),
       ...(form.email ? { email: form.email.trim() } : {}),
       commission_rate: rate / 100,
     });
@@ -109,7 +111,7 @@ function AddAgentModal({ suggestedCode, close, save }) {
           <button type="button" className="modal-close" onClick={close} aria-label="Close"><X size={16} /></button>
         </div>
         <div className="form-grid">
-          <label>Full name<input value={form.name} onChange={set('name')} autoFocus placeholder="Rahul Verma" /></label>
+          <label>Full name<input value={form.name} onChange={set('name')} autoFocus placeholder="Full name" /></label>
           <label>Agent code<input value={form.code} onChange={set('code')} placeholder="Agent code" /></label>
           <label>Mobile<input value={form.phone} onChange={set('phone')} inputMode="tel" placeholder="10-digit mobile number" /></label>
           <label>Email<input value={form.email} onChange={set('email')} type="email" placeholder="E-mail address" /></label>
@@ -133,6 +135,7 @@ export function Agents({ search, notify, role, onView, bookings = [], project = 
   const [editing, setEditing] = useState(null);
   const [adding, setAdding] = useState(false);
   const [removing, setRemoving] = useState(null);
+  const [granting, setGranting] = useState(null);
 
   const load = useCallback(async () => {
     try {
@@ -143,7 +146,7 @@ export function Agents({ search, notify, role, onView, bookings = [], project = 
         const rate = Number(a.commission_rate);
         return {
           id: a.id, name: a.name, code: a.code, rate, email: a.email || '', phone: a.phone || '',
-          active: a.is_active !== 'INACTIVE',
+          active: a.is_active !== 'INACTIVE', hasLogin: Boolean(a.has_login),
           deals: Number(t.deals) || 0, sales: Number(t.sales) || 0, collected: Number(t.collected) || 0,
         };
       }).sort((x, y) => y.sales - x.sales));
@@ -168,8 +171,11 @@ export function Agents({ search, notify, role, onView, bookings = [], project = 
 
   const addAgent = async (body) => {
     try {
-      await api.agents.create(body);
-      notify(`Agent ${body.name} (${body.code}) added`);
+      const response = await api.agents.create(body);
+      const login = response.data?.login || '';
+      notify(`Agent ${body.name} (${body.code}) added. ${login.startsWith('login created')
+        ? 'They can sign in with their e-mail and a starting password (first 4 letters of the name + last 5 digits of the mobile — not displayed); they must change it at first sign-in.'
+        : login}`);
       await load();
       return '';
     } catch (error) {
@@ -229,7 +235,7 @@ export function Agents({ search, notify, role, onView, bookings = [], project = 
               money(r.collected),
               ...(showRate ? [<b key="rate">{pct(r.rate)}</b>] : []),
               money(r.commission),
-              <Badge>{r.active === false ? 'Inactive' : 'Active'}</Badge>,
+              <span key="st" style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}><Badge>{r.active === false ? 'Inactive' : 'Active'}</Badge>{live && !r.hasLogin && <Badge>No login</Badge>}</span>,
               <div className="table-actions-cell" key={r.code}>
                 <button
                   className="icon-action" title="View agent profile"
@@ -240,6 +246,11 @@ export function Agents({ search, notify, role, onView, bookings = [], project = 
                 {canEditRate && (
                   <button className="icon-action" title="Edit agent" onClick={() => setEditing(r)}>
                     <Edit2 size={14} />
+                  </button>
+                )}
+                {canEditRate && !r.hasLogin && (
+                  <button className="icon-action" title="Create login (e-mail + starting password)" onClick={() => setGranting(r)}>
+                    <KeyRound size={14} />
                   </button>
                 )}
                 {canEditRate && (
@@ -253,6 +264,18 @@ export function Agents({ search, notify, role, onView, bookings = [], project = 
         )}
       </div>
       {adding && <AddAgentModal suggestedCode={nextCode()} close={() => setAdding(false)} save={addAgent} />}
+      {granting && (
+        <ConfirmDialog
+          title="Create login"
+          message={`Create a sign-in for ${granting.name}? They log in with their e-mail (${granting.email || 'add one first'}) and a starting password — the first 4 letters of their name plus the last 5 digits of their mobile. It is not displayed, and they must change it at first sign-in.`}
+          confirmLabel="Create login"
+          onConfirm={async () => {
+            try { await api.agents.provisionLogin(granting.id); notify(`Login created for ${granting.name}`); await load(); return ''; }
+            catch (error) { return error.message || 'Could not create the login.'; }
+          }}
+          onCancel={() => setGranting(null)}
+        />
+      )}
       {removing && (
         <ConfirmDialog
           title="Delete agent"

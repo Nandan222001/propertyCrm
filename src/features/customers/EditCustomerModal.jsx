@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { ModalShell } from '../../components/common/ModalShell';
+import { isValidMobile, normaliseMobile, MOBILE_HINT } from '../../utils/phone';
 
 const hidden = (value) => String(value || '').includes('*');
 
@@ -20,9 +21,9 @@ export function EditCustomerModal({ customer, close, save }) {
     e.preventDefault();
     const changes = {};
     if (form.name.trim() && form.name.trim() !== start(customer.name)) changes.name = form.name.trim();
-    const phone = form.phone.replace(/\D/g, '').slice(-10);
-    if (form.phone && phone.length !== 10) return setError('Enter a valid 10-digit mobile number.');
-    if (phone && phone !== start(customer.mobile).replace(/\D/g, '').slice(-10)) changes.phone = phone;
+    if (form.phone && !isValidMobile(form.phone)) return setError(MOBILE_HINT);
+    const phone = normaliseMobile(form.phone);
+    if (phone && phone !== normaliseMobile(start(customer.mobile))) changes.phone = phone;
     if (form.email.trim() && form.email.trim() !== start(customer.email)) {
       if (!form.email.includes('@')) return setError('Enter a valid e-mail address.');
       changes.email = form.email.trim();

@@ -11,3 +11,4 @@ export * from './permissions';
 export * from './security';
 export * from './billing';
 export * from './pdf';
+export * from './phone';

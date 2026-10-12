@@ -313,3 +313,15 @@ def test_next_due_date_drives_the_ledger_status(client, accounts_headers, agent_
     assert past.status_code == 200 and past.json()["data"]["status"] == "OVERDUE"
     future = client.post(path, headers=accounts_headers, json={"due_date": "2031-01-01"})
     assert future.json()["data"]["status"] in ("PENDING", "PARTIALLY_PAID")
+
+
+def test_customer_ledger_shows_only_their_own_booking(client, customer_headers):
+    """Regression: the agent-only row filter used to hide a portal customer's own booking."""
+    me = client.get("/api/v1/auth/me", headers=customer_headers).json()["data"]["user"]
+    mine = client.get("/api/v1/bookings?page_size=200", headers=customer_headers).json()["data"]
+    ledger = client.get("/api/v1/ledger?page_size=200", headers=customer_headers)
+    assert ledger.status_code == 200
+    rows = ledger.json()["data"]
+    assert len(rows) == len(mine) > 0, "a customer with bookings must see them in their ledger"
+    assert {r["booking_number"] for r in rows} == {b["booking_number"] for b in mine}
+    assert me["customer_id"]

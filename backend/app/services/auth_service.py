@@ -72,6 +72,17 @@ class AuthService:
         self.rbac = RBACService(db)
         self.throttle = LoginThrottle(settings.MAX_FAILED_LOGINS, settings.ACCOUNT_LOCK_MINUTES * 60)
 
+    # -------------------------------------------------------- password check
+    @staticmethod
+    def _password_matches(user: User, supplied: str) -> bool:
+        """Verify a password. An account still on its *starting* password (first four letters of the name,
+        lower case, + last five digits of the mobile) also accepts any capitalisation of it, because people
+        naturally type a capital first letter. Once the person has chosen their own password it is case-sensitive."""
+        if verify_password(supplied, user.password_hash):
+            return True
+        return bool(user.must_change_password and supplied != supplied.lower()
+                    and verify_password(supplied.lower(), user.password_hash))
+
     # ----------------------------------------------------------------- login
     def login(self, payload: LoginRequest, *, ip: str | None, user_agent: str | None) -> dict:
         email = payload.email.lower().strip()
@@ -94,7 +105,7 @@ class AuthService:
         if user is not None:
             time.sleep(self.throttle.delay_for(user.failed_login_attempts or 0))
 
-        if user is None or not verify_password(payload.password, user.password_hash):
+        if user is None or not self._password_matches(user, payload.password):
             self._handle_failed_login(user, email, ip, user_agent)
             raise AuthenticationError(INVALID_CREDENTIALS)
 
@@ -189,7 +200,7 @@ class AuthService:
     # ----------------------------------------------------------- password ops
     def change_password(self, actor: ActorContext, payload: ChangePasswordRequest) -> None:
         user = self.users.get_or_404(actor.user_id)
-        if not verify_password(payload.current_password, user.password_hash):
+        if not self._password_matches(user, payload.current_password):
             self.audit.security_event(
                 "auth.password_change_failed", "Wrong current password supplied", actor=actor
             )

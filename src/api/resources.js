@@ -70,6 +70,8 @@ export const actions = {
   acknowledgeEvent: (id, body) => authedRequest(ENDPOINTS.securityEvents.acknowledge(id), { method: 'POST', body }),
 };
 
+api.agents.provisionLogin = (id) => authedRequest(`${ENDPOINTS.agents.item(id)}/login`, { method: 'POST', body: {} });
+
 /** Per-agent sales totals (deals, gross sales, collected) for the Agents page. */
 actions.agentLeaderboard = () => authedRequest(`${ENDPOINTS.agents.list}/leaderboard`);
 
