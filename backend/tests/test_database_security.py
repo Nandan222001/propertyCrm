@@ -77,7 +77,7 @@ def test_every_model_carries_security_columns_and_constraints():
     """Schema guard: money columns are DECIMAL, identifiers unique, FKs present."""
     bookings = Base.metadata.tables["bookings"]
     assert str(bookings.c.final_price.type).startswith("NUMERIC")
-    assert any(constraint.name == "uq_booking_plot_status" for constraint in bookings.constraints)
+    assert "active_plot_id" in bookings.c and bookings.c.active_plot_id.unique, "one live booking per plot"
 
     users = Base.metadata.tables["users"]
     assert users.c.password_hash.type.length >= 60

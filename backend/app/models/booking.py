@@ -8,10 +8,12 @@ from decimal import Decimal
 from sqlalchemy import (
     Date,
     ForeignKey,
+    Integer,
     Numeric,
     String,
     Text,
     UniqueConstraint,
+    event,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -78,9 +80,12 @@ class Booking(Base, PkMixin, PublicIdMixin, TenantMixin, TimestampMixin, SoftDel
     def balance(self) -> Decimal:
         return max(self.final_price - self.paid_amount, Decimal("0.00"))
 
+    #: Equals ``plot_id`` while the booking is live (pending, confirmed, agreement, registered) and NULL once it
+    #: is rejected, cancelled or deleted. The UNIQUE index on it is what guarantees a plot holds at most one
+    #: live booking — while rejected / cancelled / deleted bookings never block the plot.
+    active_plot_id: Mapped[int | None] = mapped_column(Integer, nullable=True, unique=True)
+
     __table_args__ = (
-        # A plot can hold at most one live booking.
-        UniqueConstraint("plot_id", "status", name="uq_booking_plot_status"),
         UniqueConstraint("tenant_id", "booking_number", name="uq_bookings_tenant_booking_number"),
     )
 
@@ -101,3 +106,17 @@ class BookingStatusHistory(Base, PkMixin, TimestampMixin):
     ip_address: Mapped[str | None] = mapped_column(String(45))
 
     booking = relationship("Booking", back_populates="history")
+
+
+LIVE_BOOKING_STATUSES = frozenset({
+    BookingStatus.PENDING_APPROVAL.value, BookingStatus.CONFIRMED.value,
+    BookingStatus.AGREEMENT.value, BookingStatus.REGISTERED.value,
+})
+
+
+@event.listens_for(Booking, "before_insert")
+@event.listens_for(Booking, "before_update")
+def _sync_active_plot(_mapper, _connection, target: Booking) -> None:
+    """Keep ``active_plot_id`` in step with the booking, whichever code path changed it."""
+    live = target.status in LIVE_BOOKING_STATUSES and not target.is_deleted
+    target.active_plot_id = target.plot_id if live else None

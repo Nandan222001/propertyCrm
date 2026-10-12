@@ -193,3 +193,26 @@ def test_agent_is_not_created_when_the_login_cannot_be_built(client, admin_heade
     assert taken.status_code == 409, taken.text
     codes = {a["code"] for a in client.get("/api/v1/agents?page_size=200", headers=admin_headers).json()["data"]}
     assert code not in codes, "a failed login step must not leave a half-created agent behind"
+
+
+def test_plot_can_be_rebooked_after_a_booking_is_deleted_rejected_or_cancelled(client, agent_headers, admin_headers,
+                                                                              agent_approved_customer, available_plot):
+    """Regression: a deleted/rejected booking used to keep blocking the plot (unique on plot + status)."""
+    def book(headers):
+        r = client.post("/api/v1/bookings", headers=headers, json={
+            "customer_id": agent_approved_customer["id"], "plot_id": available_plot["id"], "final_price": available_plot["price"]})
+        assert r.status_code == 201, r.text
+        return r.json()["data"]
+
+    first = book(agent_headers)
+    assert client.delete(f"/api/v1/bookings/{first['id']}", headers=agent_headers).status_code == 200
+    second = book(agent_headers)                       # same plot, same status as the deleted one
+    assert client.post(f"/api/v1/bookings/{second['id']}/reject", headers=admin_headers, json={"reason": "x"}).status_code == 200
+    third = book(agent_headers)                        # rejected before; the plot is free again
+    assert client.post(f"/api/v1/bookings/{third['id']}/reject", headers=admin_headers, json={"reason": "again"}).status_code == 200
+    fourth = book(agent_headers)                       # a second rejection of the same plot must also have worked
+    assert client.post(f"/api/v1/bookings/{fourth['id']}/approve", headers=admin_headers, json={}).status_code == 200
+    # a live booking still blocks the plot
+    clash = client.post("/api/v1/bookings", headers=admin_headers, json={
+        "customer_id": agent_approved_customer["id"], "plot_id": available_plot["id"], "final_price": available_plot["price"]})
+    assert clash.status_code in (400, 409), clash.text
