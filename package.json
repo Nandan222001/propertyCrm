@@ -22,7 +22,7 @@
   "devDependencies": {
     "@vitejs/plugin-react": "^4.7.0",
     "esbuild": "^0.24.2",
-    "jsdom": "^25.0.1",
+    "jsdom": "^30.1.2",
     "vite": "^6.0.0"
   },
   "description": "Real estate ERP \u2014 React + Redux Toolkit frontend (FastAPI/MySQL backend in ./backend)",
