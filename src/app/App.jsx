@@ -78,6 +78,9 @@ export function App() {
   const teamUsers = useAppSelector(selectUsers);
   const loginNotice = useAppSelector((state) => state.auth.loginNotice);
   const [changingPassword, setChangingPassword] = useState(false);
+  // "Skip for now" on the first-sign-in prompt lasts until the next sign-in.
+  const [passwordPromptSkipped, setPasswordPromptSkipped] = useState(false);
+  useEffect(() => { if (!auth.session) setPasswordPromptSkipped(false); }, [auth.session]);
   const needsVerification = useAppSelector((state) => state.auth.needsVerification);
   const [verifying, setVerifying] = useState(needsVerification);
   const unread = auth.mode === 'live' ? notifications.items.filter((n) => !n.is_read).length : null;
@@ -619,11 +622,11 @@ export function App() {
         />
       )}
 
-      {auth.mode === 'live' && (auth.user?.mustChangePassword || changingPassword) && (
+      {auth.mode === 'live' && ((auth.user?.mustChangePassword && !passwordPromptSkipped) || changingPassword) && (
         <ChangePasswordDialog
-          forced={Boolean(auth.user?.mustChangePassword)}
+          forced={Boolean(auth.user?.mustChangePassword) && !changingPassword}
           onSubmit={(form) => dispatch(changeMyPassword(form))}
-          close={() => setChangingPassword(false)}
+          close={() => { setChangingPassword(false); setPasswordPromptSkipped(true); }}
         />
       )}
 

@@ -47,6 +47,13 @@ class Project(Base, PkMixin, PublicIdMixin, TenantMixin, TimestampMixin, SoftDel
     completion_date: Mapped[date | None] = mapped_column(Date)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
 
+    # Extra charge per plot, added to its price when the plot has that feature (all optional).
+    premium_commercial: Mapped[Decimal | None] = mapped_column(Numeric(18, 2))
+    premium_corner: Mapped[Decimal | None] = mapped_column(Numeric(18, 2))
+    premium_ne_facing: Mapped[Decimal | None] = mapped_column(Numeric(18, 2))
+    premium_east_facing: Mapped[Decimal | None] = mapped_column(Numeric(18, 2))
+    premium_park_facing: Mapped[Decimal | None] = mapped_column(Numeric(18, 2))
+
     plots = relationship("Plot", back_populates="project", lazy="selectin", cascade="all, delete-orphan")
 
     __table_args__ = (
@@ -71,6 +78,10 @@ class Plot(Base, PkMixin, PublicIdMixin, TenantMixin, TimestampMixin, SoftDelete
     customer_id: Mapped[int | None] = mapped_column(ForeignKey("customers.id", ondelete="SET NULL"))
     agent_id: Mapped[int | None] = mapped_column(ForeignKey("agents.id", ondelete="SET NULL"))
     hold_expires_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
+    # Features that carry a premium (see the project's premium_* amounts).
+    is_corner: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    is_commercial: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    is_park_facing: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
     project = relationship("Project", back_populates="plots", lazy="joined")
     bookings = relationship("Booking", back_populates="plot", lazy="selectin")

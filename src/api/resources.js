@@ -96,6 +96,14 @@ actions.saveOrgSettings = (section, values) => authedRequest(`/organisation/sett
 /** Deployment name for the sign-in page (public). */
 actions.branding = () => request('/branding', { auth: false });
 
+/** Payment schemes (per project), quotes and a booking's payment schedule. */
+actions.projectPlans = (projectId) => authedRequest(`${ENDPOINTS.projects.item(projectId)}/plans`);
+actions.createPlan = (projectId, body) => authedRequest(`${ENDPOINTS.projects.item(projectId)}/plans`, { method: 'POST', body });
+actions.updatePlan = (id, body) => authedRequest(`/plans/${id}`, { method: 'PATCH', body });
+actions.deletePlan = (id) => authedRequest(`/plans/${id}`, { method: 'DELETE' });
+actions.quotePlan = (body) => authedRequest('/plans/quote', { method: 'POST', body });
+actions.bookingSchedule = (bookingId) => authedRequest(`${ENDPOINTS.bookings.item(bookingId)}/installments`);
+
 actions.roleMatrix = () => authedRequest('/roles/matrix');
 
 actions.resetUserPassword = (id) => authedRequest(`${ENDPOINTS.users.item(id)}/reset-password`, { method: 'POST', body: {} });

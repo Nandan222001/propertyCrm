@@ -16,11 +16,13 @@ import { Mini } from '../../components/common/StatTile';
 import { Avatar } from '../../components/common/Avatar';
 import { ConfirmDialog } from '../../components/common/ConfirmDialog';
 import { EditBookingModal } from './EditBookingModal';
+import { PaymentScheduleModal } from './PaymentScheduleModal';
 import { RoleContextBanner } from '../../components/layout/RoleContextBanner';
 
 export function Bookings({ bookings, project, search, tab, TB, role, onNew, onOpenCustomer, onApprove, onReject, onPrint, onWhatsApp, onEdit, onDelete }) {
   const [editing, setEditing] = useState(null);
   const [removing, setRemoving] = useState(null);
+  const [scheduleFor, setScheduleFor] = useState(null);
   const statuses = ['All bookings', 'Confirmed', 'Pending Approval', 'Processing', 'Agreement', 'Rejected'];
   const rows = bookings.filter(b => {
     const textMatch = b.join(' ').toLowerCase().includes(search.toLowerCase());
@@ -71,6 +73,11 @@ export function Bookings({ bookings, project, search, tab, TB, role, onNew, onOp
               <button className="icon-action" onClick={() => onOpenCustomer(b[1], b)} title="View customer">
                 <Eye size={14} />
               </button>
+              {typeof b[10] === 'number' && (
+                <button className="icon-action" onClick={() => setScheduleFor(b)} title="Payment schedule (instalments)">
+                  <CalendarDays size={14} />
+                </button>
+              )}
               <button className="icon-action" onClick={() => onPrint(b)} title="Print booking form">
                 <Printer size={14} />
               </button>
@@ -96,6 +103,7 @@ export function Bookings({ bookings, project, search, tab, TB, role, onNew, onOp
           Showing {rows.length} bookings <span>{role === 'SALES AGENT' ? 'Your bookings only' : 'Role-filtered view'}</span>
         </div>
       </div>
+      {scheduleFor && <PaymentScheduleModal booking={scheduleFor} close={() => setScheduleFor(null)} />}
       {editing && <EditBookingModal booking={editing} canPrice={canApprove(role)} close={() => setEditing(null)} save={onEdit} />}
       {removing && (
         <ConfirmDialog

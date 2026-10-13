@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { ModalShell } from '../../components/common/ModalShell';
-import { parseAmt } from '../../utils';
+import { parseAmt, fmtINR } from '../../utils';
 
 const FACINGS = ['East', 'West', 'North', 'South', 'North-East', 'North-West', 'South-East', 'South-West'];
 
@@ -8,6 +8,7 @@ const FACINGS = ['East', 'West', 'North', 'South', 'North-East', 'North-West', '
 export function EditPlotModal({ plot, close, save }) {
   const [form, setForm] = useState({
     layout: plot[1] || '', area: String(parseAmt(plot[2]) || ''), facing: plot[3] || '', price: String(parseAmt(plot[4]) || ''),
+    corner: Boolean(plot[12]), commercial: Boolean(plot[13]), park: Boolean(plot[14]),
   });
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
@@ -25,6 +26,9 @@ export function EditPlotModal({ plot, close, save }) {
     if (area !== parseAmt(plot[2])) changes.area_sqft = area;
     if (form.facing && form.facing !== plot[3]) changes.facing = form.facing;
     if (price !== parseAmt(plot[4])) changes.price = price;
+    if (form.corner !== Boolean(plot[12])) changes.is_corner = form.corner;
+    if (form.commercial !== Boolean(plot[13])) changes.is_commercial = form.commercial;
+    if (form.park !== Boolean(plot[14])) changes.is_park_facing = form.park;
     if (!Object.keys(changes).length) return close();
     setBusy(true);
     const problem = await save(plot, changes);
@@ -46,6 +50,13 @@ export function EditPlotModal({ plot, close, save }) {
           </label>
           <label>Price (₹)<input value={form.price} onChange={set('price')} inputMode="numeric" /></label>
         </div>
+        <fieldset className="plot-features">
+          <legend>Features that carry a premium</legend>
+          <label><input type="checkbox" checked={form.corner} onChange={(e) => setForm({ ...form, corner: e.target.checked })} /> Corner plot</label>
+          <label><input type="checkbox" checked={form.commercial} onChange={(e) => setForm({ ...form, commercial: e.target.checked })} /> Commercial plot</label>
+          <label><input type="checkbox" checked={form.park} onChange={(e) => setForm({ ...form, park: e.target.checked })} /> Park / plantation facing</label>
+          <small className="field-hint">The premium amounts are set on the project. Facing north-east or east adds its premium automatically.{plot[11] > 0 ? ` Current premium on this plot: ₹${fmtINR(plot[11])}.` : ''}</small>
+        </fieldset>
         {plot[5] !== 'AVAILABLE' && <p className="field-hint">This plot is {String(plot[5]).toLowerCase()}; the booking keeps the price it was agreed at.</p>}
         {error && <p className="form-error">{error}</p>}
         <div className="modal-actions">

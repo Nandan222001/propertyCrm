@@ -1,12 +1,13 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { X, ChevronRight } from 'lucide-react';
-import { hasSession } from '../../api';
+import { actions, hasSession } from '../../api';
+import { PlanBreakdown } from '../projects/PlanBreakdown';
 import { parseAmt, fmtINR, isAdmin, isValidMobile, normaliseMobile, MOBILE_HINT } from '../../utils';
 
-function Shell({ kicker, title, sub, close, children }) {
+function Shell({ kicker, title, sub, close, children, wide = false }) {
   return (
     <div className="modal-backdrop" onMouseDown={e => e.target === e.currentTarget && close()}>
-      <div className="modal">
+      <div className={`modal ${wide ? 'modal-wide' : ''}`.trim()}>
         <div className="modal-head">
           <div>
             <span className="modal-kicker">{kicker}</span>
@@ -35,6 +36,7 @@ export function BookingModal({ role, agentName, customers, plots, projects = [],
   const fromCustomers = [...new Set(customers.map((c) => c.agent).filter(Boolean))].sort();
   const agentOptions = fromCustomers;
   const agentMode = role === 'SALES AGENT';
+  const priceLocked = !isAdmin(role);   // the server enforces the same rule: only an approver can set a different price
   // Live data is already limited to the agent's own customers by the server; offline we match by name.
   const myCustomers = customers.filter(c => c.status === 'Approved' && (!agentMode || hasSession() || c.agent === agentName));
   const [customer, setCustomer] = useState(myCustomers[0]?.name || '');
@@ -45,16 +47,52 @@ export function BookingModal({ role, agentName, customers, plots, projects = [],
   const [price, setPrice] = useState('');
   const [error, setError] = useState('');
 
-  const finalPrice = price || selected?.[4] || '';
+  // The project's payment schemes (the brochure's "outright / 6 months EMI / 44 months …"), and what the chosen
+  // one works out to on this plot. Everything — price, amount due at booking, schedule — comes from them.
+  const projectId = projects.find(p => p[0] === project)?.[6];
+  const [plans, setPlans] = useState([]);
+  const [planId, setPlanId] = useState('');
+  const [quote, setQuote] = useState(null);
+  const [quoteError, setQuoteError] = useState('');
+  const [tokenEdit, setTokenEdit] = useState(null);
+  useEffect(() => {
+    setPlans([]); setPlanId(''); setQuote(null);
+    if (typeof projectId !== 'number' || !hasSession()) return undefined;
+    let live = true;
+    actions.projectPlans(projectId).then((r) => {
+      if (!live) return;
+      setPlans((r.data || []).filter(p => p.is_active));   // offered, never forced: the booking starts with no scheme
+    }).catch(() => {});
+    return () => { live = false; };
+  }, [projectId]);
+  const plotApiId = selected?.[9];
+  useEffect(() => {
+    setQuote(null); setQuoteError(''); setTokenEdit(null);
+    if (!planId || typeof plotApiId !== 'number') return undefined;
+    let live = true;
+    actions.quotePlan({ plan_id: Number(planId), plot_id: plotApiId })
+      .then((r) => { if (live) setQuote(r.data); })
+      .catch((e) => { if (live) setQuoteError(e.message); });
+    return () => { live = false; };
+  }, [planId, plotApiId]);
+  const hasPlans = plans.length > 0;
+  const plan = plans.find(p => String(p.id) === planId);
+
+  const finalPrice = price || (plan ? (quote ? fmtINR(Number(quote.total_payable)) : '') : (selected?.[10] ?? selected?.[4])) || '';
+  const tokenValue = tokenEdit ?? (plan ? (quote ? fmtINR(Number(quote.upfront_total)) : '') : '');
 
   function submit(e) {
     e.preventDefault();
     const d = Object.fromEntries(new FormData(e.currentTarget));
     if (!customer) return setError('Select an approved customer first. Agents add customers from the Customers page.');
     if (!selected) return setError('No available plot in this project.');
+    if (plan && !quote) return setError(quoteError || 'Wait for the payment scheme to be calculated.');
     if (parseAmt(finalPrice) <= 0) return setError('Enter the final price.');
-    if (parseAmt(d.paid) > parseAmt(finalPrice)) return setError('Token advance cannot exceed the final price.');
-    save({ customer, project, plot: selected[0], amount: fmtINR(parseAmt(finalPrice)), paid: fmtINR(parseAmt(d.paid)), plan: d.plan, agent: agentMode ? agentName : d.agent });
+    if (parseAmt(tokenValue) > parseAmt(finalPrice)) return setError('The amount paid at booking cannot exceed the final price.');
+    save({
+      customer, project, plot: selected[0], amount: fmtINR(parseAmt(finalPrice)), paid: fmtINR(parseAmt(tokenValue)),
+      plan: plan?.name || 'Standard', planId: plan ? plan.id : undefined, agent: agentMode ? agentName : d.agent,
+    });
   }
 
   return (
@@ -63,6 +101,7 @@ export function BookingModal({ role, agentName, customers, plots, projects = [],
       title="Create Sales Booking"
       sub={agentMode ? 'Your booking is sent to the admin for approval. The plot is held until then.' : 'Admin bookings are confirmed immediately.'}
       close={close}
+      wide={Boolean(plan)}
     >
       <form onSubmit={submit}>
         <div className="form-grid">
@@ -77,23 +116,30 @@ export function BookingModal({ role, agentName, customers, plots, projects = [],
               {projects.map(p => <option key={p[0]}>{p[0]}</option>)}
             </select>
           </Field>
-          <Field label="Plot (available)" hint={selected ? `${selected[2]} sq.ft · ${selected[3]} facing · list ₹${selected[4]}` : undefined}>
+          <Field label="Plot (available)" hint={selected ? `${selected[2]} sq.ft · ${selected[3]} facing · ₹${selected[10] ?? selected[4]}${selected[11] > 0 ? ` (incl. ₹${fmtINR(selected[11])} premium)` : ''}` : undefined}>
             <select value={selected?.[0] || ''} onChange={e => { setPlotNo(e.target.value); setPrice(''); }}>
               {free.length === 0 && <option value="">No available plots in this project — the admin adds plots under Projects &amp; plots → Add Plots</option>}
-              {free.map(p => <option key={p[0]} value={p[0]}>{p[0]} · ₹{p[4]}</option>)}
+              {free.map(p => <option key={p[0]} value={p[0]}>{p[0]} · ₹{p[10] ?? p[4]}</option>)}
             </select>
           </Field>
-          <Field label="Final price for customer (₹)">
-            <input value={finalPrice} onChange={e => setPrice(e.target.value)} inputMode="numeric" />
+          <Field label="Final price for customer (₹)" hint={priceLocked ? (plan ? 'Fixed by the payment scheme — only the admin can change it' : 'Fixed at the plot\'s listed price — only the admin can change it') : undefined}>
+            <input value={finalPrice} onChange={e => setPrice(e.target.value)} inputMode="numeric" readOnly={priceLocked} />
           </Field>
-          <Field label="Token advance (₹)">
-            <input name="paid" defaultValue="2,00,000" inputMode="numeric" />
+          <Field label={plan ? 'Due at booking (₹)' : 'Amount paid at booking (₹)'} hint={plan ? (priceLocked ? 'Application fee + enrollment + allotment of the chosen scheme' : 'Application fee + enrollment + allotment (admin may adjust)') : undefined}>
+            <input name="paid" value={tokenValue} onChange={e => setTokenEdit(e.target.value)} inputMode="numeric" readOnly={Boolean(plan) && priceLocked} placeholder="0" />
           </Field>
-          <Field label="Installment plan">
-            <select name="plan" defaultValue="12 monthly installments">
-              {['12 monthly installments', '6 monthly installments', 'Paid in full'].map(x => <option key={x}>{x}</option>)}
-            </select>
-          </Field>
+          {hasPlans ? (
+            <Field label="Payment scheme (optional)" hint={plan ? 'Every amount below follows this scheme' : 'Only choose a scheme if the customer wants one; otherwise the plot is booked at its full price.'}>
+              <select value={planId} onChange={e => { setPlanId(e.target.value); setPrice(''); }}>
+                <option value="">No payment scheme — full price</option>
+                {plans.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+              </select>
+            </Field>
+          ) : (
+            <Field label="Payment scheme" hint="This project has no payment scheme yet — the admin sets them from the project's wallet icon. The plot is booked at its full price.">
+              <input value="Standard (full price)" readOnly />
+            </Field>
+          )}
           {agentMode ? (
             <Field label="Sales agent"><input value={agentName} readOnly /></Field>
           ) : (
@@ -102,6 +148,8 @@ export function BookingModal({ role, agentName, customers, plots, projects = [],
             </Field>
           )}
         </div>
+        {plan && quoteError && <p className="form-error">{quoteError}</p>}
+        {plan && quote && <PlanBreakdown quote={quote} />}
         {error && <p className="form-error">{error}</p>}
         <div className="modal-actions">
           <button type="button" className="button button-white" onClick={close}>Cancel</button>

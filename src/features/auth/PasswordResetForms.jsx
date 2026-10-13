@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { ArrowRight, Lock, Mail } from 'lucide-react';
 import { actions } from '../../api';
+import { PasswordInput } from '../../components/common/PasswordInput';
 
 const STRONG = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,128}$/;
 
@@ -72,12 +73,12 @@ export function ResetPasswordForm({ token, onDone }) {
     <form className="login-card" onSubmit={submit} noValidate>
       <div className="form-group">
         <label>New password
-          <div className="input-with-icon"><Lock size={15} /><input type="password" autoComplete="new-password" value={form.next} onChange={set('next')} autoFocus /></div>
+          <div className="input-with-icon"><Lock size={15} /><PasswordInput autoComplete="new-password" value={form.next} onChange={set('next')} autoFocus /></div>
         </label>
       </div>
       <div className="form-group">
         <label>Confirm new password
-          <div className="input-with-icon"><Lock size={15} /><input type="password" autoComplete="new-password" value={form.confirm} onChange={set('confirm')} /></div>
+          <div className="input-with-icon"><Lock size={15} /><PasswordInput autoComplete="new-password" value={form.confirm} onChange={set('confirm')} /></div>
         </label>
       </div>
       {state.error && <div className="login-error-banner"><span>{state.error}</span></div>}

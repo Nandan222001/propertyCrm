@@ -37,6 +37,7 @@ from app.schemas.finance import (
 from app.services.base_service import BaseService
 from app.services.company_profile import company_profile
 from app.services.org_settings import setting_int
+from app.services.plan_service import PlanService
 from app.utils.money import amount_in_words
 
 PAYMENT_STATUS_FOR = {
@@ -120,9 +121,12 @@ class PaymentService(BaseService[Payment]):
         rows: list[PaymentLedgerRow] = []
         for booking in bookings.items:
             due = None
-            latest = self.payments.list(filters={"booking_id": booking.id}, sort="received_on:desc", limit=1)
-            if latest:
-                due = latest[0].due_date
+            if booking.plan_id is not None:
+                due = PlanService(self.db, self.actor).next_due(booking.id)     # follows the payment scheme's schedule
+            else:
+                latest = self.payments.list(filters={"booking_id": booking.id}, sort="received_on:desc", limit=1)
+                if latest:
+                    due = latest[0].due_date
             rows.append(
                 PaymentLedgerRow(
                     booking_number=booking.booking_number,
@@ -178,6 +182,7 @@ class PaymentService(BaseService[Payment]):
             if not self.actor.can(Permission.PAYMENT_APPROVE):
                 raise PermissionDeniedError("Only an approver can revise the booking price")
             booking.final_price = payload.final_price
+            PlanService(self.db, self.actor).rescale(booking, payload.final_price)
 
         outstanding = booking.balance
         if outstanding <= 0:
@@ -192,6 +197,14 @@ class PaymentService(BaseService[Payment]):
         fully_paid = balance_after <= 0
         received_on = payload.received_on or date.today()
 
+        # A booking made on a payment scheme: apply the money to the earliest unpaid lines, and the next
+        # due date is the next unpaid line of that schedule.
+        schedule_due = None
+        if booking.plan_id is not None:
+            plans = PlanService(self.db, self.actor)
+            plans.allocate_payment(booking.id, payload.amount)
+            schedule_due = plans.next_due(booking.id)
+
         payment = Payment(
             booking_id=booking.id,
             customer_id=booking.customer_id,
@@ -199,7 +212,7 @@ class PaymentService(BaseService[Payment]):
             mode=payload.mode,
             reference=payload.reference,
             received_on=received_on,
-            due_date=payload.due_date or (None if fully_paid else received_on + timedelta(days=setting_int(self.db, "tax", "installmentDays"))),
+            due_date=payload.due_date or schedule_due or (None if fully_paid else received_on + timedelta(days=setting_int(self.db, "tax", "installmentDays"))),
             status=PAYMENT_STATUS_FOR[fully_paid],
             balance_after=max(balance_after, Decimal("0")),
             notes=payload.notes,
@@ -247,6 +260,8 @@ class PaymentService(BaseService[Payment]):
             raise BusinessRuleError("Unknown booking")
         if booking.balance <= 0:
             raise BusinessRuleError("This booking is fully paid — there is no next instalment")
+        if booking.plan_id is not None:
+            raise BusinessRuleError("This booking follows its payment scheme's schedule, so its due dates are fixed by the scheme")
         latest = self.payments.list(filters={"booking_id": booking.id}, sort="received_on:desc", limit=1)
         if not latest:
             raise BusinessRuleError("Record a payment first — the due date belongs to the instalment schedule")

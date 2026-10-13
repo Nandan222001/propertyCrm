@@ -242,3 +242,21 @@ def test_admin_adds_a_run_of_plots_to_a_project_and_agents_can_then_book_them(cl
     booked = client.post("/api/v1/bookings", headers=agent_headers, json={
         "customer_id": agent_approved_customer["id"], "plot_id": first["id"], "final_price": "1200000"})
     assert booked.status_code == 201, booked.text
+
+
+def test_final_price_is_fixed_for_agents_but_an_admin_can_agree_another(client, agent_headers, admin_headers,
+                                                                        agent_approved_customer, available_plot):
+    listed = available_plot["price"]
+    cheaper = client.post("/api/v1/bookings", headers=agent_headers, json={
+        "customer_id": agent_approved_customer["id"], "plot_id": available_plot["id"], "final_price": "1"})
+    assert cheaper.status_code in (400, 409, 422) and "fixed at the listed price" in cheaper.text
+    # nothing was created: the plot is still free and can be booked at the listed price
+    ok = client.post("/api/v1/bookings", headers=agent_headers, json={
+        "customer_id": agent_approved_customer["id"], "plot_id": available_plot["id"], "final_price": listed})
+    assert ok.status_code == 201, ok.text
+    assert client.delete(f"/api/v1/bookings/{ok.json()['data']['id']}", headers=agent_headers).status_code == 200
+    # an admin may negotiate a different price
+    negotiated = client.post("/api/v1/bookings", headers=admin_headers, json={
+        "customer_id": agent_approved_customer["id"], "plot_id": available_plot["id"], "final_price": "1000000"})
+    assert negotiated.status_code == 201, negotiated.text
+    assert float(negotiated.json()["data"]["final_price"]) == 1_000_000

@@ -135,6 +135,7 @@ class BookingService(BaseService[Booking]):
             balance=booking.balance,
             status=booking.status,
             payment_plan=booking.payment_plan,
+            plan_id=booking.plan_id,
             approved_at=booking.approved_at,
             rejection_reason=booking.rejection_reason,
             registry_stage=booking.registry_stage or "NOT_STARTED",
@@ -156,6 +157,36 @@ class BookingService(BaseService[Booking]):
             raise ConflictError(f"Plot {plot.plot_number} is currently {plot.status} and cannot be booked")
         if self.bookings.for_plot(plot.id) is not None:
             raise ConflictError(f"Plot {plot.plot_number} already has an active booking")
+        # The price comes from the plot (plus its premiums) and the payment scheme chosen for the project. Only an
+        # approver may agree a different total; everyone else books at exactly what the scheme works out to.
+        from app.services.plan_calculator import PlanTerms, build_quote, plot_total_price
+        from app.services.plan_service import PlanService
+
+        plans = PlanService(self.db, self.actor)
+        approver = self.actor.can(Permission.BOOKING_APPROVE)
+        list_price = plot_total_price(plot.project, plot)
+        booking_day = payload.booking_date or date.today()
+        plan = quote = None
+        if payload.plan_id is not None:
+            plan = plans.get_plan(payload.plan_id)
+            if plan.project_id != plot.project_id or not plan.is_active:
+                raise BusinessRuleError("This payment scheme is not available for the plot's project")
+        if plan is not None:
+            quote = build_quote(PlanTerms.from_model(plan), list_price, booking_day)
+            expected = quote["total_payable"]
+            if payload.final_price != expected:
+                if not approver:
+                    raise BusinessRuleError(
+                        f"The final price is fixed at ₹{expected:,.2f} for the '{plan.name}' scheme on plot "
+                        f"{plot.plot_number}. Only an admin can set a different price.")
+                quote = build_quote(PlanTerms.from_model(plan), list_price, booking_day, total_override=payload.final_price)
+            if not approver and payload.token_amount != quote["upfront_total"]:
+                raise BusinessRuleError(
+                    f"The amount due at booking is fixed at ₹{quote['upfront_total']:,.2f} for the '{plan.name}' scheme.")
+        elif not approver and payload.final_price != list_price:
+            raise BusinessRuleError(
+                f"The final price is fixed at the listed price of ₹{list_price:,.2f} for plot {plot.plot_number}. "
+                "Only an admin can set a different price.")
         if customer.is_deleted:
             raise BusinessRuleError("This customer record is not available for booking")
         if customer.is_pending_approval:
@@ -187,13 +218,15 @@ class BookingService(BaseService[Booking]):
             token_amount=payload.token_amount,
             discount_amount=payload.discount_amount,
             paid_amount=Decimal("0.00"),
-            payment_plan=payload.payment_plan,
+            payment_plan=plan.name if plan is not None else payload.payment_plan,
             notes=payload.notes,
             status=status,
             created_by_id=self.actor.user_id,
             approved_by_id=self.actor.user_id if approved else None,
         )
         self.bookings.create(booking)
+        if plan is not None:
+            plans.attach_schedule(booking, plan, quote)
         self._transition_plot(plot, status, customer_id=customer.id, agent_id=agent_id,
                               hold_days=None if approved else self._hold_days())
         self.history.record(
@@ -257,6 +290,10 @@ class BookingService(BaseService[Booking]):
         self._authorise("update")
         before = {"final_price": str(booking.final_price), "status": booking.status}
         self.bookings.update(booking, values)
+        if price_changed and booking.plan_id is not None:
+            from app.services.plan_service import PlanService
+
+            PlanService(self.db, self.actor).rescale(booking, booking.final_price)
         self._audit("crud.update", booking, before=before,
                     after={"final_price": str(booking.final_price), "status": booking.status},
                     summary="Booking updated")
@@ -298,6 +335,10 @@ class BookingService(BaseService[Booking]):
         previous = booking.status
         if payload.final_price is not None and payload.final_price != booking.final_price:
             booking.final_price = payload.final_price
+            if booking.plan_id is not None:
+                from app.services.plan_service import PlanService
+
+                PlanService(self.db, self.actor).rescale(booking, payload.final_price)
         booking.status = BookingStatus.CONFIRMED.value
         booking.approved_by_id = self.actor.user_id
         booking.approved_at = self.bookings.now()

@@ -46,33 +46,6 @@
 .contact-card{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:14px;padding:14px 16px}
 .view-only-tag{font-size:11px;font-weight:700;letter-spacing:.8px;color:#0d9488;background:#ccfbf1;border-radius:4px;padding:4px 7px}
 
-/* ---------- 3D map ---------- */
-.map3d-controls{display:flex;flex-wrap:wrap;align-items:center;gap:14px;padding:12px 2px 10px}
-.map3d-controls label{display:flex;align-items:center;gap:7px;font-size:11px;font-weight:600;color:#677185}
-.map3d-controls input[type=range]{width:96px}
-.map3d-legend{display:flex;gap:12px;margin-left:auto;font-size:11px;color:#677185;flex-wrap:wrap}
-.map3d-legend i{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:5px}
-.map3d-stage{position:relative;height:430px;overflow:hidden;border-radius:10px;background:linear-gradient(180deg,#eef2fb,#f9fafc);display:grid;place-items:center;perspective:1400px}
-.map3d-scene{position:relative;transform-style:preserve-3d;transition:transform .25s ease}
-.map3d-ground{position:absolute;inset:-14px;background:#dfe5f1;border-radius:6px;transform:translateZ(-1px);box-shadow:0 0 0 1px #cfd7e8}
-.blk{position:absolute;transform-style:preserve-3d;cursor:pointer}
-.blk .f{position:absolute;display:block;font-style:normal;background:var(--c)}
-.blk .top{inset:0;transform:translateZ(var(--h));display:grid;place-items:center;transition:filter .15s}
-.blk .top span{font:700 11px Manrope;color:#fff;transform:rotate(0deg);text-shadow:0 1px 1px #0003;pointer-events:none}
-.blk:hover .top,.blk.active .top{filter:brightness(1.18)}
-.blk.active .top{outline:2px solid #172033;outline-offset:-2px}
-.blk .south{left:0;top:100%;width:100%;height:var(--h);transform-origin:top;transform:rotateX(90deg);filter:brightness(.8)}
-.blk .north{left:0;top:0;width:100%;height:var(--h);transform-origin:top;transform:rotateX(90deg);filter:brightness(.7)}
-.blk .east{left:100%;top:0;width:var(--h);height:100%;transform-origin:left;transform:rotateY(-90deg);filter:brightness(.65)}
-.blk .west{left:0;top:0;width:var(--h);height:100%;transform-origin:left;transform:rotateY(-90deg);filter:brightness(.9)}
-.map3d-detail{display:flex;flex-wrap:wrap;align-items:center;gap:22px;margin-top:12px;padding:12px 14px;border:1px solid #eaedf1;border-radius:8px;font-size:13px;min-height:56px}
-.map3d-detail p{margin:0;color:#8892a4;font-size:12px}
-.map3d-detail small{display:block;font-size:11px;color:#929baa;letter-spacing:.6px}
-.map3d-detail b{display:block;font:700 13px Manrope}
-.map3d-dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:4px}
-.map3d-empty{position:absolute;color:#8892a4;font-size:13px}
-@media(max-width:520px){.map3d-stage{height:340px}.map3d-legend{margin-left:0}}
-
 /* ---------- bill / booking form (screen + print) ---------- */
 .print-modal{width:min(820px,100%);background:#fff;border-radius:12px;box-shadow:0 25px 90px #1720333d;margin:auto}
 .print-backdrop{align-items:flex-start;overflow:auto}
@@ -293,3 +266,63 @@
 .icon-action.danger:hover { background: #fee2e2; }
 
 .boot-screen { min-height: 100vh; display: grid; place-items: center; color: var(--text-muted, #64748b); font-size: 15px; }
+
+/* Password box with a show / hide eye */
+.password-field { position: relative; display: block; width: 100%; }
+.password-field input { width: 100%; padding-right: 40px; }
+.password-toggle { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); border: 0; background: transparent; color: var(--text-muted, #64748b); cursor: pointer; padding: 6px; border-radius: 6px; display: inline-flex; }
+.password-toggle:hover { background: rgba(100, 116, 139, 0.12); color: var(--text, #0f172a); }
+
+/* Projects | Plots options: two clear buttons side by side, the open one filled */
+.tabs.view-options { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.tabs.view-options > button:not(.filter-btn):not(.button) { border: 1px solid var(--border, #cbd5e1); background: #fff; color: #475569; padding: 8px 20px; border-radius: 9px; font-size: 13px; font-weight: 700; cursor: pointer; margin: 0; }
+.tabs.view-options > button.active:not(.filter-btn) { background: #4f5fce; border-color: #4f5fce; color: #fff; box-shadow: 0 2px 6px rgba(79, 95, 206, 0.3); }
+
+/* Project form: premium charges */
+.premium-box { margin-top: 14px; padding: 12px 14px; border: 1px dashed var(--border, #cbd5e1); border-radius: 10px; }
+.premium-box h3 { margin: 0 0 4px; font-size: 14px; }
+.premium-box h3 small { font-weight: 400; color: var(--text-muted, #64748b); }
+
+.plot-features { border: 1px solid var(--border, #e2e8f0); border-radius: 10px; margin: 12px 0 0; padding: 8px 14px 10px; display: flex; flex-wrap: wrap; gap: 6px 18px; }
+.plot-features legend { font-size: 12px; font-weight: 700; padding: 0 6px; color: #475569; }
+.plot-features label { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; }
+.plot-features .field-hint { flex-basis: 100%; }
+
+/* Payment schemes */
+.plan-list { display: grid; gap: 10px; margin: 10px 0; }
+.plan-card { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 12px 14px; border: 1px solid var(--border, #e2e8f0); border-radius: 10px; }
+.plan-card p { margin: 2px 0 0; font-size: 12.5px; }
+.plan-preview { margin-top: 14px; padding: 12px 14px; background: rgba(79, 95, 206, 0.05); border-radius: 10px; }
+.plan-preview h3 { margin: 0 0 8px; font-size: 14px; }
+.plan-preview h3 small { font-weight: 400; color: var(--text-muted, #64748b); }
+.check-row { display: flex; align-items: center; gap: 8px; }
+.plan-summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 8px 16px; margin: 10px 0; }
+.plan-summary > div { display: flex; justify-content: space-between; gap: 10px; padding: 6px 10px; background: #fff; border-radius: 8px; border: 1px solid var(--border, #e2e8f0); font-size: 13px; }
+.plan-summary dt { color: #64748b; } .plan-summary dd { margin: 0; font-weight: 700; }
+.plan-summary .total { background: #eef0ff; border-color: #c7cdf5; }
+.plan-summary .good dd { color: #15803d; }
+.plan-schedule td, .plan-schedule th { padding: 6px 10px; font-size: 12.5px; }
+.plan-schedule th:first-child, .plan-schedule td:first-child { width: 40px; text-align: center; }
+
+/* Payment scheme form: guidance under each field, and a normal-sized checkbox row */
+.modal .form-grid .field-hint { display: block; margin-top: 4px; font-size: 11.5px; font-weight: 400; line-height: 1.4; color: #64748b; }
+.modal .form-grid .field-warn { color: #b45309; }
+.modal .form-grid label.check-row { display: flex; flex-direction: row; align-items: flex-start; gap: 10px; }
+.modal .form-grid label.check-row input[type=checkbox] { width: 18px; height: 18px; flex: none; margin: 2px 0 0; padding: 0; }
+.modal .form-grid label.check-row span { font-weight: 600; }
+.text-button { background: none; border: 0; padding: 0; color: #4f5fce; font-weight: 600; cursor: pointer; text-decoration: underline; font-size: inherit; }
+
+/* Dialogs taller than the screen scroll (and stay reachable at both ends) instead of being cut off */
+.modal-backdrop { overflow-y: auto; align-items: flex-start; }
+.modal-backdrop > .modal, .modal-backdrop > .modal-wide { margin: auto; }
+
+/* Payment schedule: every instalment, in a box that scrolls so long schemes stay tidy */
+.plan-count { margin: 6px 0 4px; font-size: 12px; }
+.plan-schedule-scroll { max-height: 380px; overflow: auto; border: 1px solid var(--border, #e2e8f0); border-radius: 8px; background: #fff; }
+.plan-schedule-scroll thead th { position: sticky; top: 0; background: #f8fafc; z-index: 1; }
+.plan-schedule tfoot td { padding: 8px 10px; border-top: 2px solid var(--border, #e2e8f0); background: #f8fafc; position: sticky; bottom: 0; }
+.plan-schedule th:first-child, .plan-schedule td:first-child { width: 52px; text-align: left; padding-left: 16px; }
+
+/* The app's tables bleed 18px past their panel (negative margins). Inside these boxes that hid the first column. */
+.plan-schedule-scroll { margin: 8px 0 0 !important; }
+.plan-schedule-scroll .plan-schedule, .plan-schedule { margin: 0 !important; width: 100%; }

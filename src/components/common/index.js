@@ -10,3 +10,4 @@ export { Panel } from './Panel';
 export { EmptyState } from './EmptyState';
 export { ModalShell } from './ModalShell';
 export { ConfirmDialog } from './ConfirmDialog';
+export { PasswordInput } from './PasswordInput';

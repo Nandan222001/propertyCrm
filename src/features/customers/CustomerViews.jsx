@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Eye, Printer, MessageCircle, Download, FileText, Check, X as XIcon, Plus, Edit2, Trash2 } from 'lucide-react';
 import { ConfirmDialog } from '../../components/common/ConfirmDialog';
 import { EditCustomerModal } from './EditCustomerModal';
+import { PaymentScheduleModal } from '../bookings/PaymentScheduleModal';
 import { COMPANY, REGISTRY_STEPS } from '../../data/appConfig';
 import { parseAmt, fmtINR, openWhatsApp, isAdmin, canCreateCustomer, canApprove, canEditCustomer, canDeleteCustomer } from '../../utils';
 
@@ -107,6 +108,7 @@ export function CustomerProfile({
   customer, bookings, pays, receipts, registry, portal, role,
   onRegistry, onOpenBill, onPrintBooking, notify
 }) {
+  const [schedule, setSchedule] = useState(null);
   const mine = bookings.filter(b => b[1] === customer.name && b[7] !== 'Rejected');
   const ledger = pays.filter(p => p[0] === customer.name);
   const bills = receipts.filter(r => r.customer === customer.name && (!portal || r.shared));
@@ -116,6 +118,7 @@ export function CustomerProfile({
 
   return (
     <div className="customer-detail">
+      {schedule && <PaymentScheduleModal booking={schedule} close={() => setSchedule(null)} />}
       <div className="panel customer-summary">
         <Avatar name={customer.name} />
         <div>
@@ -167,6 +170,7 @@ export function CustomerProfile({
                 ) : reg}
               </div>
               <div className="row-actions" style={{ marginTop: 10 }}>
+                {typeof b[10] === 'number' && <button className="button button-white small-btn" onClick={() => setSchedule(b)}>Payment schedule</button>}
                 <button className="button button-white small-btn" onClick={() => onPrintBooking(b)}><Printer size={12} /> Booking form</button>
               </div>
             </article>

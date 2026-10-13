@@ -24,6 +24,12 @@ class ProjectBase(SafeText):
     launch_date: date | None = None
     completion_date: date | None = None
     is_active: bool = True
+    # Extra charge added to the price of a plot with that feature (all optional).
+    premium_commercial: Money | None = None
+    premium_corner: Money | None = None
+    premium_ne_facing: Money | None = None
+    premium_east_facing: Money | None = None
+    premium_park_facing: Money | None = None
 
 
 class ProjectCreate(ProjectBase):
@@ -48,6 +54,11 @@ class ProjectResponse(TimestampedResponse):
     base_rate_per_sqft: Decimal | None = None
     estimated_revenue: Decimal | None = None
     is_active: bool = True
+    premium_commercial: Decimal | None = None
+    premium_corner: Decimal | None = None
+    premium_ne_facing: Decimal | None = None
+    premium_east_facing: Decimal | None = None
+    premium_park_facing: Decimal | None = None
     plot_counts: dict[str, int] = Field(default_factory=dict)
 
 
@@ -57,6 +68,9 @@ class PlotBase(SafeText):
     area_sqft: Decimal = Field(gt=0, le=1_000_000)
     price: Money
     status: PlotStatus = PlotStatus.AVAILABLE
+    is_corner: bool = False
+    is_commercial: bool = False
+    is_park_facing: bool = False
 
 
 class PlotCreate(PlotBase):
@@ -94,6 +108,9 @@ class PlotUpdate(SafeText):
     area_sqft: Decimal | None = Field(default=None, gt=0, le=1_000_000)
     price: Money | None = None
     status: PlotStatus | None = None
+    is_corner: bool | None = None
+    is_commercial: bool | None = None
+    is_park_facing: bool | None = None
 
 
 class PlotStatusUpdate(SafeText):
@@ -119,6 +136,11 @@ class PlotResponse(TimestampedResponse):
     customer_id: int | None = None
     agent_id: int | None = None
     hold_expires_at: datetime | None = None
+    is_corner: bool = False
+    is_commercial: bool = False
+    is_park_facing: bool = False
+    premium: Decimal = Decimal("0")          # extras for the plot's features, from the project's premium charges
+    total_price: Decimal | None = None       # price + premium: what the plot is sold for
 
 
 class InventoryResponse(ORMModel):

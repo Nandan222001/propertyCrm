@@ -37,7 +37,7 @@ const uiSlice = createSlice({
       state.search = '';
       state.mobileOpen = false;
       if (action.payload !== PAGES.CUSTOMER_DETAIL) state.customerSelected = null;
-      if (action.payload === PAGES.PROJECTS) state.tab = 'Plots';
+      if (action.payload === PAGES.PROJECTS) state.tab = 'Projects';
       if (action.payload === PAGES.BOOKINGS) state.tab = 'All bookings';
     },
     sidebarToggled(state, action) {

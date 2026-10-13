@@ -19,6 +19,7 @@ from app.routes.dashboard_routes import router as dashboard_router
 from app.routes.health_routes import router as health_router
 from app.routes.notification_routes import router as notification_router
 from app.routes.payment_routes import router as payment_router
+from app.routes.plan_routes import router as plan_router
 from app.routes.property_routes import router as property_router
 from app.routes.report_routes import router as report_router
 from app.routes.tenant_routes import router as tenant_router
@@ -45,6 +46,7 @@ for router in (
     tenant_router,
     user_router,
     property_router,
+    plan_router,
     customer_router,
     booking_router,
     payment_router,

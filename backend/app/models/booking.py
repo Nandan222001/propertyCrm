@@ -52,6 +52,9 @@ class Booking(Base, PkMixin, PublicIdMixin, TenantMixin, TimestampMixin, SoftDel
     gst_amount: Mapped[Decimal] = mapped_column(Numeric(18, 2), default=Decimal("0"), nullable=False)
 
     payment_plan: Mapped[str | None] = mapped_column(String(80))
+    #: The scheme chosen at booking and the schedule it produced, frozen as agreed (later scheme edits never change it).
+    plan_id: Mapped[int | None] = mapped_column(ForeignKey("payment_plans.id", ondelete="SET NULL"), index=True)
+    plan_snapshot: Mapped[str | None] = mapped_column(Text)
     status: Mapped[str] = mapped_column(
         String(24), default=BookingStatus.PENDING_APPROVAL.value, nullable=False, index=True
     )

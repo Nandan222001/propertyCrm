@@ -217,6 +217,7 @@ const createBookingLive = (form) => async (dispatch, getState) => {
     const response = await api.bookings.create({
       customer_id: customer.id, plot_id: plot[9], final_price: parseAmt(form.amount),
       token_amount: parseAmt(form.paid || 0), payment_plan: form.plan,
+      ...(form.planId ? { plan_id: form.planId } : {}),
     });
     const booking = response.data;
     dispatch(modalClosed());

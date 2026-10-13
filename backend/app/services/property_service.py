@@ -28,6 +28,7 @@ from app.schemas.property import (
     ProjectUpdate,
 )
 from app.services.base_service import BaseService
+from app.services.plan_calculator import plot_premium, plot_total_price
 
 
 class ProjectService(BaseService[Project]):
@@ -61,6 +62,11 @@ class ProjectService(BaseService[Project]):
             base_rate_per_sqft=project.base_rate_per_sqft,
             estimated_revenue=project.estimated_revenue,
             is_active=project.is_active,
+            premium_commercial=project.premium_commercial,
+            premium_corner=project.premium_corner,
+            premium_ne_facing=project.premium_ne_facing,
+            premium_east_facing=project.premium_east_facing,
+            premium_park_facing=project.premium_park_facing,
             plot_counts=counts or {},
             created_at=project.created_at,
             updated_at=project.updated_at,
@@ -155,6 +161,11 @@ class PlotService(BaseService[Plot]):
             customer_id=customer_id,
             agent_id=agent_id,
             hold_expires_at=plot.hold_expires_at,
+            is_corner=plot.is_corner,
+            is_commercial=plot.is_commercial,
+            is_park_facing=plot.is_park_facing,
+            premium=plot_premium(plot.project, plot) if plot.project else Decimal("0"),
+            total_price=plot_total_price(plot.project, plot) if plot.project else plot.price,
             created_at=plot.created_at,
             updated_at=plot.updated_at,
         )

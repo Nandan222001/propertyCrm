@@ -3,13 +3,24 @@
  *   [0] name  [1] "Phase · City"  [2] total plots  [3] booked  [4] hold  [5] est. revenue ("12.6 Cr")
  * extended with the fields the add/edit form needs:
  *   [6] api id  [7] city  [8] phase  [9] location  [10] RERA no.  [11] active  [12] base rate / sq.ft
+ *   [13] commercial  [14] corner  [15] north-east facing  [16] east facing  [17] park facing  (premium per plot, ₹)
  */
 const CRORE = 10000000;
 
 export const PROJECT_COL = {
   NAME: 0, WHERE: 1, TOTAL: 2, BOOKED: 3, HOLD: 4, REVENUE: 5,
   ID: 6, CITY: 7, PHASE: 8, LOCATION: 9, RERA: 10, ACTIVE: 11, RATE: 12,
+  PREMIUM_COMMERCIAL: 13, PREMIUM_CORNER: 14, PREMIUM_NE: 15, PREMIUM_EAST: 16, PREMIUM_PARK: 17,
 };
+
+/** Premium charges: form field -> API field. Each is an extra added to the price of a plot with that feature. */
+export const PREMIUMS = [
+  ['premiumCommercial', 'premium_commercial', 'Commercial plot', 13],
+  ['premiumCorner', 'premium_corner', 'Corner plot', 14],
+  ['premiumNe', 'premium_ne_facing', 'North-East facing', 15],
+  ['premiumEast', 'premium_east_facing', 'East facing', 16],
+  ['premiumPark', 'premium_park_facing', 'Park / plantation facing', 17],
+];
 
 const where = (phase, city) => [phase, city].filter(Boolean).join(' · ');
 
@@ -24,7 +35,7 @@ export const crValue = (label) => {
 
 /** Normalised view of a row for the form (seed rows have no extras: split the label). */
 export function projectFormValues(row) {
-  if (!row) return { name: '', phase: '', city: '', location: '', rera: '', total: '', rate: '', revenue: '', active: true };
+  if (!row) return { name: '', phase: '', city: '', location: '', rera: '', total: '', rate: '', revenue: '', active: true, ...Object.fromEntries(PREMIUMS.map(([key]) => [key, ''])) };
   const [phaseFromLabel = '', cityFromLabel = ''] = String(row[1] || '').split(' · ');
   return {
     name: row[0],
@@ -36,6 +47,7 @@ export function projectFormValues(row) {
     rate: row[PROJECT_COL.RATE] ? String(row[PROJECT_COL.RATE]) : '',
     revenue: crValue(row[5]),
     active: row[PROJECT_COL.ACTIVE] !== false,
+    ...Object.fromEntries(PREMIUMS.map(([key, , , index]) => [key, row[index] ? String(row[index]) : ''])),
   };
 }
 
@@ -55,6 +67,7 @@ export function projectRowFromForm(form, existing) {
     form.rera.trim(),
     form.active,
     form.rate ? Number(form.rate) : undefined,
+    ...PREMIUMS.map(([key]) => (form[key] ? Number(form[key]) : undefined)),
   ];
 }
 
@@ -71,6 +84,7 @@ export function projectApiPayload(form) {
   if (form.rera.trim()) body.rera_number = form.rera.trim();
   if (form.rate) body.base_rate_per_sqft = Number(form.rate);
   if (form.revenue) body.estimated_revenue = Math.round(Number(form.revenue) * CRORE);
+  PREMIUMS.forEach(([key, field]) => { if (form[key] !== '' && form[key] != null) body[field] = Number(form[key]); });
   return body;
 }
 
@@ -92,6 +106,7 @@ export function projectFromApi(p) {
     p.rera_number || '',
     p.is_active !== false,
     p.base_rate_per_sqft ? Number(p.base_rate_per_sqft) : undefined,
+    ...PREMIUMS.map(([, field]) => (p[field] != null ? Number(p[field]) : undefined)),
   ];
 }
 
@@ -111,5 +126,8 @@ export function validateProject(form, { projects = [], editing = null } = {}) {
   if (form.rate !== '' && !(Number(form.rate) >= 0)) return 'Base rate must be a positive number';
   if (form.revenue !== '' && !(Number(form.revenue) >= 0)) return 'Estimated revenue must be a positive number';
   if (form.rera.length > 60) return 'RERA number is too long (max 60)';
+  for (const [key, , label] of PREMIUMS) {
+    if (form[key] !== '' && !(Number(form[key]) >= 0)) return `${label}: the premium must be a positive amount`;
+  }
   return '';
 }

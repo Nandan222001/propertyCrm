@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { X, Check } from 'lucide-react';
-import { projectFormValues, validateProject } from '../../utils/projects';
+import { projectFormValues, validateProject, PREMIUMS } from '../../utils/projects';
 
 /** Add / edit a project. `editing` is the existing table row (null when adding). */
 export function ProjectModal({ editing, projects, close, save }) {
@@ -73,6 +73,21 @@ export function ProjectModal({ editing, projects, close, save }) {
               <option>Inactive</option>
             </select>
           </label>
+        </div>
+
+        <div className="premium-box">
+          <h3>Premium charges <small>(optional, extra per plot)</small></h3>
+          <p className="field-hint">
+            A plot marked as corner, commercial, park-facing, or facing north-east / east pays this extra on top of its price.
+            Leave blank for none. Plots get their features when you edit them.
+          </p>
+          <div className="form-grid">
+            {PREMIUMS.map(([key, , label]) => (
+              <label key={key}>{label} (₹)
+                <input value={form[key]} onChange={set(key)} inputMode="numeric" placeholder="Extra amount" />
+              </label>
+            ))}
+          </div>
         </div>
 
         {error && <p className="form-error" role="alert" style={{ color: '#d92d20', margin: '8px 0 0' }}>{error}</p>}

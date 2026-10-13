@@ -53,11 +53,12 @@ export function adaptWorkspace({
   return {
     projects: projects.map(projectFromApi),
 
-    // [plot no, layout, area, facing, price, status, customer, agent, project, apiId]
+    // [plot no, layout, area, facing, price, status, customer, agent, project, apiId,
+    //  total price (price + premium), premium, corner, commercial, park facing]
     plots: plots.map((p) => [
       p.plot_number, p.layout || dash, fmtINR(p.area_sqft), p.facing || dash, fmtINR(p.price), p.status,
       customerById.get(p.customer_id)?.name || dash, agentById.get(p.agent_id)?.name || dash, p.project_name || dash,
-      p.id,
+      p.id, fmtINR(p.total_price ?? p.price), Number(p.premium || 0), Boolean(p.is_corner), Boolean(p.is_commercial), Boolean(p.is_park_facing),
     ]),
 
     // [id, customer, project, plot, date, value, paid, status, agent, plan, apiId, customerId]

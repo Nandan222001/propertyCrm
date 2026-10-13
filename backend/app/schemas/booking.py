@@ -19,6 +19,7 @@ class BookingCreate(SafeText):
     token_amount: Money = Decimal("0")
     discount_amount: Money = Decimal("0")
     payment_plan: str | None = Field(default=None, max_length=80)
+    plan_id: int | None = Field(default=None, gt=0, description="The project's payment scheme chosen for this booking")
     agent_code: str | None = Field(default=None, max_length=16)
     booking_date: date | None = None
     notes: str | None = Field(default=None, max_length=2000)
@@ -99,6 +100,7 @@ class BookingResponse(TimestampedResponse):
     balance: Decimal
     status: str
     payment_plan: str | None = None
+    plan_id: int | None = None
     approved_at: datetime | None = None
     rejection_reason: str | None = None
     registry_stage: str = "NOT_STARTED"
