@@ -452,3 +452,9 @@
 @media(max-width:800px){.menu-toggle{display:block}}
 /* Use the full width next to the sidebar instead of a centred 1480px column. */
 .content{max-width:2200px}
+
+/* Password box with a lock icon (reset-password form): keep the eye inside the box and the lock visible */
+.input-with-icon > svg:first-child { z-index: 2; }
+.input-with-icon .password-field { flex: 1; min-width: 0; }
+.input-with-icon .password-field input { padding-left: 36px !important; padding-right: 42px !important; }
+.input-with-icon .password-toggle svg { position: static; left: auto; }
