@@ -34,7 +34,7 @@ function buildResource(paths) {
     resource.get = (id) => authedRequest(paths.item(id));
     resource.create = (body) => authedRequest(paths.list, { method: 'POST', body });
     resource.update = (id, body) => authedRequest(paths.item(id), { method: 'PATCH', body });
-    resource.remove = (id) => authedRequest(paths.item(id), { method: 'DELETE' });
+    resource.remove = (id, body) => authedRequest(paths.item(id), body ? { method: 'DELETE', body } : { method: 'DELETE' });
   }
   return resource;
 }
@@ -48,6 +48,7 @@ export const actions = {
   login: (body) => request(ENDPOINTS.auth.login, { method: 'POST', body, auth: false }),
   logout: (body) => authedRequest(ENDPOINTS.auth.logout, { method: 'POST', body }),
   me: () => authedRequest(ENDPOINTS.auth.me),
+  confirmPassword: (password) => authedRequest(ENDPOINTS.auth.confirmPassword, { method: 'POST', body: { password } }),
   changePassword: (body) => authedRequest(ENDPOINTS.auth.changePassword, { method: 'POST', body }),
   approveBooking: (id, body) => authedRequest(ENDPOINTS.bookings.approve(id), { method: 'POST', body }),
   rejectBooking: (id, body) => authedRequest(ENDPOINTS.bookings.reject(id), { method: 'POST', body }),

@@ -3,6 +3,7 @@ import { X, ChevronRight } from 'lucide-react';
 import { actions, hasSession } from '../../api';
 import { PlanBreakdown } from '../projects/PlanBreakdown';
 import { parseAmt, fmtINR, isAdmin, isValidMobile, normaliseMobile, MOBILE_HINT } from '../../utils';
+import { limitMobile, MOBILE_INPUT } from '../../utils/phone';
 
 function Shell({ kicker, title, sub, close, children, wide = false }) {
   return (
@@ -242,7 +243,7 @@ export function CustomerModal({ agentName, customers, projects = [], defaultProj
       <form onSubmit={submit}>
         <div className="form-grid">
           <Field label="Full name"><input name="name" required placeholder="Full name" /></Field>
-          <Field label="Mobile (WhatsApp)"><input name="mobile" required inputMode="tel" placeholder="10-digit mobile number" /></Field>
+          <Field label="Mobile (WhatsApp)"><input name="mobile" required {...MOBILE_INPUT} onInput={(e) => { e.target.value = limitMobile(e.target.value); }} placeholder="10-digit mobile number" /></Field>
           <Field label="Email"><input name="email" type="email" required placeholder="E-mail address" /></Field>
           <Field label="Sales agent"><input value={agentName} readOnly /></Field>
           {projects.length > 0 && (

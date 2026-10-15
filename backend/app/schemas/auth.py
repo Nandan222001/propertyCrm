@@ -37,6 +37,12 @@ class RefreshRequest(RequestModel):
     refresh_token: str = Field(min_length=20, max_length=512)
 
 
+class ConfirmPasswordRequest(RequestModel):
+    """Re-authentication before a sensitive action: just the signed-in user's own password."""
+
+    password: str = Field(min_length=1, max_length=128)
+
+
 class ChangePasswordRequest(RequestModel):
     current_password: str = Field(min_length=8, max_length=128)
     new_password: str = Field(min_length=8, max_length=128)

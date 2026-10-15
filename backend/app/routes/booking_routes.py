@@ -10,6 +10,7 @@ from app.controllers import booking_controller as controller
 from app.core.constants import Permission
 from app.core.dependencies import ActorDep, DbDep, PaginationDep, require
 from app.schemas.booking import (
+    BookingDeleteRequest,
     BookingCreate,
     BookingDecision,
     BookingStatusUpdate,
@@ -83,5 +84,6 @@ def set_registry_stage(booking_id: int, payload: RegistryStageUpdate, service: c
 
 
 @router.delete("/{booking_id}", summary="Soft-delete a booking")
-def delete_booking(booking_id: int, service: controller.BookingServiceDep, _: DELETE = None):
-    return controller.delete_booking(booking_id, service)
+def delete_booking(booking_id: int, payload: BookingDeleteRequest, service: controller.BookingServiceDep,
+                   _: DELETE = None):
+    return controller.delete_booking(booking_id, payload, service)

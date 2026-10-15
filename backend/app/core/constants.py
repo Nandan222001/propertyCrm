@@ -146,7 +146,7 @@ ROLE_PERMISSIONS: dict[Role, frozenset[Permission]] = {
         {
             Permission.PROJECT_VIEW, Permission.PLOT_VIEW,
             Permission.BOOKING_VIEW_OWN, Permission.BOOKING_CREATE,
-            Permission.BOOKING_UPDATE, Permission.BOOKING_DELETE,
+            Permission.BOOKING_UPDATE,
             Permission.CUSTOMER_VIEW_OWN, Permission.CUSTOMER_CREATE, Permission.CUSTOMER_UPDATE,
             Permission.CUSTOMER_DELETE,
             Permission.COMMISSION_VIEW, Permission.DASHBOARD_VIEW,

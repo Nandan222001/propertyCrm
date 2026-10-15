@@ -14,7 +14,7 @@ import { Table } from '../../components/common/DataTable';
 import { Badge } from '../../components/common/Badge';
 import { Mini } from '../../components/common/StatTile';
 import { Avatar } from '../../components/common/Avatar';
-import { ConfirmDialog } from '../../components/common/ConfirmDialog';
+import { DeleteBookingDialog } from './DeleteBookingDialog';
 import { EditBookingModal } from './EditBookingModal';
 import { PaymentScheduleModal } from './PaymentScheduleModal';
 import { RoleContextBanner } from '../../components/layout/RoleContextBanner';
@@ -105,14 +105,7 @@ export function Bookings({ bookings, project, search, tab, TB, role, onNew, onOp
       </div>
       {scheduleFor && <PaymentScheduleModal booking={scheduleFor} close={() => setScheduleFor(null)} />}
       {editing && <EditBookingModal booking={editing} canPrice={canApprove(role)} close={() => setEditing(null)} save={onEdit} />}
-      {removing && (
-        <ConfirmDialog
-          title="Delete booking"
-          message={`Delete booking ${removing[0]} (${removing[1]}, plot ${removing[3]})? The plot becomes available again. Bookings with payments or invoices cannot be deleted — cancel those instead.`}
-          onConfirm={() => onDelete(removing)}
-          onCancel={() => setRemoving(null)}
-        />
-      )}
+      {removing && <DeleteBookingDialog booking={removing} onDelete={onDelete} onCancel={() => setRemoving(null)} />}
     </>
   );
 }

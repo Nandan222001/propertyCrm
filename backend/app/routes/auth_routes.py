@@ -11,6 +11,7 @@ from fastapi import APIRouter, BackgroundTasks, Request, Response
 from app.controllers import auth_controller as controller
 from app.core.dependencies import ActorDep, CurrentUserDep, DbDep
 from app.schemas.auth import (
+    ConfirmPasswordRequest,
     ChangePasswordRequest,
     ForgotPasswordRequest,
     LoginRequest,
@@ -57,6 +58,11 @@ def logout(
 @router.get("/me", summary="Current identity, effective permissions and security policy")
 def me(user: CurrentUserDep, db: DbDep) -> dict:
     return controller.me(user, db)
+
+
+@router.post("/password/confirm", summary="Re-enter your password before a sensitive action")
+def confirm_password(payload: ConfirmPasswordRequest, actor: ActorDep, service: controller.AuthServiceDep) -> dict:
+    return controller.confirm_password(payload, actor, service)
 
 
 @router.post("/password/change", summary="Change password (revokes every session)")

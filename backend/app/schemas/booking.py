@@ -45,6 +45,12 @@ class BookingUpdate(SafeText):
     agent_code: str | None = Field(default=None, max_length=16)
 
 
+class BookingDeleteRequest(SafeText):
+    """Deleting a booking is re-authenticated: the admin types their own password first."""
+
+    password: str = Field(min_length=1, max_length=128)
+
+
 class BookingDecision(SafeText):
     """Approve / reject with an auditable reason and optional revised price."""
 

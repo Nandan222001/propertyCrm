@@ -10,6 +10,7 @@ import { Badge } from '../../components/common/Badge';
 import { Mini } from '../../components/common/StatTile';
 import { Avatar } from '../../components/common/Avatar';
 import { RoleContextBanner } from '../../components/layout/RoleContextBanner';
+import { limitMobile, MOBILE_INPUT } from '../../utils/phone';
 
 const SEES_RATES = ['ADMIN', 'ACCOUNTS', 'SALES MANAGER'];
 const pct = (rate) => `${Number((Number(rate) * 100).toFixed(2))}%`;
@@ -22,7 +23,7 @@ function EditAgentModal({ agent, close, save }) {
   });
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
-  const set = (key) => (e) => setForm({ ...form, [key]: e.target.value });
+  const set = (key, fn = (v) => v) => (e) => setForm({ ...form, [key]: fn(e.target.value) });
   const submit = async (e) => {
     e.preventDefault();
     const rate = Number(form.rate);
@@ -54,7 +55,7 @@ function EditAgentModal({ agent, close, save }) {
         <div className="form-grid">
           <label>Full name<input value={form.name} onChange={set('name')} autoFocus /></label>
           <label>Agent code<input value={form.code} onChange={set('code')} /></label>
-          <label>Mobile<input value={form.phone} onChange={set('phone')} inputMode="tel" /></label>
+          <label>Mobile<input value={form.phone} onChange={set('phone', limitMobile)} {...MOBILE_INPUT} /></label>
           <label>Email<input value={form.email} onChange={set('email')} type="email" /></label>
           <label>Commission rate (%)<input value={form.rate} onChange={set('rate')} inputMode="decimal" /></label>
           <label>Status
@@ -79,7 +80,7 @@ function AddAgentModal({ suggestedCode, close, save }) {
   const [form, setForm] = useState({ name: '', code: suggestedCode, phone: '', email: '', rate: '2' });
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
-  const set = (key) => (e) => setForm({ ...form, [key]: e.target.value });
+  const set = (key, fn = (v) => v) => (e) => setForm({ ...form, [key]: fn(e.target.value) });
   const submit = async (e) => {
     e.preventDefault();
     const rate = Number(form.rate);
@@ -113,7 +114,7 @@ function AddAgentModal({ suggestedCode, close, save }) {
         <div className="form-grid">
           <label>Full name<input value={form.name} onChange={set('name')} autoFocus placeholder="Full name" /></label>
           <label>Agent code<input value={form.code} onChange={set('code')} placeholder="Agent code" /></label>
-          <label>Mobile<input value={form.phone} onChange={set('phone')} inputMode="tel" placeholder="10-digit mobile number" /></label>
+          <label>Mobile<input value={form.phone} onChange={set('phone', limitMobile)} {...MOBILE_INPUT} placeholder="10-digit mobile number" /></label>
           <label>Email<input value={form.email} onChange={set('email')} type="email" placeholder="E-mail address" /></label>
           <label>Commission rate (%)<input value={form.rate} onChange={set('rate')} inputMode="decimal" /></label>
         </div>

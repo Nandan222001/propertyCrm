@@ -10,6 +10,7 @@ from app.core.constants import Permission
 from app.core.dependencies import ActorDep, DbDep, PaginationDep, require
 from app.core.responses import success
 from app.schemas.booking import (
+    BookingDeleteRequest,
     BookingCreate,
     BookingDecision,
     BookingStatusUpdate,
@@ -72,8 +73,8 @@ def change_status(booking_id: int, payload: BookingStatusUpdate, service: Bookin
     return success(service.serialise(booking).model_dump(), f"Status set to {booking.status}")
 
 
-def delete_booking(booking_id: int, service: BookingServiceDep) -> dict:
-    service.delete_booking(booking_id)
+def delete_booking(booking_id: int, payload: BookingDeleteRequest, service: BookingServiceDep) -> dict:
+    service.delete_booking(booking_id, payload.password)
     return success(None, "Booking deleted")
 
 

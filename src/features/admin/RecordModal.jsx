@@ -9,6 +9,7 @@ import {
   Sparkles, Check, CheckCircle, Printer, MessageCircle
 } from 'lucide-react';
 import { parseAmt, fmtINR, amountInWords, agentKey, todayLabel, openWhatsApp, waLink, isAdmin, canCreateBooking, canApprove, canCreateCustomer, canRecordPayment, canManageBills, isCustomer, isPendingStatus } from '../../utils';
+import { limitMobile, MOBILE_INPUT } from '../../utils/phone';
 
 export function RecordModal({ kind, close, save, context, initial, role }) {
   const record = kind === 'record';
@@ -70,6 +71,8 @@ export function RecordModal({ kind, close, save, context, initial, role }) {
                     type={type}
                     placeholder={placeholder}
                     defaultValue={initial?.[n] || ''}
+                    {...(n === 'phone' ? MOBILE_INPUT : {})}
+                    onInput={n === 'phone' ? (e) => { e.target.value = limitMobile(e.target.value); } : undefined}
                     required={['customer', 'plot', 'amount', 'total', 'name', 'email'].includes(n)}
                   />
                 )}

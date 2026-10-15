@@ -20,7 +20,8 @@ export const canCreateCustomer = (role) => role === ROLES.SALES_AGENT;
 export const canEditCustomer = (role) => isAdmin(role) || role === ROLES.SALES_AGENT || role === ROLES.SALES_MANAGER;
 export const canDeleteCustomer = (role, customer) => isAdmin(role) || (role === ROLES.SALES_AGENT && customer?.status !== 'Approved');
 export const canEditBooking = (role, booking) => isAdmin(role) || ([ROLES.SALES_AGENT].includes(role) && booking?.[7] === 'Pending Approval');
-export const canDeleteBooking = canEditBooking;
+/** Only an administrator may delete a booking (and must re-enter their password). */
+export const canDeleteBooking = (role) => isAdmin(role);
 export const canRecordPayment = (role) => isAdmin(role) || role === ROLES.ACCOUNTS;
 export const canManageBills = (role) => isAdmin(role) || role === ROLES.ACCOUNTS;
 export const canManageUsers = (role) => isAdmin(role);

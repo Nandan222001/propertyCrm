@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Check, X } from 'lucide-react';
 import { PLAN_LABEL, TENANT_PLANS, blankTenantForm, slugify, validateTenant } from '../../utils/tenants';
+import { limitMobile, MOBILE_INPUT } from '../../utils/phone';
 
 /** Create (editing = null) or edit an organisation. Creating also provisions its first administrator. */
 export function TenantModal({ editing, tenants, close, save }) {
@@ -9,8 +10,8 @@ export function TenantModal({ editing, tenants, close, save }) {
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
 
-  const set = (key) => (e) => setForm({ ...form, [key]: e.target.value });
-  const setAdmin = (key) => (e) => setForm({ ...form, admin: { ...form.admin, [key]: e.target.value } });
+  const set = (key, fn = (v) => v) => (e) => setForm({ ...form, [key]: fn(e.target.value) });
+  const setAdmin = (key, fn = (v) => v) => (e) => setForm({ ...form, admin: { ...form.admin, [key]: fn(e.target.value) } });
   const onName = (e) => {
     const name = e.target.value;
     setForm({ ...form, name, ...(editing || slugTouched ? {} : { slug: slugify(name) }) });
@@ -79,7 +80,7 @@ export function TenantModal({ editing, tenants, close, save }) {
           </label>
           <label>
             Contact phone
-            <input value={form.contact_phone} onChange={set('contact_phone')} placeholder="+91 …" />
+            <input value={form.contact_phone} onChange={set('contact_phone', limitMobile)} {...MOBILE_INPUT} placeholder="10-digit mobile number" />
           </label>
           <label className="span-2">
             Notes
@@ -101,7 +102,7 @@ export function TenantModal({ editing, tenants, close, save }) {
               </label>
               <label>
                 Mobile *
-                <input value={form.admin.phone} onChange={setAdmin('phone')} />
+                <input value={form.admin.phone} onChange={setAdmin('phone', limitMobile)} {...MOBILE_INPUT} />
               </label>
               <p className="field-hint" style={{ gridColumn: '1 / -1' }}>
                 Starting password: the first four letters of the name plus the last five digits of the mobile.

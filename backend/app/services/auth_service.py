@@ -25,6 +25,7 @@ from app.core.context import ActorContext
 from app.core.exceptions import (
     AccountLockedError,
     AuthenticationError,
+    PermissionDeniedError,
     NotFoundError,
     ValidationError,
 )
@@ -198,6 +199,13 @@ class AuthService:
         )
 
     # ----------------------------------------------------------- password ops
+    def confirm_password(self, actor: ActorContext, password: str) -> None:
+        """Check the signed-in user's own password (403 when wrong, so the SPA does not treat it as an expired session)."""
+        user = self.users.get_or_404(actor.user_id)
+        if not self._password_matches(user, password):
+            self.audit.security_event("auth.password_confirm_failed", "Wrong password on re-authentication", actor=actor)
+            raise PermissionDeniedError("Your password is not correct")
+
     def change_password(self, actor: ActorContext, payload: ChangePasswordRequest) -> None:
         user = self.users.get_or_404(actor.user_id)
         if not self._password_matches(user, payload.current_password):

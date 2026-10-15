@@ -425,7 +425,7 @@ export function App() {
               onPrint={(booking) => dispatch(bookingPrintSet(booking[0]))}
               onWhatsApp={whatsappBooking}
               onEdit={(booking, changes) => dispatch(updateBookingLive(booking, changes))}
-              onDelete={(booking) => dispatch(deleteBookingLive(booking))}
+              onDelete={(booking, password) => dispatch(deleteBookingLive(booking, password))}
             />
           )}
 

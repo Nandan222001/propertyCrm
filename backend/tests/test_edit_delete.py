@@ -15,6 +15,11 @@ def _new_customer(client, headers, email, phone, name="Edit Probe"):
     return created.json()["data"]
 
 
+def delete_booking(client, booking_id, headers, password="Demo@12345") -> int:
+    """Deleting a booking needs the signed-in user's own password in the body."""
+    return client.request("DELETE", f"/api/v1/bookings/{booking_id}", headers=headers, json={"password": password}).status_code
+
+
 def test_agent_edits_and_removes_own_pending_customer_only(client, agent_headers, admin_headers, unique_email, unique_phone):
     mine = _new_customer(client, agent_headers, unique_email, unique_phone)
     edited = client.patch(f"/api/v1/customers/{mine['id']}", headers=agent_headers, json={"name": "Renamed Probe", "city": "Pune"})
@@ -52,7 +57,7 @@ def test_agent_removes_own_pending_booking_and_plot_is_released(client, agent_he
                                 "final_price": available_plot["price"]}).json()["data"]
     edited = client.patch(f"/api/v1/bookings/{booking['id']}", headers=agent_headers, json={"notes": "Call after 5pm"})
     assert edited.status_code == 200, edited.text
-    assert client.delete(f"/api/v1/bookings/{booking['id']}", headers=agent_headers).status_code == 200
+    assert delete_booking(client, booking["id"], admin_headers) == 200
     plots = client.get(f"/api/v1/plots?search={available_plot['plot_number']}", headers=admin_headers).json()["data"]
     assert next(p for p in plots if p["id"] == available_plot["id"])["status"] == "AVAILABLE"
 
@@ -64,8 +69,8 @@ def test_agent_cannot_delete_a_confirmed_booking_but_admin_can_when_unpaid(clien
                                 "final_price": available_plot["price"]}).json()["data"]
     assert client.post(f"/api/v1/bookings/{booking['id']}/approve", headers=admin_headers, json={}).status_code == 200
     assert client.patch(f"/api/v1/bookings/{booking['id']}", headers=agent_headers, json={"notes": "x"}).status_code == 403
-    assert client.delete(f"/api/v1/bookings/{booking['id']}", headers=agent_headers).status_code == 403
-    assert client.delete(f"/api/v1/bookings/{booking['id']}", headers=admin_headers).status_code == 200
+    assert delete_booking(client, booking["id"], agent_headers) == 403
+    assert delete_booking(client, booking["id"], admin_headers) == 200
 
 
 def test_project_and_plot_deletion_guard_rails(client, admin_headers, agent_headers):
@@ -205,7 +210,7 @@ def test_plot_can_be_rebooked_after_a_booking_is_deleted_rejected_or_cancelled(c
         return r.json()["data"]
 
     first = book(agent_headers)
-    assert client.delete(f"/api/v1/bookings/{first['id']}", headers=agent_headers).status_code == 200
+    assert delete_booking(client, first["id"], admin_headers) == 200
     second = book(agent_headers)                       # same plot, same status as the deleted one
     assert client.post(f"/api/v1/bookings/{second['id']}/reject", headers=admin_headers, json={"reason": "x"}).status_code == 200
     third = book(agent_headers)                        # rejected before; the plot is free again
@@ -254,9 +259,31 @@ def test_final_price_is_fixed_for_agents_but_an_admin_can_agree_another(client, 
     ok = client.post("/api/v1/bookings", headers=agent_headers, json={
         "customer_id": agent_approved_customer["id"], "plot_id": available_plot["id"], "final_price": listed})
     assert ok.status_code == 201, ok.text
-    assert client.delete(f"/api/v1/bookings/{ok.json()['data']['id']}", headers=agent_headers).status_code == 200
+    assert delete_booking(client, ok.json()["data"]["id"], admin_headers) == 200
     # an admin may negotiate a different price
     negotiated = client.post("/api/v1/bookings", headers=admin_headers, json={
         "customer_id": agent_approved_customer["id"], "plot_id": available_plot["id"], "final_price": "1000000"})
     assert negotiated.status_code == 201, negotiated.text
     assert float(negotiated.json()["data"]["final_price"]) == 1_000_000
+
+
+def test_only_an_admin_with_the_right_password_can_delete_a_booking(client, agent_headers, admin_headers,
+                                                                   agent_approved_customer, available_plot):
+    booking = client.post("/api/v1/bookings", headers=agent_headers,
+                          json={"customer_id": agent_approved_customer["id"], "plot_id": available_plot["id"],
+                                "final_price": available_plot["price"]}).json()["data"]
+    url = f"/api/v1/bookings/{booking['id']}"
+    # agents can never delete, not even their own pending booking, and not without a body either
+    assert delete_booking(client, booking["id"], agent_headers) == 403
+    assert client.delete(url, headers=admin_headers).status_code == 422
+    # the admin's own password is required
+    assert delete_booking(client, booking["id"], admin_headers, password="wrong-password") == 403
+    assert client.get(url, headers=admin_headers).status_code == 200            # still there
+    assert delete_booking(client, booking["id"], admin_headers) == 200
+    assert client.get(url, headers=admin_headers).status_code == 404
+
+
+def test_password_is_checked_before_the_delete_confirmation(client, admin_headers):
+    wrong = client.post("/api/v1/auth/password/confirm", headers=admin_headers, json={"password": "not-my-password"})
+    assert wrong.status_code == 403            # 403, not 401, so the app does not sign the admin out
+    assert client.post("/api/v1/auth/password/confirm", headers=admin_headers, json={"password": "Demo@12345"}).status_code == 200

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { ModalShell } from '../../components/common/ModalShell';
-import { isValidMobile, normaliseMobile, MOBILE_HINT } from '../../utils/phone';
+import { isValidMobile, normaliseMobile, MOBILE_HINT, limitMobile, MOBILE_INPUT } from '../../utils/phone';
 
 const hidden = (value) => String(value || '').includes('*');
 
@@ -15,7 +15,7 @@ export function EditCustomerModal({ customer, close, save }) {
   });
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
-  const set = (key) => (e) => setForm({ ...form, [key]: e.target.value });
+  const set = (key, fn = (v) => v) => (e) => setForm({ ...form, [key]: fn(e.target.value) });
 
   const submit = async (e) => {
     e.preventDefault();
@@ -41,7 +41,7 @@ export function EditCustomerModal({ customer, close, save }) {
       <form onSubmit={submit} noValidate>
         <div className="form-grid">
           <label>Full name<input value={form.name} onChange={set('name')} placeholder={hidden(customer.name) ? 'Hidden — type to change' : ''} autoFocus /></label>
-          <label>Mobile<input value={form.phone} onChange={set('phone')} inputMode="numeric" placeholder={hidden(customer.mobile) ? 'Hidden — type to change' : ''} /></label>
+          <label>Mobile<input value={form.phone} onChange={set('phone', limitMobile)} {...MOBILE_INPUT} placeholder={hidden(customer.mobile) ? 'Hidden — type to change' : ''} /></label>
           <label>E-mail<input value={form.email} onChange={set('email')} placeholder={hidden(customer.email) ? 'Hidden — type to change' : ''} /></label>
           <label>Address<input value={form.address} onChange={set('address')} placeholder={hidden(customer.address) ? 'Hidden — type to change' : ''} /></label>
         </div>

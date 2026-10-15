@@ -11,6 +11,7 @@ from app.core.dependencies import ActorDep, CurrentUserDep, DbDep
 from app.core.middleware import client_ip
 from app.core.responses import success
 from app.schemas.auth import (
+    ConfirmPasswordRequest,
     ChangePasswordRequest,
     ForgotPasswordRequest,
     LoginRequest,
@@ -73,6 +74,11 @@ def me(user: CurrentUserDep, db: DbDep) -> dict:
         },
         "Current session",
     )
+
+
+def confirm_password(payload: ConfirmPasswordRequest, actor: ActorDep, service: AuthServiceDep) -> dict:
+    service.confirm_password(actor, payload.password)
+    return success(None, "Password confirmed")
 
 
 def change_password(payload: ChangePasswordRequest, actor: ActorDep, service: AuthServiceDep) -> dict:

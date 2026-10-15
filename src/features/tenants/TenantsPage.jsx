@@ -5,7 +5,7 @@ import { Mini } from '../../components/common/StatTile';
 import { Table } from '../../components/common/DataTable';
 import { Pager, usePaged } from '../../components/common/Pager';
 import { PLAN_LABEL, platformStats, seatUsage } from '../../utils/tenants';
-import { isValidMobile, MOBILE_HINT } from '../../utils/phone';
+import { isValidMobile, MOBILE_HINT, limitMobile, MOBILE_INPUT } from '../../utils/phone';
 import { TenantModal } from './TenantModal';
 import { SuspendModal } from './TenantDialogs';
 
@@ -27,7 +27,7 @@ function SeatBar({ tenant }) {
 function AddAdminForm({ onAdd }) {
   const [form, setForm] = useState({ name: '', email: '', phone: '' });
   const [error, setError] = useState('');
-  const set = (key) => (e) => setForm({ ...form, [key]: e.target.value });
+  const set = (key, fn = (v) => v) => (e) => setForm({ ...form, [key]: fn(e.target.value) });
   const submit = async (e) => {
     e.preventDefault();
     if (form.name.trim().length < 2) { setError('Name is required'); return; }
@@ -42,7 +42,7 @@ function AddAdminForm({ onAdd }) {
       <div className="form-grid">
         <label>Name<input value={form.name} onChange={set('name')} /></label>
         <label>E-mail<input type="email" value={form.email} onChange={set('email')} /></label>
-        <label>Mobile<input value={form.phone} onChange={set('phone')} inputMode="tel" /></label>
+        <label>Mobile<input value={form.phone} onChange={set('phone', limitMobile)} {...MOBILE_INPUT} /></label>
       </div>
       {error && <p role="alert" style={{ color: '#d92d20', margin: '6px 0 0' }}>{error}</p>}
       <div className="modal-actions" style={{ marginTop: 8 }}>

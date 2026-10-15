@@ -299,17 +299,23 @@ class BookingService(BaseService[Booking]):
                     summary="Booking updated")
         return booking
 
-    def delete_booking(self, booking_id: int) -> Booking:
-        """Remove a booking that never turned into money; otherwise it must be cancelled, not erased."""
+    def delete_booking(self, booking_id: int, password: str) -> Booking:
+        """Remove a booking that never turned into money; otherwise it must be cancelled, not erased.
+
+        Admin only, and only after the admin re-enters their own password."""
         from sqlalchemy import func, select
 
         from app.models.billing import Invoice
         from app.models.payment import Payment
 
         self._authorise("delete")
+        from app.core.security import verify_password
+        from app.models.user import User
+
+        user = self.db.get(User, self.actor.user_id)
+        if user is None or not verify_password(password, user.password_hash):
+            raise PermissionDeniedError("Your password is not correct — the booking was not deleted")
         booking = self.get(booking_id, scope_clause=self.scope_clause())
-        if not self.actor.can(Permission.BOOKING_APPROVE) and booking.status != BookingStatus.PENDING_APPROVAL.value:
-            raise PermissionDeniedError("You can only remove a booking that is still awaiting approval")
         if booking.status in (BookingStatus.AGREEMENT.value, BookingStatus.REGISTERED.value):
             raise BusinessRuleError("A booking at agreement or registration stage cannot be deleted")
         money = self.db.execute(select(func.count(Payment.id)).where(
