@@ -37,6 +37,14 @@ export function Sidebar({
       </div>
 
       <div className="workspace-card">
+        <div className="sidebar-role-tag" style={{ borderLeftColor: roleConfig.color }}>
+          <span className="role-dot" style={{ background: roleConfig.color }} />
+          <div className="role-tag-info">
+            <b>{role}</b>
+            <small>{roleConfig.badge}</small>
+          </div>
+        </div>
+
         {showWorkspace && projects.length > 0 && (
         <div className="workspace-picker">
         <button
@@ -70,14 +78,6 @@ export function Sidebar({
         )}
         </div>
         )}
-
-        <div className="sidebar-role-tag" style={{ borderLeftColor: roleConfig.color }}>
-          <span className="role-dot" style={{ background: roleConfig.color }} />
-          <div className="role-tag-info">
-            <b>{role}</b>
-            <small>{roleConfig.badge}</small>
-          </div>
-        </div>
       </div>
 
       <div className="nav-label">WORKSPACE</div>

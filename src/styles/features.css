@@ -326,3 +326,7 @@
 /* The app's tables bleed 18px past their panel (negative margins). Inside these boxes that hid the first column. */
 .plan-schedule-scroll { margin: 8px 0 0 !important; }
 .plan-schedule-scroll .plan-schedule, .plan-schedule { margin: 0 !important; width: 100%; }
+
+/* Sidebar: the role tag sits first, the project picker below it */
+.workspace-card>.sidebar-role-tag:first-child{margin:20px 0 12px}
+.workspace-card .workspace-picker .workspace{margin:0 0 22px}
