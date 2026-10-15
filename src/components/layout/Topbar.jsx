@@ -12,7 +12,7 @@ export function Topbar({
       </button>
 
       <div className="breadcrumb">
-        {tenantName || 'Workspace'} <span>/</span> <b>{page}</b>
+        <span className="crumb-org">{tenantName || 'Workspace'}</span> <span className="crumb-sep">/</span> <b>{page}</b>
       </div>
 
       <div className="top-actions">

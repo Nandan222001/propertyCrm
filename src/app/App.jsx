@@ -337,14 +337,14 @@ export function App() {
             <>
               {role === ROLES.SUPER_ADMIN && <PlatformDashboard tenants={tenants} go={go} userName={auth.user?.name} />}
               {role === ROLES.ADMIN && (
-                <AdminDashboard bookings={domain.bookings} pays={domain.payments} plots={domain.plots} go={go} D={(kind, preset) => dispatch(modalOpened({ modal: kind, preset }))} notify={notify} />
+                <AdminDashboard bookings={domain.bookings} pays={domain.payments} plots={domain.plots} project={ui.project} go={go} D={(kind, preset) => dispatch(modalOpened({ modal: kind, preset }))} notify={notify} />
               )}
               {role === ROLES.ADMIN && <PortfolioInsights go={go} projects={domain.projects} plots={domain.plots} bookings={scoped.bookings} receipts={scoped.receipts} />}
               {role === ROLES.SALES_MANAGER && (
                 <SalesManagerDashboard go={go} D={(kind, preset) => dispatch(modalOpened({ modal: kind, preset }))} notify={notify} bookings={scoped.bookings} customers={scoped.customers || domain.customers} project={ui.project} />
               )}
               {role === ROLES.SALES_AGENT && (
-                <SalesAgentDashboard agentName={auth.user?.name} go={go} D={(kind, preset) => dispatch(modalOpened({ modal: kind, preset }))} notify={notify} bookings={scoped.bookings} plots={domain.plots} />
+                <SalesAgentDashboard agentName={auth.user?.name} go={go} D={(kind, preset) => dispatch(modalOpened({ modal: kind, preset }))} notify={notify} bookings={scoped.bookings} plots={domain.plots} project={ui.project} />
               )}
               {role === ROLES.CUSTOMER && (
                 <CustomerProfile

@@ -32,8 +32,8 @@ function AddAdminForm({ onAdd }) {
     e.preventDefault();
     if (form.name.trim().length < 2) { setError('Name is required'); return; }
     if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(form.email.trim())) { setError('Enter a valid e-mail'); return; }
-    if (form.name.replace(/[^A-Za-z]/g, '').length < 4) { setError('The name needs at least four letters (they form the starting password)'); return; }
-    if (!isValidMobile(form.phone)) { setError(`${MOBILE_HINT} Its last five digits form the starting password.`); return; }
+    if (form.name.replace(/[^A-Za-z]/g, '').length < 4) { setError('Enter a name with at least 4 letters.'); return; }
+    if (!isValidMobile(form.phone)) { setError(MOBILE_HINT); return; }
     setError('');
     if (await onAdd(form)) setForm({ name: '', email: '', phone: '' });
   };

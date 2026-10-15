@@ -20,7 +20,7 @@ def initial_password(name: str | None, phone: str | None) -> str:
     letters = "".join(ch for ch in folded if ch.isascii() and ch.isalpha())[:4].lower()
     digits = re.sub(r"\D", "", phone or "")[-5:]
     if len(letters) < 4:
-        raise ValidationError("The name needs at least four letters to set the starting password", code="initial_password")
+        raise ValidationError("Enter a name with at least 4 letters.", code="initial_password")
     if len(digits) < 5:
-        raise ValidationError("A mobile number is required to set the starting password", code="initial_password")
+        raise ValidationError("Enter a 10-digit mobile number.", code="initial_password")
     return letters + digits

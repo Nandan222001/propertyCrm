@@ -783,8 +783,8 @@ const saveUserLive = (record) => async (dispatch, getState) => {
       dispatch(toastPushed(`Team member ${record.name} updated`));
     } else {
       const letters = String(record.name || '').normalize('NFKD').replace(/[^A-Za-z]/g, '');
-      if (letters.length < 4) { dispatch(toastPushed('Enter a name with at least four letters — the starting password uses them.')); return; }
-      if (!isValidMobile(record.phone)) { dispatch(toastPushed(`${MOBILE_HINT} The starting password uses its last five digits.`)); return; }
+      if (letters.length < 4) { dispatch(toastPushed('Enter a name with at least 4 letters.')); return; }
+      if (!isValidMobile(record.phone)) { dispatch(toastPushed(MOBILE_HINT)); return; }
       await api.users.create({ ...base, phone: normaliseMobile(record.phone), email: record.email });
       dispatch(toastPushed(`Team member ${record.name} added. Their starting password is the first 4 letters of the name + last 5 digits of the mobile (not displayed); they must change it at first sign-in.`));
     }

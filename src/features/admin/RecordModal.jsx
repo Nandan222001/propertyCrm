@@ -22,7 +22,7 @@ export function RecordModal({ kind, close, save, context, initial, role }) {
   const fields = kind === 'user' ? [
     ['name', 'Full Name', 'text', 'Enter full name'],
     ['email', 'Email Address', 'email', 'E-mail address'],
-    ['phone', kind === 'user' && !initial ? 'Mobile Number (required — last 5 digits form the starting password)' : 'Mobile Number', 'tel', '10-digit mobile number'],
+    ['phone', kind === 'user' && !initial ? 'Mobile Number (required)' : 'Mobile Number', 'tel', '10-digit mobile number'],
     ['title', 'Job title (optional)', 'text', 'e.g. Senior Property Consultant'],
     ['role', 'Role', 'select', ['ADMIN', 'SALES MANAGER', 'SALES AGENT', 'ACCOUNTS']],
     ['agent_code', 'Agent code (sales agents)', 'text', 'Agent code — links the login to an agent record'],

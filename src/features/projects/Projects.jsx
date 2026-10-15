@@ -70,7 +70,9 @@ export function Projects({ plots, search, project, filter, F, tab, TB, notify, p
 
   const view = tab === 'Plots' ? 'Plots' : 'Projects';
 
+  const inScope = (name) => project === 'All projects' || name === project;
   const projectRows = projects
+    .filter(p => inScope(p[0]))
     .filter(p => !search || p.slice(0, 6).join(' ').toLowerCase().includes(search.toLowerCase()))
     .map(p => [
       <b>{p[0]}</b>, p[1], p[2], p[3], p[4], p[5] === '—' ? '—' : `₹${p[5]}`,
@@ -90,18 +92,24 @@ export function Projects({ plots, search, project, filter, F, tab, TB, notify, p
       </div>,
     ]);
 
-  const totals = projects.reduce((t, p) => ({
-    plots: t.plots + parseAmt(p[2]), booked: t.booked + parseAmt(p[3]), hold: t.hold + parseAmt(p[4]),
-  }), { plots: 0, booked: 0, hold: 0 });
+  // Headline figures count the plots that really exist (not the number planned when the project was
+  // created) and follow the project chosen in the sidebar.
+  const scopedProjects = projects.filter(p => inScope(p[0]));
+  const scopedPlots = plots.filter(p => inScope(p[8]));
+  const totals = {
+    plots: scopedPlots.length,
+    available: scopedPlots.filter(p => p[5] === 'AVAILABLE').length,
+    hold: scopedPlots.filter(p => p[5] === 'HOLD').length,
+  };
 
   return (
     <>
       <RoleContextBanner role={role} page="Projects & plots" />
 
       <div className="mini-stats four">
-        <Mini title="TOTAL PROJECTS" value={projects.length} />
+        <Mini title="TOTAL PROJECTS" value={scopedProjects.length} />
         <Mini title="TOTAL PLOTS" value={totals.plots} />
-        <Mini title="AVAILABLE FOR SALE" value={Math.max(totals.plots - totals.booked - totals.hold, 0)} color="green-text" />
+        <Mini title="AVAILABLE FOR SALE" value={totals.available} color="green-text" />
         <Mini title="ON HOLD / RESERVED" value={totals.hold} color="amber-text" />
       </div>
 

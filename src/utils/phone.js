@@ -15,4 +15,4 @@ export const limitMobile = (value) => {
 /** Spread on a mobile <input>: browser-level 10-digit cap plus numeric keypad. */
 export const MOBILE_INPUT = { inputMode: 'numeric', maxLength: 10, pattern: '[0-9]{10}', autoComplete: 'tel-national' };
 export const isValidMobile = (value) => /^[6-9]\d{9}$/.test(normaliseMobile(value));
-export const MOBILE_HINT = 'Enter a valid 10-digit mobile number (it starts with 6, 7, 8 or 9).';
+export const MOBILE_HINT = 'Enter a 10-digit mobile number that starts with 6, 7, 8 or 9.';

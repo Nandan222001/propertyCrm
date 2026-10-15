@@ -11,7 +11,7 @@ const OPEN = (b) => b[7] !== 'Rejected' && b[7] !== 'Cancelled';
  * agent by the API), the commissions this agent may see, and shared plot inventory —
  * never from other agents' deals.
  */
-export function SalesAgentDashboard({ go, D, notify, agentName = '', bookings = [], plots = [] }) {
+export function SalesAgentDashboard({ go, D, notify, agentName = '', bookings = [], plots: allPlots = [], project = 'All projects' }) {
   const live = hasSession();
   const [commissions, setCommissions] = useState([]);
 
@@ -39,6 +39,7 @@ export function SalesAgentDashboard({ go, D, notify, agentName = '', bookings = 
   };
 
   const dues = confirmed.filter((b) => parseAmt(b[5]) - parseAmt(b[6]) > 0);
+  const plots = project === 'All projects' ? allPlots : allPlots.filter((p) => p[8] === project);
   const available = plots.filter((p) => p[5] === 'AVAILABLE').slice(0, 4);
 
   return (

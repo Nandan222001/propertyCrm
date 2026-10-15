@@ -3,9 +3,14 @@ import { ArrowUpRight, ChevronRight, Download, Plus, Search, CalendarDays } from
 import { fmtINR } from '../../utils/money';
 import { compactINR, inventoryStats, monthlySeries, salesStats } from '../../utils/dashboardStats';
 
-export function AdminDashboard({ bookings = [], pays = [], plots = [], go, D, notify }) {
+export function AdminDashboard({ bookings: allBookings = [], pays: allPays = [], plots: allPlots = [], project = 'All projects', go, D, notify }) {
   const [chartRange, setChartRange] = useState('Last 6 months');
 
+  // The project chosen in the sidebar scopes every figure on the overview.
+  const all = project === 'All projects';
+  const bookings = all ? allBookings : allBookings.filter((b) => b[2] === project);
+  const pays = all ? allPays : allPays.filter((p) => p[2] === project);
+  const plots = all ? allPlots : allPlots.filter((x) => x[8] === project);
   const sales = salesStats(bookings);
   const inventory = inventoryStats(plots);
   const series = monthlySeries(bookings, chartRange === 'Last quarter' ? 3 : chartRange === 'This year' ? 12 : 6);

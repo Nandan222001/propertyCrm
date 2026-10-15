@@ -34,21 +34,12 @@ export function LoginScreen({ onLogin, notice: initialNotice = '' }) {
     window.history.replaceState({}, '', '/');
   };
 
+  // The left-hand background is the company logo image.
   const heroImages = [
     {
-      url: '/images/auth-luxury-estate.jpg',
-      title: 'Master-Planned Township',
+      url: '/images/login-brand.jpeg',
+      title: 'Building your dreams',
       tag: 'Portfolio View'
-    },
-    {
-      url: '/images/auth-township-model.jpg',
-      title: 'Architectural Blueprint & Modeling',
-      tag: 'Master Layout'
-    },
-    {
-      url: '/images/auth-agent-portal.jpg',
-      title: 'Executive Sales Experience Lounge',
-      tag: 'Client Suite'
     }
   ];
 
@@ -79,7 +70,7 @@ export function LoginScreen({ onLogin, notice: initialNotice = '' }) {
   return (
     <main className="login-screen interactive-auth">
       {/* Visual Showcase Left Panel */}
-      <section className="login-art auth-hero-panel" style={{ backgroundImage: `linear-gradient(rgba(18, 26, 49, 0.72), rgba(18, 26, 49, 0.88)), url(${heroImages[selectedImage].url})` }}>
+      <section className="login-art auth-hero-panel">
         <div className="login-brand">
           <div className="brand-mark">{(brand.name || '·').slice(0, 1).toUpperCase()}</div>
           <div>

@@ -330,3 +330,99 @@
 /* Sidebar: the role tag sits first, the project picker below it */
 .workspace-card>.sidebar-role-tag:first-child{margin:20px 0 12px}
 .workspace-card .workspace-picker .workspace{margin:0 0 22px}
+
+/* Login: the company logo is the large background image on a clean light panel; the text sits below it in navy */
+.login-art.auth-hero-panel{
+  --logo-top:128px;--logo-size:clamp(280px,44vh,380px);
+  min-height:max(100vh,860px);color:#14224b;
+  background-color:#fff;
+  background-image:url(/images/login-brand.jpeg),linear-gradient(180deg,#fff 0,#fff 60%,#eef2fa 100%);
+  background-repeat:no-repeat;
+  background-blend-mode:multiply,normal;
+  background-size:var(--logo-size) var(--logo-size),100% 100%;
+  background-position:center var(--logo-top),0 0;
+  border-right:1px solid #e6e9f2;
+}
+.login-art.auth-hero-panel:after{display:none}
+.login-art .login-brand b{color:#14224b}
+.login-art .login-brand b span{color:#b8860b}
+.login-art .login-brand small{color:#5b6788;opacity:1}
+.login-art .login-brand .brand-mark{background:#14224b;color:#fff}
+.login-art .image-showcase-bar{background:#fff;border:1px solid #14224b1f;box-shadow:0 2px 10px #14224b12;backdrop-filter:none}
+.login-art .showcase-label{color:#14224b}
+.login-art .login-pitch{margin:auto 0 0;padding-top:34px;text-align:center;max-width:none}
+.login-art .login-pitch .eyebrow{color:#5b6788;justify-content:center}
+.login-art .login-pitch h1{color:#14224b;font-size:clamp(26px,2.5vw,34px);line-height:1.18;letter-spacing:-.8px;margin:10px 0 8px}
+.login-art .login-pitch h1 em{color:#b8860b}
+.login-art .login-pitch>p{max-width:440px;margin:0 auto;font-size:13.5px;color:#4a5675;line-height:1.6}
+.login-art .current-photo-badge{margin-top:12px;display:inline-block;background:#14224b;border:0}
+.login-art .current-photo-badge .photo-title{color:#fff}
+.login-art .auth-footer-features{margin-top:20px;justify-content:center}
+.login-art .trust-pill{color:#14224b;background:#fff;border:1px solid #14224b26}
+@media(max-width:900px){.login-art.auth-hero-panel{--logo-top:120px;--logo-size:260px;min-height:760px}}
+
+
+/* ---------------------------------------------------------------- responsive polish (phones & tablets) */
+.panel,.stat-card,.role-dashboard>*,.overview-grid>*,.bottom-grid>*{min-width:0}
+.page-heading{flex-wrap:wrap}
+.heading-actions{flex-wrap:wrap}
+.donut-area{flex-wrap:wrap}
+.tabs{overflow-x:auto;scrollbar-width:none}
+.tabs::-webkit-scrollbar{display:none}
+.breadcrumb{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+@media(max-width:1024px){
+  .content{padding-left:22px;padding-right:22px}
+  .filters{flex-wrap:wrap;row-gap:8px;padding-top:8px;padding-bottom:8px}
+  .global-search{width:160px}
+}
+@media(max-width:800px){
+  .topbar{gap:10px}
+  .crumb-org,.crumb-sep{display:none}
+  .breadcrumb{flex:1}
+  .breadcrumb b{font-size:14px}
+  .top-actions{flex:none}
+  .page-heading{align-items:flex-start}
+  .page-heading h1{font-size:20px}
+  .heading-actions{width:100%}
+  .heading-actions .button{flex:1 1 140px}
+  .role-context-banner{flex-direction:column;align-items:flex-start;gap:8px;padding:11px 13px}
+  .role-context-banner .banner-left{align-items:flex-start;flex-wrap:wrap}
+  .role-context-banner .banner-text p{font-size:12px}
+  .filters>label{border-right:0}
+  .icon-action,.row-more{padding:7px}
+  .modal-backdrop{padding:10px}
+  .modal{padding:18px;border-radius:12px}
+  .modal-wide{width:100%}
+  .section-panel{padding-left:12px;padding-right:12px}
+  .table-scroll,.data-table{margin-left:-12px;margin-right:-12px}
+}
+@media(max-width:600px){
+  .form-grid,.form-grid-2{grid-template-columns:1fr}
+  .form-grid .span-2{grid-column:auto}
+  .modal-actions{flex-wrap:wrap}
+  .modal-actions .button{flex:1 1 120px}
+  .topbar-role-pill{display:none}
+  .global-search{width:44px;padding:0;justify-content:center}
+  .global-search input,.global-search kbd{display:none}
+  .top-divider{display:none}
+  .stat-value{font-size:20px}
+  .mini-stats.four,.mini-stats.five{grid-template-columns:1fr 1fr}
+  .plan-schedule-scroll{max-height:320px}
+}
+.reminder-item{gap:10px}
+.reminder-item>div:first-child{min-width:0;flex:1}
+.reminder-item>div:first-child b,.reminder-item>div:first-child small{overflow-wrap:anywhere}
+.reminder-right{flex:none}
+.panel-head{gap:10px;flex-wrap:wrap}
+.panel-head>div{min-width:0;flex:1 1 150px}
+.directive-item>div:last-child{min-width:0;flex:1}
+.directive-item p,.directive-item b{overflow-wrap:anywhere}
+.app-top,.disburse-head,.mini-inv-item,.net-row{gap:8px 10px;flex-wrap:wrap}
+.app-top>*,.disburse-head>*,.mini-inv-item>*,.net-row>*{min-width:0}
+.approval-card h4,.disburse-card b,.mini-inv-item b,.mini-inv-item small{overflow-wrap:anywhere}
+.app-buttons{flex-wrap:wrap}
+.disburse-calc{grid-template-columns:repeat(3,minmax(0,1fr))}
+.disburse-calc>*{min-width:0;overflow-wrap:anywhere}
+@media(max-width:480px){.disburse-calc{grid-template-columns:1fr 1fr}}
+@media(max-width:700px){.overview-grid,.bottom-grid,.role-dash-grid{grid-template-columns:minmax(0,1fr)!important}}

@@ -62,7 +62,7 @@ def normalise_mobile(value: str) -> str:
     if len(digits) == 11 and digits.startswith("0"):
         digits = digits[1:]
     if not MOBILE_IN_RE.match(digits):
-        raise ValidationError("Enter a valid 10-digit Indian mobile number", code="invalid_mobile")
+        raise ValidationError("Enter a 10-digit mobile number that starts with 6, 7, 8 or 9.", code="invalid_mobile")
     return digits
 
 

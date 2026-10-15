@@ -43,8 +43,8 @@ export function validateTenant(form, { tenants = [], editing = null } = {}) {
     const admin = form.admin;
     if (admin.name.trim().length < 2) return 'Administrator name is required';
     if (!EMAIL_RE.test(admin.email.trim())) return 'Administrator e-mail is not valid';
-    if (admin.name.replace(/[^A-Za-z]/g, '').length < 4) return 'Administrator name needs at least four letters (they form the starting password)';
-    if (!isValidMobile(admin.phone)) return `Administrator mobile: ${MOBILE_HINT} Its last five digits form the starting password.`;
+    if (admin.name.replace(/[^A-Za-z]/g, '').length < 4) return 'Enter the administrator\'s name with at least 4 letters.';
+    if (!isValidMobile(admin.phone)) return `Administrator mobile: ${MOBILE_HINT}`;
   }
   return '';
 }

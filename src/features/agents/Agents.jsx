@@ -86,9 +86,9 @@ function AddAgentModal({ suggestedCode, close, save }) {
     const rate = Number(form.rate);
     if (form.name.trim().length < 2) return setError('Enter the agent\'s full name.');
     if (!/^[A-Za-z0-9-]{2,16}$/.test(form.code.trim())) return setError('Code: 2-16 letters, digits or dashes (e.g. AG-031).');
-    if (form.name.replace(/[^A-Za-z]/g, '').length < 4) return setError('The name needs at least four letters — they form the starting password.');
+    if (form.name.replace(/[^A-Za-z]/g, '').length < 4) return setError('Enter a name with at least 4 letters.');
     if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(form.email.trim())) return setError('Enter the agent\'s e-mail — it is their sign-in.');
-    if (!isValidMobile(form.phone)) return setError(`${MOBILE_HINT} Its last five digits form the starting password.`);
+    if (!isValidMobile(form.phone)) return setError(MOBILE_HINT);
     if (!Number.isFinite(rate) || rate <= 0 || rate > 25) return setError('Commission rate must be between 0.1% and 25%.');
     setBusy(true);
     const problem = await save({
