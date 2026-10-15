@@ -458,3 +458,6 @@
 .input-with-icon .password-field { flex: 1; min-width: 0; }
 .input-with-icon .password-field input { padding-left: 36px !important; padding-right: 42px !important; }
 .input-with-icon .password-toggle svg { position: static; left: auto; }
+
+/* Page content: 25px left and right padding beside the sidebar (phones keep their tighter gutters) */
+@media(min-width:601px){.content{padding-left:25px;padding-right:25px}}
