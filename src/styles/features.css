@@ -446,3 +446,9 @@
 .login-brand-form small{color:#5b6788;opacity:1}
 .login-brand-form .brand-mark{background:#14224b;color:#fff}
 @media(max-width:800px){.login-art.auth-hero-panel{min-height:200px;background-size:auto 80%,100% 100%}}
+
+/* Desktop: no hamburger (the sidebar is always visible); it only appears where the sidebar slides away. */
+.menu-toggle{display:none}
+@media(max-width:800px){.menu-toggle{display:block}}
+/* Use the full width next to the sidebar instead of a centred 1480px column. */
+.content{max-width:2200px}

@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import {
   LayoutDashboard, Map, ClipboardList, Wallet, Users, Handshake, Percent,
-  ChartNoAxesCombined, FolderOpen, Bell, Settings, Shield, Search, Plus,
+  ChartNoAxesCombined, FolderOpen, Bell, Settings, Shield, Search,
   Download, ChevronDown, ChevronRight, Menu, X, ArrowUpRight, MoreHorizontal,
   CalendarDays, Building2, House, Receipt, FileText, Clock3, CheckCircle2,
   AlertCircle, SlidersHorizontal, Send, Eye, Edit2, LockKeyhole, RefreshCw,
@@ -48,11 +48,6 @@ export function Payments({ pays, receipts, project, search, filter, F, D, notify
         <div className="tabs">
           <button className={view === 'ledger' ? 'active' : ''} onClick={() => setView('ledger')}>{customerView ? 'My payments' : 'Ledger'} ({list.length})</button>
           <button className={view === 'bills' ? 'active' : ''} onClick={() => setView('bills')}>Bills &amp; receipts ({receipts.length})</button>
-          {canRecordPayment(role) && (
-            <button className="button button-primary small-btn" onClick={() => D('payment')} style={{ marginLeft: 'auto' }}>
-              <Plus size={12} /> Record Payment
-            </button>
-          )}
         </div>
 
         {view === 'ledger' && (
