@@ -32,6 +32,8 @@ os.environ.update(
         "AUDIT_LOG_ENABLED": "true",
         "PII_MASK_BY_DEFAULT": "true",
         "SEED_DEMO_PASSWORD": "Demo@12345",
+        "RESEND_API_KEY": "",  # never send real mail from tests
+        "SMTP_HOST": "",
     }
 )
 

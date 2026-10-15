@@ -1,12 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import {
-  Lock, Mail, CheckCircle2, Layers, ArrowRight, Eye, EyeOff
+  Lock, Mail, ArrowRight, Eye, EyeOff
 } from 'lucide-react';
 import { actions } from '../../api';
 import { ForgotPasswordForm, ResetPasswordForm } from './PasswordResetForms';
 
 export function LoginScreen({ onLogin, notice: initialNotice = '' }) {
-  const [selectedImage, setSelectedImage] = useState(0); // 0, 1, 2
   // The deployment's name comes from the server (no tenant is known before sign-in).
   const [brand, setBrand] = useState({ name: '', tagline: '' });
   useEffect(() => {
@@ -34,15 +33,6 @@ export function LoginScreen({ onLogin, notice: initialNotice = '' }) {
     window.history.replaceState({}, '', '/');
   };
 
-  // The left-hand background is the company logo image.
-  const heroImages = [
-    {
-      url: '/images/login-brand.jpeg',
-      title: 'Building your dreams',
-      tag: 'Portfolio View'
-    }
-  ];
-
   const handleLoginSubmit = async (e) => {
     e.preventDefault();
     if (!email.includes('@')) {
@@ -69,64 +59,19 @@ export function LoginScreen({ onLogin, notice: initialNotice = '' }) {
 
   return (
     <main className="login-screen interactive-auth">
-      {/* Visual Showcase Left Panel */}
-      <section className="login-art auth-hero-panel">
-        <div className="login-brand">
-          <div className="brand-mark">{(brand.name || '·').slice(0, 1).toUpperCase()}</div>
-          <div>
-            <b>{brandFirst} <span>{brandRest}</span></b>
-            <small>{(brand.tagline || '').toUpperCase()}</small>
-          </div>
-        </div>
-
-        {/* Image Showcase Switcher */}
-        <div className="image-showcase-bar">
-          <span className="showcase-label"><Layers size={13} /> Architectural Showcase:</span>
-          <div className="showcase-thumbnails">
-            {heroImages.map((img, i) => (
-              <button
-                key={img.title}
-                type="button"
-                className={`showcase-thumb-btn ${selectedImage === i ? 'active' : ''}`}
-                onClick={() => setSelectedImage(i)}
-                title={img.title}
-              >
-                <span>{img.tag}</span>
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div className="login-pitch">
-          <div className="eyebrow">
-            <i className="live-dot" /> {heroImages[selectedImage].tag.toUpperCase()} · LIVE WORKSPACE
-          </div>
-          <h1>
-            Every plot.<br />
-            Every payment.<br />
-            <em>One clear picture.</em>
-          </h1>
-          <p>
-            An end-to-end operational operating system designed specifically for real estate developers, 
-            sales forces and accounts treasury.
-          </p>
-
-          <div className="current-photo-badge">
-            <span className="photo-title">{heroImages[selectedImage].title}</span>
-          </div>
-
-        </div>
-
-        {/* Feature Highlights on Image */}
-        <div className="auth-footer-features">
-          <div className="trust-pill"><CheckCircle2 size={13} /> Role-Based Access Control</div>
-          <div className="trust-pill"><CheckCircle2 size={13} /> Multi-Development Ready</div>
-        </div>
-      </section>
+      {/* Image-only panel: the company logo artwork, no text on top. */}
+      <section className="login-art auth-hero-panel" role="img" aria-label={brand.name || 'Company logo'} />
 
       {/* Interactive Form Right Panel */}
       <section className="login-form-wrap">
         <div className="login-card-container">
+          <div className="login-brand login-brand-form">
+            <div className="brand-mark">{(brand.name || '·').slice(0, 1).toUpperCase()}</div>
+            <div>
+              <b>{brandFirst} <span>{brandRest}</span></b>
+              <small>{(brand.tagline || '').toUpperCase()}</small>
+            </div>
+          </div>
           <div className="auth-mode-tabs"><span className="mode-tab active">Sign In to Workspace</span></div>
 
           {error && (

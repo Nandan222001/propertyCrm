@@ -4,6 +4,7 @@
  * mirrors the change through the REST API. Reads hydrate the same slices the
  * demo seed fills, which is why the app works both against MySQL and offline.
  */
+import { startingPassword } from '../utils/startingPassword';
 import { ApiUnavailableError, actions, api, hasSession, setTokens, clearTokens } from '../api';
 import { ROLES, toUiRole } from '../constants/roles';
 import { COMPANY, roleConfigs } from '../data/appConfig';
@@ -44,6 +45,7 @@ export const signIn = ({ email, password }) => async (dispatch) => {
     pageCache.clear();
     setTokens(data?.tokens);
     const user = data?.user || {};
+    startingPassword[user.must_change_password ? 'remember' : 'clear'](password);
     dispatch(sessionLoaded({ user, permissions: user.permissions }));
     dispatch(toastPushed(`Welcome back, ${user.name || email}.`));
     clientAudit('auth.login', { mode: 'live', role: user.role });
@@ -88,6 +90,7 @@ export const signOut = () => async (dispatch, getState) => {
   if (mode === 'live') await actions.logout().catch(() => {});
   clearTokens();
   pageCache.clear();
+  startingPassword.clear();
   dispatch(signedOut());
   dispatch(toastPushed('Logged out of workspace session.'));
 };
@@ -872,6 +875,7 @@ export const actionNotification = (item) => async (dispatch, getState) => {
 export const changeMyPassword = ({ current, next, confirm }) => async (dispatch) => {
   try {
     await actions.changePassword({ current_password: current, new_password: next, confirm_password: confirm });
+    startingPassword.clear();
   } catch (error) {
     return error.message || 'Could not change the password.';
   }

@@ -102,6 +102,8 @@ class Settings(BaseSettings):
     FORCE_HTTPS: bool = False
 
     # --- outgoing e-mail (password reset links). Unset SMTP_HOST = e-mail disabled (links are only logged / returned in dev).
+    #: Resend (https://resend.com) HTTP API key. When set it is used instead of SMTP.
+    RESEND_API_KEY: str | None = None
     SMTP_HOST: str | None = None
     SMTP_PORT: int = 587
     SMTP_USER: str | None = None

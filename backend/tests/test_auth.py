@@ -317,6 +317,35 @@ def test_reset_mail_is_actually_sent_over_smtp(monkeypatch):
     assert "/reset-password?token=tok123" in sent[-1][3]
 
 
+def test_reset_mail_goes_through_resend_when_an_api_key_is_set(monkeypatch):
+    from app.core.config import settings
+    from app.services import mailer
+    seen = {}
+
+    class FakeResponse:
+        def __enter__(self): return self
+        def __exit__(self, *exc): return False
+
+    def fake_urlopen(request, timeout=0):
+        seen["url"] = request.full_url
+        seen["auth"] = request.get_header("Authorization")
+        seen["body"] = request.data.decode()
+        return FakeResponse()
+
+    monkeypatch.setattr(settings, "RESEND_API_KEY", "re_test_key")
+    monkeypatch.setattr(mailer.urllib.request, "urlopen", fake_urlopen)
+    assert mailer.mail_enabled() is True
+    assert mailer.send_mail("user@example.test", "Reset your password", "Open link") is True
+    assert seen["url"] == "https://api.resend.com/emails"
+    assert seen["auth"] == "Bearer re_test_key"
+    assert "user@example.test" in seen["body"]
+
+    def failing(request, timeout=0):
+        raise OSError("network down")
+    monkeypatch.setattr(mailer.urllib.request, "urlopen", failing)
+    assert mailer.send_mail("user@example.test", "x", "y") is False  # never raises into the request
+
+
 def test_starting_password_accepts_any_capitalisation_until_the_user_chooses_their_own(client, admin_headers, unique_email):
     created = client.post("/api/v1/users", headers=admin_headers, json={
         "name": "Meghana", "email": unique_email, "role": "ACCOUNTS", "phone": "8600359985"})

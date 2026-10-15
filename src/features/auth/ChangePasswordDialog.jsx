@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { KeyRound, X } from 'lucide-react';
 import { PasswordInput } from '../../components/common/PasswordInput';
+import { startingPassword } from '../../utils/startingPassword';
 
 const STRONG = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,128}$/;
 
@@ -9,7 +10,7 @@ const STRONG = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,128}$/;
  * can be closed (X or "Skip for now") to carry on with the starting password. Changing it signs everyone out.
  */
 export function ChangePasswordDialog({ forced = false, onSubmit, close }) {
-  const [form, setForm] = useState({ current: '', next: '', confirm: '' });
+  const [form, setForm] = useState({ current: forced ? startingPassword.get() : '', next: '', confirm: '' });
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const set = (key) => (e) => setForm({ ...form, [key]: e.target.value });
@@ -38,8 +39,8 @@ export function ChangePasswordDialog({ forced = false, onSubmit, close }) {
           <button type="button" className="modal-close" onClick={close} aria-label="Close"><X size={16} /></button>
         </div>
         <div className="form-grid">
-          <label>Current password<PasswordInput autoComplete="current-password" value={form.current} onChange={set('current')} autoFocus /></label>
-          <label>New password<PasswordInput autoComplete="new-password" value={form.next} onChange={set('next')} /></label>
+          <label>Current password<PasswordInput autoComplete="current-password" value={form.current} onChange={set('current')} autoFocus={!form.current} /></label>
+          <label>New password<PasswordInput autoComplete="new-password" value={form.next} onChange={set('next')} autoFocus={Boolean(form.current)} /></label>
           <label>Confirm new password<PasswordInput autoComplete="new-password" value={form.confirm} onChange={set('confirm')} /></label>
         </div>
         {error && <p className="form-error" role="alert">{error}</p>}
