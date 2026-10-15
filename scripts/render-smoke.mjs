@@ -57,7 +57,7 @@ const { renderToString } = await import('react-dom/server');
 const { Provider } = await import('react-redux');
 const { MemoryRouter } = await import('react-router-dom');
 
-const { App, createStore, signedIn } = await import(pathToFileURL(outfile).href);
+const { App, createStore, signedIn, pageChanged } = await import(pathToFileURL(outfile).href);
 
 const failures = [];
 const render = (store, route = '/') => renderToString(
@@ -90,7 +90,7 @@ for (const role of ROLES) {
 }
 
 // 3. Deep links on the heavier pages.
-for (const [role, route] of [['ADMIN', '/bookings'], ['ACCOUNTS', '/payments'], ['ACCOUNTS', '/billing'], ['CUSTOMER', '/billing'], ['ADMIN', '/projects-plots'], ['SUPER ADMIN', '/user-roles'], ['CUSTOMER', '/documents'], ['ADMIN', '/reports'], ['ADMIN', '/administration'], ['SUPER ADMIN', '/reports'], ['ACCOUNTS', '/reports'], ['ADMIN', '/approvals'], ['ADMIN', '/commissions'], ['ADMIN', '/agents'], ['ADMIN', '/notifications']]) {
+for (const [role, route] of [['ADMIN', '/bookings'], ['ACCOUNTS', '/payments'], ['ACCOUNTS', '/billing'], ['CUSTOMER', '/billing'], ['ADMIN', '/projects-plots'], ['SUPER ADMIN', '/user-roles'], ['CUSTOMER', '/documents'], ['ADMIN', '/reports'], ['ADMIN', '/administration'], ['SUPER ADMIN', '/reports'], ['ACCOUNTS', '/reports'], ['ADMIN', '/approvals'], ['ADMIN', '/commissions'], ['ADMIN', '/agents'], ['ADMIN', '/notifications'], ['ACCOUNTS', '/expenses'], ['ADMIN', '/expenses']]) {
   try {
     const store = createStore();
     store.dispatch(signedIn({ role, user: { name: `${role} Tester`, role } }));
@@ -98,6 +98,24 @@ for (const [role, route] of [['ADMIN', '/bookings'], ['ACCOUNTS', '/payments'], 
     console.log(`  ✓ ${role} ${route}`);
   } catch (error) {
     failures.push(`${role} ${route} render threw: ${error.message}`);
+  }
+}
+
+// 4. Expenses and company profit belong to ADMIN and ACCOUNTS only; everyone else is sent back to the overview.
+for (const role of ['ACCOUNTS', 'ADMIN', 'SALES MANAGER', 'SALES AGENT', 'CUSTOMER']) {
+  try {
+    const store = createStore();
+    store.dispatch(signedIn({ role, user: { name: `${role} Tester`, role } }));
+    store.dispatch(pageChanged('Expenses'));
+    const html = render(store, '/expenses');
+    const sees = /Expense register/.test(html);
+    const allowed = role === 'ACCOUNTS' || role === 'ADMIN';
+    if (sees !== allowed) failures.push(`${role} ${allowed ? 'must' : 'must not'} see the Expenses page`);
+    const menu = />Expenses</.test(html);
+    if (menu !== allowed) failures.push(`${role} ${allowed ? 'must' : 'must not'} have an Expenses menu item`);
+    console.log(`  ✓ ${role} Expenses ${allowed ? 'allowed' : 'blocked'}`);
+  } catch (error) {
+    failures.push(`${role} /expenses render threw: ${error.message}`);
   }
 }
 

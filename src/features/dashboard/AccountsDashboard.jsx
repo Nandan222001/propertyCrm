@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Download, Plus, ShieldCheck, RefreshCw } from 'lucide-react';
-import { api, hasSession } from '../../api';
+import { api, actions, hasSession } from '../../api';
 import { parseAmt, fmtINR } from '../../utils';
 import { compactINR } from '../../utils/dashboardStats';
 import { usePageLoading } from '../../hooks';
@@ -24,7 +24,9 @@ export function AccountsDashboard({ go, D, notify, pays = [], receipts = [] }) {
   const live = hasSession();
   const [commissions, setCommissions] = useState(() => pageCache.get('accounts-dash') ?? []);
   const [loaded, setLoaded] = useState(!live || pageCache.has('accounts-dash'));
-  usePageLoading('accounts-dash', !loaded);
+  const [profit, setProfit] = useState(() => pageCache.get('profit-summary') ?? null);
+  const [profitLoaded, setProfitLoaded] = useState(!live || pageCache.has('profit-summary'));
+  usePageLoading('accounts-dash', !loaded || !profitLoaded);
   const now = new Date();
 
   const load = useCallback(async () => {
@@ -36,6 +38,13 @@ export function AccountsDashboard({ go, D, notify, pays = [], receipts = [] }) {
     setLoaded(true);
   }, [live]);
   useEffect(() => { load(); }, [load, pays.length]);
+  useEffect(() => {
+    if (!live) return;
+    actions.profitSummary()
+      .then((response) => setProfit(pageCache.set('profit-summary', response.data || null)))
+      .catch(() => setProfit(null))
+      .finally(() => setProfitLoaded(true));
+  }, [live, pays.length]);
 
   const collected = pays.reduce((t, r) => t + parseAmt(r[4]), 0);
   const outstanding = pays.reduce((t, r) => t + parseAmt(r[5]), 0);
@@ -97,6 +106,23 @@ export function AccountsDashboard({ go, D, notify, pays = [], receipts = [] }) {
           <span className="stat-sub">{buckets[2].rows.length + buckets[3].rows.length} account(s) need escalation</span>
         </div>
       </div>
+
+      <section className="panel profit-panel">
+        <div className="panel-head">
+          <div>
+            <h2>Company profit till date</h2>
+            <p>Money collected − agent commission − expenses</p>
+          </div>
+          <button className="text-button" onClick={() => go('Expenses')}>Open Expenses →</button>
+        </div>
+        <div className="mini-stats four" style={{ marginTop: 12 }}>
+          <div className="mini-stat">
+            <small>COMPANY PROFIT</small>
+            <b className={profit && Number(profit.profit) < 0 ? 'danger-text' : 'green-text'}>{profit ? money(Number(profit.profit)) : '—'}</b>
+            <span className="stat-sub">{profit ? `${money(Number(profit.collected))} − ${money(Number(profit.commissions))} − ${money(Number(profit.expenses))}` : 'Not available right now'}</span>
+          </div>
+        </div>
+      </section>
 
       <section className="panel aging-panel">
         <div className="panel-head">

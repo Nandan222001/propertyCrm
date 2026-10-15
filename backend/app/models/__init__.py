@@ -12,6 +12,7 @@ from app.models.audit import (
 from app.models.billing import Invoice, InvoiceItem, InvoiceStatusHistory
 from app.models.booking import Booking, BookingStatusHistory
 from app.models.customer import Customer, CustomerConsent
+from app.models.expense import Expense
 from app.models.payment import Agent, Commission, Payment, Receipt
 from app.models.payment_plan import BookingInstallment, PaymentPlan
 from app.models.property import Document, Plot, Project
@@ -28,6 +29,7 @@ __all__ = [
     "BookingInstallment",
     "BookingStatusHistory",
     "Commission",
+    "Expense",
     "Customer",
     "CustomerConsent",
     "DataSubjectRequest",

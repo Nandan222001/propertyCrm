@@ -27,7 +27,7 @@ export const roleConfigs = {
     title: 'Operations Command Center',
     subtitle: 'Overall project portfolio, customer bookings, collection reconciliations and operations.',
     permissions: ['PROJECTS_CRUD', 'BOOKINGS_CRUD', 'PAYMENTS_CRUD', 'AGENTS_CRUD', 'REPORTS_VIEW', 'USER_MANAGEMENT'],
-    workspaceNav: ['Overview', 'Approvals', 'Projects & plots', 'Bookings', 'Payments', 'Billing', 'Customers', 'Agents', 'Commissions'],
+    workspaceNav: ['Overview', 'Approvals', 'Projects & plots', 'Bookings', 'Payments', 'Billing', 'Customers', 'Agents', 'Commissions', 'Expenses'],
     insightsNav: ['Reports', 'Documents', 'Notifications', 'User & role management', 'Administration']
   },
   'SALES MANAGER': {
@@ -57,7 +57,7 @@ export const roleConfigs = {
     title: 'Financial Ledger, Collections & Dues',
     subtitle: 'Payment receipts, installment reconciliation, aging debtor analysis, and commission payouts.',
     permissions: ['RECORD_PAYMENTS', 'MANAGE_LEDGER', 'RECONCILE_ACCOUNTS', 'DISBURSE_COMMISSIONS', 'FINANCIAL_REPORTS'],
-    workspaceNav: ['Overview', 'Payments', 'Billing', 'Bookings', 'Customers', 'Commissions'],
+    workspaceNav: ['Overview', 'Payments', 'Billing', 'Bookings', 'Customers', 'Commissions', 'Expenses'],
     insightsNav: ['Reports', 'Documents', 'Notifications']
   },
   'CUSTOMER': {

@@ -71,6 +71,8 @@ class Permission(StrEnum):
     COMMISSION_VIEW = "commission:view"
     COMMISSION_APPROVE = "commission:approve"
     COMMISSION_PAYOUT = "commission:payout"
+    EXPENSE_VIEW = "expense:view"
+    EXPENSE_MANAGE = "expense:manage"
     # billing
     INVOICE_VIEW_ALL = "invoice:view_all"
     INVOICE_VIEW_OWN = "invoice:view_own"
@@ -119,6 +121,7 @@ ROLE_PERMISSIONS: dict[Role, frozenset[Permission]] = {
             Permission.CUSTOMER_UPDATE, Permission.CUSTOMER_APPROVE, Permission.CUSTOMER_DELETE,
             Permission.PAYMENT_VIEW_ALL, Permission.PAYMENT_CREATE, Permission.PAYMENT_APPROVE,
             Permission.RECEIPT_MANAGE, Permission.COMMISSION_VIEW, Permission.COMMISSION_APPROVE,
+            Permission.EXPENSE_VIEW, Permission.EXPENSE_MANAGE,
             Permission.INVOICE_VIEW_ALL, Permission.INVOICE_CREATE, Permission.INVOICE_UPDATE,
             Permission.INVOICE_ISSUE, Permission.INVOICE_CANCEL,
             Permission.REPORT_VIEW, Permission.REPORT_EXPORT, Permission.DASHBOARD_VIEW,
@@ -159,6 +162,7 @@ ROLE_PERMISSIONS: dict[Role, frozenset[Permission]] = {
             Permission.BOOKING_VIEW_ALL, Permission.CUSTOMER_VIEW_ALL,
             Permission.PAYMENT_VIEW_ALL, Permission.PAYMENT_CREATE, Permission.PAYMENT_APPROVE,
             Permission.RECEIPT_MANAGE, Permission.COMMISSION_VIEW, Permission.COMMISSION_PAYOUT,
+            Permission.EXPENSE_VIEW, Permission.EXPENSE_MANAGE,
             Permission.INVOICE_VIEW_ALL, Permission.INVOICE_CREATE, Permission.INVOICE_UPDATE,
             Permission.INVOICE_ISSUE, Permission.INVOICE_CANCEL,
             Permission.REPORT_VIEW, Permission.REPORT_EXPORT, Permission.DASHBOARD_VIEW,

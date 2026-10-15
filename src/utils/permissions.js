@@ -23,6 +23,8 @@ export const canEditBooking = (role, booking) => isAdmin(role) || ([ROLES.SALES_
 /** Only an administrator may delete a booking (and must re-enter their password). */
 export const canDeleteBooking = (role) => isAdmin(role);
 export const canRecordPayment = (role) => isAdmin(role) || role === ROLES.ACCOUNTS;
+/** Expenses and the company-profit figure: the administrator and the accounts desk only. */
+export const canManageExpenses = (role) => isAdmin(role) || role === ROLES.ACCOUNTS;
 export const canManageBills = (role) => isAdmin(role) || role === ROLES.ACCOUNTS;
 export const canManageUsers = (role) => isAdmin(role);
 /** Billing desk: raise, edit, issue and cancel tax invoices. */

@@ -48,6 +48,7 @@ import { Payments } from '../features/payments/Payments';
 import { Billing } from '../features/billing/Billing';
 import { Agents } from '../features/agents/Agents';
 import { Commissions } from '../features/commissions/Commissions';
+import { Expenses } from '../features/expenses/Expenses';
 import { Reports } from '../features/reports/Reports';
 import { Notifications } from '../features/notifications/Notifications';
 import { Roles } from '../features/users/Roles';
@@ -283,7 +284,7 @@ export function App() {
 
         <div className={`content ${pageLoading ? 'is-loading' : ''}`}>
           <PageHeader title={<>{heading[0]} {page === PAGES.OVERVIEW && <span className="wave">✳</span>}</>} subtitle={heading[1]}>
-            {!scoped.isCustomerRole && !auth.isPlatform && (
+            {!scoped.isCustomerRole && !auth.isPlatform && page !== PAGES.EXPENSES && (
               <button className="button button-white" onClick={notifyExport}>
                 <Download size={14} /> Export CSV
               </button>
@@ -515,6 +516,7 @@ export function App() {
 
           {page === PAGES.AGENTS && <Agents search={ui.search} notify={notify} role={role} bookings={scoped.bookings} project={ui.project} onView={(agent) => dispatch(agentInfoSet(agent))} />}
           {page === PAGES.COMMISSIONS && <Commissions search={ui.search} notify={notify} role={role} bookings={scoped.bookings} project={ui.project} />}
+          {page === PAGES.EXPENSES && <Expenses search={ui.search} notify={notify} role={role} />}
           {page === PAGES.REPORTS && (
             <Reports
               notify={notify}

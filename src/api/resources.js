@@ -19,6 +19,7 @@ const COLLECTION_PATHS = {
   ledger: ENDPOINTS.ledger,
   agents: ENDPOINTS.agents,
   commissions: ENDPOINTS.commissions,
+  expenses: ENDPOINTS.expenses,
   documents: ENDPOINTS.documents,
   notifications: ENDPOINTS.notifications,
   auditLogs: ENDPOINTS.auditLogs,
@@ -60,6 +61,7 @@ export const actions = {
   shareInvoice: (id) => authedRequest(ENDPOINTS.invoices.share(id), { method: 'POST', body: {} }),
   invoiceSummary: () => authedRequest(ENDPOINTS.invoices.summary),
   invoicePdf: (id) => requestBlob(ENDPOINTS.invoices.pdf(id)),
+  profitSummary: () => authedRequest(ENDPOINTS.expenses.summary),
   ledgerSummary: () => authedRequest(ENDPOINTS.ledger.summary),
   approvalQueue: () => authedRequest(ENDPOINTS.bookings.approvals),
   dailyReport: (params) => authedRequest(ENDPOINTS.reports.daily, { params }),
@@ -70,6 +72,9 @@ export const actions = {
   resetTenantAdminPassword: (id, userId) => authedRequest(ENDPOINTS.tenants.resetPassword(id, userId), { method: 'POST', body: {} }),
   acknowledgeEvent: (id, body) => authedRequest(ENDPOINTS.securityEvents.acknowledge(id), { method: 'POST', body }),
 };
+
+/** The expenses API edits with PUT (full record), not PATCH. */
+api.expenses.update = (id, body) => authedRequest(ENDPOINTS.expenses.item(id), { method: 'PUT', body });
 
 api.plots.createBulk = (body) => authedRequest(`${ENDPOINTS.plots.list}/bulk`, { method: 'POST', body });
 

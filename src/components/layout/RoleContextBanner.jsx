@@ -39,6 +39,10 @@ export function RoleContextBanner({ role, page }) {
       'SALES AGENT': 'My Commission Statement — View your personal earnings at your agreed commission rate, the TDS deduction breakdown, and bank payout dates.',
       'ACCOUNTS': 'Disbursement Desk — Calculate TDS (5%), generate Form 16A slips, and process electronic NEFT disbursements to agent bank accounts.'
     },
+    'Expenses': {
+      'ADMIN': 'Operations Command — Track every company expense and see profit till date: collections less agent commission less expenses.',
+      'ACCOUNTS': 'Expense Desk — Record office, marketing, legal and development spends. Company profit updates as you add them.'
+    },
     'Reports': {
       'ADMIN': 'Operations BI — Comprehensive operations reports across projects, bookings, payments, and agent throughput.',
       'SALES MANAGER': 'Sales BI — Agent leaderboard rankings, lead-to-booking conversion funnel velocity, and lost deal analysis.',

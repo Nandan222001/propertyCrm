@@ -45,6 +45,7 @@ export const ENDPOINTS = {
   ledger: { list: '/ledger', summary: '/ledger/summary' },
   agents: { list: '/agents', item: (id) => `/agents/${id}` },
   commissions: { list: '/commissions', item: (id) => `/commissions/${id}` },
+  expenses: { list: '/expenses', item: (id) => `/expenses/${id}`, summary: '/expenses/profit-summary' },
   documents: { list: '/documents', item: (id) => `/documents/${id}` },
   notifications: { list: '/notifications', item: (id) => `/notifications/${id}` },
   reports: { daily: '/reports/daily', auditTrail: '/reports/audit-trail' },

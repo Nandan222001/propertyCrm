@@ -1,7 +1,7 @@
 /** Route table, headings and icon map — one definition for sidebar + routes. */
 import {
   LayoutDashboard, Map, ClipboardList, Wallet, Users, Handshake, Percent,
-  ChartNoAxesCombined, FolderOpen, Bell, Settings, Shield, FileText, ReceiptIndianRupee, Building2,
+  ChartNoAxesCombined, FolderOpen, Bell, Settings, Shield, FileText, ReceiptIndianRupee, Building2, Banknote,
 } from 'lucide-react';
 
 const PAGE = {
@@ -15,6 +15,7 @@ const PAGE = {
   CUSTOMER_DETAIL: 'Customer detail',
   AGENTS: 'Agents',
   COMMISSIONS: 'Commissions',
+  EXPENSES: 'Expenses',
   REPORTS: 'Reports',
   DOCUMENTS: 'Documents',
   NOTIFICATIONS: 'Notifications',
@@ -37,6 +38,7 @@ export const PATH_FOR = {
   [PAGE.CUSTOMER_DETAIL]: '/customers/detail',
   [PAGE.AGENTS]: '/agents',
   [PAGE.COMMISSIONS]: '/commissions',
+  [PAGE.EXPENSES]: '/expenses',
   [PAGE.REPORTS]: '/reports',
   [PAGE.DOCUMENTS]: '/documents',
   [PAGE.NOTIFICATIONS]: '/notifications',
@@ -59,6 +61,7 @@ export const PAGE_ICON = {
   [PAGE.CUSTOMERS]: Users,
   [PAGE.AGENTS]: Handshake,
   [PAGE.COMMISSIONS]: Percent,
+  [PAGE.EXPENSES]: Banknote,
   [PAGE.REPORTS]: ChartNoAxesCombined,
   [PAGE.DOCUMENTS]: FolderOpen,
   [PAGE.NOTIFICATIONS]: Bell,
@@ -77,6 +80,7 @@ export const PAGE_META = {
   [PAGE.CUSTOMERS]: ['Customer Master Directory', 'Comprehensive client files, plot allocations, milestone payments, and documents.'],
   [PAGE.AGENTS]: ['Sales Force & Agency Roster', 'Agent productivity, active bookings, commission tiering, and performance metrics.'],
   [PAGE.COMMISSIONS]: ['Agent Commissions & Payouts', 'Eligibility rules, manager approvals, TDS tax compliance, and bank disbursements.'],
+  [PAGE.EXPENSES]: ['Expenses & Company Profit', 'Record what the company spends. Profit = money collected, minus agent commission, minus expenses.'],
   [PAGE.REPORTS]: ['Reports & Business Intelligence', 'Real-time financial, operational, sales funnel and portfolio BI.'],
   [PAGE.DOCUMENTS]: ['Document Vault & Contracts', 'Booking forms, allotment letters, agreement copies, and tax invoices.'],
   [PAGE.NOTIFICATIONS]: ['Operational Follow-ups & Alerts', 'Payment overdue warnings, customer reminders, and system notifications.'],
