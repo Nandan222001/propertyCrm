@@ -16,6 +16,8 @@ import { toRow } from '../commissions/Commissions';
 import { api, hasSession } from '../../api';
 
 import { RoleContextBanner } from '../../components/layout/RoleContextBanner';
+import { usePageLoading } from '../../hooks';
+import { pageCache } from '../../utils/pageCache';
 
 const REPORTS = [
   ['Sales & Booking Velocity', 'Comprehensive contract report with installment breakdowns', 'sales', 'Uses scope + project'],
@@ -30,16 +32,19 @@ export function Reports({ notify, role, bookings = [], payments = [], plots = []
   useEffect(() => { setReportProject(activeProject); }, [activeProject]);
 
   // Live: the commissions this role may see (from the server). Offline preview: the sample register.
-  const [liveCommissions, setLiveCommissions] = useState(hasSession() ? [] : null);
+  const [liveCommissions, setLiveCommissions] = useState(hasSession() ? (pageCache.get('report-commissions') ?? []) : null);
+  const [commissionsLoaded, setCommissionsLoaded] = useState(!hasSession() || pageCache.has('report-commissions'));
   useEffect(() => {
     if (!hasSession()) return;
     api.commissions.list({ page_size: 200 })
       .then((response) => {
         const byId = new Map(bookings.filter((b) => typeof b[10] === 'number').map((b) => [b[10], b]));
-        setLiveCommissions((response.data || []).map((c) => toRow(c, byId)));
+        setLiveCommissions(pageCache.set('report-commissions', (response.data || []).map((c) => toRow(c, byId))));
+        setCommissionsLoaded(true);
       })
-      .catch(() => setLiveCommissions([]));
+      .catch(() => { setLiveCommissions([]); setCommissionsLoaded(true); });
   }, [bookings]);
+  usePageLoading('reports', !commissionsLoaded);
   const data = useMemo(
     () => ({ bookings, payments, plots, commissions: liveCommissions ?? [] }),
     [bookings, payments, plots, liveCommissions],

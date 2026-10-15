@@ -15,7 +15,7 @@ import { FilterBar, PageHeader, Toast } from '../components/common';
 import { Sidebar, Topbar } from '../components/layout';
 import { useAppDispatch, useAppSelector, useAuth, useNotify } from '../hooks';
 import {
-  selectAllowedPages, selectBillReceipt, selectBillingSummary, selectBookingForPrint, selectDomain,
+  selectAllowedPages, selectBillReceipt, selectBillingSummary, selectBookingForPrint, selectDomain, selectPageLoading,
   selectDocuments, selectHeading, selectTenants, selectTenantsMeta, selectNavBadge, selectNavigation, selectPage,
   selectPendingApprovals, selectUsers, selectPlotForPrint, selectRoleConfig, selectScopedData, selectUi,
 } from '../store/selectors';
@@ -74,6 +74,7 @@ export function App() {
 
   const ui = useAppSelector(selectUi);
   const domain = useAppSelector(selectDomain);
+  const pageLoading = useAppSelector(selectPageLoading);
   const notifications = useAppSelector((state) => state.notifications);
   const teamUsers = useAppSelector(selectUsers);
   const loginNotice = useAppSelector((state) => state.auth.loginNotice);
@@ -280,7 +281,7 @@ export function App() {
           onLogout={() => dispatch(signOut())}
         />
 
-        <div className="content">
+        <div className={`content ${pageLoading ? 'is-loading' : ''}`}>
           <PageHeader title={<>{heading[0]} {page === PAGES.OVERVIEW && <span className="wave">✳</span>}</>} subtitle={heading[1]}>
             {!scoped.isCustomerRole && !auth.isPlatform && (
               <button className="button button-white" onClick={notifyExport}>

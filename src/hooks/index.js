@@ -4,8 +4,18 @@ import { useAppDispatch, useAppSelector } from '../store';
 import { selectCurrentUser, selectMode, selectRole, selectSession } from '../store/selectors';
 import { hasPermission, isAdmin, isPlatformAdmin, canApprove, canCreateBooking, canCreateCustomer, canManageBills, canRecordPayment } from '../utils/permissions';
 import { notify } from '../store/thunks';
+import { loadingSet } from '../store/slices/uiSlice';
 
 export { useAppDispatch, useAppSelector };
+
+/** A page that fetches its own data calls this so numbers read "Loading…" until the data is in (never a false 0). */
+export function usePageLoading(key, loading) {
+  const dispatch = useAppDispatch();
+  useEffect(() => {
+    dispatch(loadingSet({ key, value: Boolean(loading) }));
+    return () => { dispatch(loadingSet({ key, value: false })); };
+  }, [dispatch, key, loading]);
+}
 
 /** Identity + capability helpers for the active session. */
 export function useAuth() {

@@ -165,3 +165,9 @@ export const selectTenantsMeta = createSelector(
   [(state) => state.tenants.status, (state) => state.tenants.error],
   (status, error) => ({ loading: status === 'loading', error }),
 );
+
+/** True while the workspace or a page's own data is still being fetched: KPI tiles show "Loading…" instead of 0. */
+export const selectPageLoading = (state) => state.domain.status === 'loading'
+  || Object.keys(state.ui.loadingKeys || {}).length > 0
+  || state.tenants.status === 'loading'
+  || state.auth.usersReady === false;

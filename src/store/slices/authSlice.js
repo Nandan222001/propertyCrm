@@ -30,6 +30,8 @@ const readStoredRole = (key) => {
 
 const initialState = {
   loginNotice: '',
+  /** False only while the team list is being fetched (so counts can read "Loading…"). */
+  usersReady: true,
   /** Role string of the active session ('' = signed out). */
   session: readStoredRole('session'),
   /** True while a session restored from this browser has not yet been confirmed by the server. */
@@ -114,8 +116,15 @@ const authSlice = createSlice({
     passwordChangeCleared(state) {
       if (state.currentUser) state.currentUser.mustChangePassword = false;
     },
+    usersLoading(state) {
+      state.usersReady = false;
+    },
+    usersFailed(state) {
+      state.usersReady = true;
+    },
     usersLoaded(state, action) {
       state.users = action.payload;
+      state.usersReady = true;
     },
     userRemoved(state, action) {
       state.users = state.users.filter((u) => u.id !== action.payload);
@@ -129,6 +138,6 @@ const authSlice = createSlice({
 });
 
 export const {
-  signedIn, sessionLoaded, sessionFailed, signedOut, userSaved, usersLoaded, userRemoved, authError, loginNoticeSet, passwordChangeCleared,
+  signedIn, sessionLoaded, sessionFailed, signedOut, userSaved, usersLoaded, usersLoading, usersFailed, userRemoved, authError, loginNoticeSet, passwordChangeCleared,
 } = authSlice.actions;
 export default authSlice.reducer;

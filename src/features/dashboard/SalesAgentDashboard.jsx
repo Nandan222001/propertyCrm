@@ -2,6 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { Target, Plus, Phone, MapPin, Award, AlertCircle } from 'lucide-react';
 import { api, hasSession } from '../../api';
 import { parseAmt, fmtINR } from '../../utils';
+import { usePageLoading } from '../../hooks';
+import { pageCache } from '../../utils/pageCache';
 
 const crLakh = (n) => (n >= 10000000 ? `₹${(n / 10000000).toFixed(2)} Cr` : n >= 100000 ? `₹${(n / 100000).toFixed(2)} L` : `₹${fmtINR(n)}`);
 const OPEN = (b) => b[7] !== 'Rejected' && b[7] !== 'Cancelled';
@@ -13,13 +15,15 @@ const OPEN = (b) => b[7] !== 'Rejected' && b[7] !== 'Cancelled';
  */
 export function SalesAgentDashboard({ go, D, notify, agentName = '', bookings = [], plots: allPlots = [], project = 'All projects' }) {
   const live = hasSession();
-  const [commissions, setCommissions] = useState([]);
+  const [commissions, setCommissions] = useState(() => pageCache.get('agent-dash') ?? []);
+  const [loaded, setLoaded] = useState(!live || pageCache.has('agent-dash'));
+  usePageLoading('agent-dash', !loaded);
 
   useEffect(() => {
     if (!live) return;
     api.commissions.list({ page_size: 200 })
-      .then((response) => setCommissions(response.data || []))
-      .catch(() => setCommissions([]));
+      .then((response) => { setCommissions(pageCache.set('agent-dash', response.data || [])); setLoaded(true); })
+      .catch(() => { setCommissions([]); setLoaded(true); });
   }, [live, bookings.length]);
 
   const mine = bookings.filter(OPEN);

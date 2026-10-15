@@ -26,12 +26,18 @@ const initialState = {
   crudPage: PAGES.OVERVIEW,
   editRecord: null,
   userEdit: null,
+  /** Pages that are still fetching their own data: { key: true } while loading. */
+  loadingKeys: {},
 };
 
 const uiSlice = createSlice({
   name: 'ui',
   initialState,
   reducers: {
+    loadingSet(state, action) {
+      const { key, value } = action.payload;
+      if (value) state.loadingKeys[key] = true; else delete state.loadingKeys[key];
+    },
     pageChanged(state, action) {
       state.page = action.payload;
       state.search = '';
@@ -100,6 +106,6 @@ const uiSlice = createSlice({
 export const {
   pageChanged, sidebarToggled, modalOpened, modalClosed, toastPushed, toastCleared,
   searchChanged, periodChanged, projectChanged, tabChanged, filterChanged,
-  customerSelected, billOpened, bookingPrintSet, agentInfoSet,
+  customerSelected, billOpened, bookingPrintSet, agentInfoSet, loadingSet,
 } = uiSlice.actions;
 export default uiSlice.reducer;

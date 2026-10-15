@@ -3,6 +3,8 @@ import { Target, Users, Plus, AlertCircle } from 'lucide-react';
 import { api, actions, hasSession } from '../../api';
 import { parseAmt, fmtINR } from '../../utils';
 import { compactINR } from '../../utils/dashboardStats';
+import { usePageLoading } from '../../hooks';
+import { pageCache } from '../../utils/pageCache';
 
 const money = (n) => { const c = compactINR(n); return `${c.val}${c.unit ? ` ${c.unit}` : ''}`; };
 const LIVE = (b) => !['Pending Approval', 'Rejected', 'Cancelled'].includes(b[7]);
@@ -15,8 +17,10 @@ const monthKey = (label) => { const d = new Date(String(label || '')); return Nu
  */
 export function SalesManagerDashboard({ go, D, notify, bookings: allBookings = [], customers: allCustomers = [], project = 'All projects' }) {
   const live = hasSession();
-  const [fullTeam, setTeam] = useState([]);
-  const [commissions, setCommissions] = useState([]);
+  const [fullTeam, setTeam] = useState(() => pageCache.get('mgr-team') ?? []);
+  const [commissions, setCommissions] = useState(() => pageCache.get('mgr-comm') ?? []);
+  const [loaded, setLoaded] = useState(!live || pageCache.has('mgr-team'));
+  usePageLoading('manager-dash', !loaded);
   const all = project === 'All projects';
   // The project chosen in the sidebar / filter bar scopes every figure on this page.
   const bookings = all ? allBookings : allBookings.filter((b) => b[2] === project);
@@ -34,11 +38,12 @@ export function SalesManagerDashboard({ go, D, notify, bookings: allBookings = [
         id: r.id, name: r.name, code: r.code, deals: Number(r.deals) || 0,
         sales: Number(r.sales) || 0, collected: Number(r.collected) || 0, rate: rates.get(r.id),
       })).sort((a, b) => b.sales - a.sales);
-      setTeam(rows);
-      setCommissions(comm.data || []);
+      setTeam(pageCache.set('mgr-team', rows));
+      setCommissions(pageCache.set('mgr-comm', comm.data || []));
     } catch (error) {
       notify(`Could not load team data: ${error.message}`);
     }
+    setLoaded(true);
   }, [live, notify]);
 
   useEffect(() => { load(); }, [load, allBookings.length]);

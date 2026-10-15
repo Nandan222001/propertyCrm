@@ -20,7 +20,7 @@ import { notificationsLoaded, notificationPatched } from './slices/notifications
 import { setRemoteSettings } from '../utils/settings';
 import { clientAudit } from '../utils/security';
 import {
-  sessionFailed, sessionLoaded, signedIn, signedOut, userSaved, usersLoaded, userRemoved, authError, loginNoticeSet,
+  sessionFailed, sessionLoaded, signedIn, signedOut, userSaved, usersLoaded, usersLoading, usersFailed, userRemoved, authError, loginNoticeSet,
 } from './slices/authSlice';
 import {
   crudRowRemoved, crudRowUpserted, followUpSet, registryStatusSet, paymentStatusSet, projectSaved, rowPatched, rowRemoved, rowUpserted,
@@ -31,6 +31,7 @@ import {
 } from '../utils/billing';
 import { buildInvoicePdf, downloadPdfBytes } from '../utils/pdf';
 import { modalClosed, toastPushed } from './slices/uiSlice';
+import { pageCache } from '../utils/pageCache';
 
 /** Toast helper — every page calls `notify(...)` through this one action. */
 export const notify = (message) => toastPushed(message);
@@ -40,6 +41,7 @@ export const notify = (message) => toastPushed(message);
 export const signIn = ({ email, password }) => async (dispatch) => {
   try {
     const { data } = await actions.login({ email, password });
+    pageCache.clear();
     setTokens(data?.tokens);
     const user = data?.user || {};
     dispatch(sessionLoaded({ user, permissions: user.permissions }));
@@ -85,6 +87,7 @@ export const signOut = () => async (dispatch, getState) => {
   const mode = getState().auth.mode;
   if (mode === 'live') await actions.logout().catch(() => {});
   clearTokens();
+  pageCache.clear();
   dispatch(signedOut());
   dispatch(toastPushed('Logged out of workspace session.'));
 };
@@ -760,13 +763,14 @@ const adaptUser = (u) => ({
 const toApiRole = (uiRole) => String(uiRole || '').trim().replace(/\s+/g, '_').toUpperCase();
 
 /** My organisation's team (live; only roles allowed to read /users get a list). */
-export const loadUsers = () => async (dispatch) => {
+export const loadUsers = ({ silent = false } = {}) => async (dispatch) => {
+  if (!silent) dispatch(usersLoading());
   try {
     const rows = await listAll(api.users);
     dispatch(usersLoaded(rows.map(adaptUser)));
   } catch (error) {
     if (error?.status === 403) dispatch(usersLoaded([]));
-    else dispatch(toastPushed(`Could not load the team: ${error.message}`));
+    else { dispatch(usersFailed()); dispatch(toastPushed(`Could not load the team: ${error.message}`)); }
   }
 };
 
@@ -789,7 +793,7 @@ const saveUserLive = (record) => async (dispatch, getState) => {
       dispatch(toastPushed(`Team member ${record.name} added. Their starting password is the first 4 letters of the name + last 5 digits of the mobile (not displayed); they must change it at first sign-in.`));
     }
     dispatch(modalClosed());
-    await dispatch(loadUsers());
+    await dispatch(loadUsers({ silent: true }));
   } catch (error) {
     dispatch(toastPushed(`Could not save the team member: ${error.message}`));
   }
@@ -822,7 +826,7 @@ export const deleteRecord = (record) => async (dispatch, getState) => {
       try {
         await api.users.remove(record.id);
         dispatch(toastPushed(`Removed user ${record.name}`));
-        await dispatch(loadUsers());
+        await dispatch(loadUsers({ silent: true }));
       } catch (error) {
         dispatch(toastPushed(`Could not remove the user: ${error.message}`));
       }

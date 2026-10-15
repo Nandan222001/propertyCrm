@@ -426,3 +426,10 @@
 .disburse-calc>*{min-width:0;overflow-wrap:anywhere}
 @media(max-width:480px){.disburse-calc{grid-template-columns:1fr 1fr}}
 @media(max-width:700px){.overview-grid,.bottom-grid,.role-dash-grid{grid-template-columns:minmax(0,1fr)!important}}
+
+/* While data is still arriving, KPI numbers read "Loading…" instead of a misleading 0 */
+@keyframes kpi-pulse{0%,100%{opacity:.45}50%{opacity:1}}
+.content.is-loading :is(.mini-stat b,.stat-value,.agent-kpis b,.strip-item b){position:relative;font-size:0!important;line-height:0;color:transparent!important;letter-spacing:0}
+.content.is-loading :is(.mini-stat b,.stat-value,.agent-kpis b,.strip-item b)>*{display:none}
+.content.is-loading :is(.mini-stat b,.stat-value,.agent-kpis b,.strip-item b)::after{content:'Loading…';display:block;font:600 13px 'DM Sans',sans-serif;line-height:1.4;color:#9aa2b0;animation:kpi-pulse 1.1s ease-in-out infinite}
+.content.is-loading .progress-track span{width:0!important}

@@ -17,16 +17,19 @@ import { Badge } from '../../components/common/Badge';
 import { Mini } from '../../components/common/StatTile';
 import { Avatar } from '../../components/common/Avatar';
 import { RoleContextBanner } from '../../components/layout/RoleContextBanner';
+import { usePageLoading } from '../../hooks';
+import { pageCache } from '../../utils/pageCache';
 
 export function Roles({ role, notify, users = [], create, edit, remove, resetPassword }) {
   const [resetting, setResetting] = useState(null);
   // The matrix is read from the server's own permission table, so it can never drift from what is enforced.
-  const [grants, setGrants] = useState(null);
+  const [grants, setGrants] = useState(() => pageCache.get('role-matrix') ?? null);
   useEffect(() => {
     let live = true;
-    actions.roleMatrix().then((r) => { if (live) setGrants(r.data?.roles || []); }).catch(() => { if (live) setGrants([]); });
+    actions.roleMatrix().then((r) => { if (live) setGrants(pageCache.set('role-matrix', r.data?.roles || [])); }).catch(() => { if (live) setGrants([]); });
     return () => { live = false; };
   }, []);
+  usePageLoading('roles', grants === null);
   const matrix = (grants || []).filter((r) => r.role !== 'SUPER_ADMIN').map((r) => {
     const has = (p) => r.permissions.includes(p);
     const level = (module, { single = false } = {}) => {

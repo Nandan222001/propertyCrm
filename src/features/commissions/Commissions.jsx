@@ -7,6 +7,8 @@ import { Table } from '../../components/common/DataTable';
 import { Badge } from '../../components/common/Badge';
 import { Mini } from '../../components/common/StatTile';
 import { RoleContextBanner } from '../../components/layout/RoleContextBanner';
+import { usePageLoading } from '../../hooks';
+import { pageCache } from '../../utils/pageCache';
 
 const STAGES = ['PROCESSING', 'APPROVED', 'PAYABLE', 'PAID'];
 
@@ -94,7 +96,7 @@ export function Commissions({ search, notify, role, bookings = [], project = 'Al
   const live = hasSession();
   const [viewing, setViewing] = useState(null);
   const [paying, setPaying] = useState(null);
-  const [rows, setRows] = useState(null);
+  const [rows, setRows] = useState(() => pageCache.get('commissions') ?? null);
   const isManager = role === 'SALES MANAGER' || role === 'ADMIN';
   const isAccounts = role === 'ACCOUNTS' || role === 'ADMIN';
 
@@ -102,7 +104,7 @@ export function Commissions({ search, notify, role, bookings = [], project = 'Al
     try {
       const response = await api.commissions.list({ page_size: 200 });
       const byId = new Map(bookings.filter((b) => typeof b[10] === 'number').map((b) => [b[10], b]));
-      setRows((response.data || []).map((c) => toRow(c, byId)));
+      setRows(pageCache.set('commissions', (response.data || []).map((c) => toRow(c, byId))));
     } catch (error) {
       notify(`Could not load commissions: ${error.message}`);
       setRows([]);
@@ -110,6 +112,7 @@ export function Commissions({ search, notify, role, bookings = [], project = 'Al
   }, [bookings, notify]);
 
   useEffect(() => { if (live) load(); }, [live, load]);
+  usePageLoading('commissions', live && rows === null);
 
   const decide = async (row, status, reference) => {
     try {

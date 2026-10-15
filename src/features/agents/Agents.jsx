@@ -11,6 +11,8 @@ import { Mini } from '../../components/common/StatTile';
 import { Avatar } from '../../components/common/Avatar';
 import { RoleContextBanner } from '../../components/layout/RoleContextBanner';
 import { limitMobile, MOBILE_INPUT } from '../../utils/phone';
+import { usePageLoading } from '../../hooks';
+import { pageCache } from '../../utils/pageCache';
 
 const SEES_RATES = ['ADMIN', 'ACCOUNTS', 'SALES MANAGER'];
 const pct = (rate) => `${Number((Number(rate) * 100).toFixed(2))}%`;
@@ -132,7 +134,7 @@ export function Agents({ search, notify, role, onView, bookings = [], project = 
   const live = hasSession();
   const canEditRate = isAdmin(role) && live;
   const showRate = live && SEES_RATES.includes(role);
-  const [rows, setRows] = useState(null);       // null while loading (live mode)
+  const [rows, setRows] = useState(() => pageCache.get('agents') ?? null);       // null until the first load (live mode)
   const [editing, setEditing] = useState(null);
   const [adding, setAdding] = useState(false);
   const [removing, setRemoving] = useState(null);
@@ -142,7 +144,7 @@ export function Agents({ search, notify, role, onView, bookings = [], project = 
     try {
       const [list, board] = await Promise.all([api.agents.list({ page_size: 200 }), actions.agentLeaderboard()]);
       const totals = new Map((board.data || []).map((r) => [r.id, r]));
-      setRows((list.data || []).map((a) => {
+      const fresh = ((list.data || []).map((a) => {
         const t = totals.get(a.id) || {};
         const rate = Number(a.commission_rate);
         return {
@@ -151,6 +153,7 @@ export function Agents({ search, notify, role, onView, bookings = [], project = 
           deals: Number(t.deals) || 0, sales: Number(t.sales) || 0, collected: Number(t.collected) || 0,
         };
       }).sort((x, y) => y.sales - x.sales));
+      setRows(pageCache.set('agents', fresh));
     } catch (error) {
       notify(`Could not load agents: ${error.message}`);
       setRows([]);
@@ -158,6 +161,7 @@ export function Agents({ search, notify, role, onView, bookings = [], project = 
   }, [notify]);
 
   useEffect(() => { if (live) load(); }, [live, load]);
+  usePageLoading('agents', live && rows === null);
 
   const saveAgent = async (agent, changes) => {
     try {

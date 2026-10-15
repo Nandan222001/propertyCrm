@@ -3,6 +3,8 @@ import { Download, Plus, ShieldCheck, RefreshCw } from 'lucide-react';
 import { api, hasSession } from '../../api';
 import { parseAmt, fmtINR } from '../../utils';
 import { compactINR } from '../../utils/dashboardStats';
+import { usePageLoading } from '../../hooks';
+import { pageCache } from '../../utils/pageCache';
 
 const money = (n) => { const c = compactINR(n); return `${c.val}${c.unit ? ` ${c.unit}` : ''}`; };
 const DAY = 86400000;
@@ -20,15 +22,18 @@ const daysOver = (row, now) => {
  */
 export function AccountsDashboard({ go, D, notify, pays = [], receipts = [] }) {
   const live = hasSession();
-  const [commissions, setCommissions] = useState([]);
+  const [commissions, setCommissions] = useState(() => pageCache.get('accounts-dash') ?? []);
+  const [loaded, setLoaded] = useState(!live || pageCache.has('accounts-dash'));
+  usePageLoading('accounts-dash', !loaded);
   const now = new Date();
 
   const load = useCallback(async () => {
     if (!live) return;
     try {
       const response = await api.commissions.list({ page_size: 200 });
-      setCommissions(response.data || []);
+      setCommissions(pageCache.set('accounts-dash', response.data || []));
     } catch { setCommissions([]); }
+    setLoaded(true);
   }, [live]);
   useEffect(() => { load(); }, [load, pays.length]);
 
