@@ -144,12 +144,14 @@ export function Projects({ plots, search, project, filter, F, tab, TB, notify, p
 
         {view === 'Projects' ? (
           <Table
+            label="projects"
             headers={['PROJECT NAME', 'LOCATION & PHASE', 'TOTAL PLOTS', 'BOOKED', 'HOLD', 'EST. REVENUE', 'STATUS', 'ACTIONS']}
             empty="No projects yet"
             rows={projectRows}
           />
         ) : (
           <Table
+            label="plots"
             headers={['PLOT NO.', 'PROJECT', 'LAYOUT', 'AREA (SQ.FT)', 'FACING', 'PRICE', 'STATUS', 'CUSTOMER', 'AGENT', 'ACTIONS']}
             empty="No plots yet — the admin adds them with Add Plots"
             rows={plotRows}

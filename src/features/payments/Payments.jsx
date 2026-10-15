@@ -66,6 +66,7 @@ export function Payments({ pays, receipts, project, search, filter, F, D, notify
               ))}
             </div>
             <Table
+              label="ledgers"
               headers={['CUSTOMER', 'PROJECT & PLOT', 'FINAL PRICE', 'PAID TO DATE', 'PENDING BALANCE', 'NEXT DUE DATE', 'STATUS', customerView ? 'AGENT' : 'ACTIONS']}
               rows={list.map(p => [
                 <b>{p[0]}</b>,
@@ -100,13 +101,14 @@ export function Payments({ pays, receipts, project, search, filter, F, D, notify
                 )
               ])}
             />
-            <div className="table-pagination">Showing {list.length} ledgers <span>Balance updates automatically when a payment is recorded · use Record Payment to mark as paid</span></div>
+            <div className="table-pagination"><span>Balance updates automatically when a payment is recorded · use Record Payment to mark as paid</span></div>
           </>
         )}
 
         {view === 'bills' && (
           <>
             <Table
+              label="receipts"
               headers={['RECEIPT NO.', 'DATE', 'CUSTOMER', 'PLOT', 'AMOUNT', 'MODE', 'SHARED', 'ACTIONS']}
               rows={bills.map(r => [
                 <b>{r.no}</b>,

@@ -148,6 +148,7 @@ export function Commissions({ search, notify, role, bookings = [], project = 'Al
       <div className="panel section-panel">
         {live && rows === null ? <p className="empty-note">Loading commissions…</p> : (
           <Table
+            label="commissions"
             headers={['AGENT', 'PROJECT', 'PLOT', 'DEAL VALUE', 'COMM. SLAB', 'AMOUNT (₹)', 'STATUS', 'ACTIONS']}
             empty="No commissions yet"
             rows={data.filter(a => a.join(' ').toLowerCase().includes(search.toLowerCase())).map(a => [

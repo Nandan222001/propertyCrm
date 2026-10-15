@@ -158,6 +158,7 @@ export function Billing({
         </div>
 
         <Table
+          label="invoices"
           headers={['INVOICE', 'CUSTOMER', 'PROJECT · PLOT', 'ISSUED / DUE', 'TOTAL', 'PAID', 'BALANCE', 'STATUS', 'ACTIONS']}
           rows={list.map((inv) => [
             <div key={`${inv.invoice_number}-no`}>
@@ -192,7 +193,6 @@ export function Billing({
           </div>
         )}
         <div className="table-pagination">
-          Showing {list.length} of {invoices.length} invoices
           <span>Every collection against a bill flows into the payments ledger and issues a numbered receipt</span>
         </div>
       </div>

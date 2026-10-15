@@ -68,6 +68,7 @@ export function Roles({ role, notify, users = [], create, edit, remove, resetPas
         </div>
 
         <Table
+          label="users"
           headers={['USER', 'EMAIL', 'MOBILE', 'ROLE', 'STATUS', 'ACTIONS']}
           rows={users.map((u, i) => [
             <div className="customer-cell" key={u.id}><Avatar name={u.name} i={i} /><b>{u.name}</b></div>,
@@ -113,6 +114,7 @@ export function Roles({ role, notify, users = [], create, edit, remove, resetPas
 
         {grants === null && <p className="empty-note">Loading permissions…</p>}
         <Table
+          paginate={false}
           headers={['ROLE', 'ALL PLOTS', 'BOOKINGS', 'PAYMENTS', 'CUSTOMERS', 'COMMISSIONS', 'REPORTS', 'DOCS', 'ADMIN']}
           rows={matrix.map(row => row.map((x, i) => i === 0 ? <b>{x}</b> : (
             <span className={x === '✓' ? 'access-yes' : x === '●' ? 'access-partial' : 'access-no'}>{x}</span>

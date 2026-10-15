@@ -168,6 +168,7 @@ export function TenantsPage({
         {loading && <p className="empty-note">Loading organisations…</p>}
 
         <Table
+          paginate={false}
           headers={['ORGANISATION', 'ADMINISTRATOR', 'PLAN', 'SEATS', 'PROJECTS', 'BOOKINGS', 'STATUS', 'CREATED', 'ACTIONS']}
           rows={paged.rows.map((t) => [
             <div key={`${t.id}-n`}><b>{t.name}</b><div className="cell-sub">/{t.slug}</div></div>,

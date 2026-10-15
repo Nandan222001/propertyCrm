@@ -229,6 +229,7 @@ export function Agents({ search, notify, role, onView, bookings = [], project = 
         )}
         {live && rows === null ? <p className="empty-note">Loading agents…</p> : (
           <Table
+            label="agents"
             headers={headers}
             empty="No agents yet"
             rows={shown.map((r, i) => [

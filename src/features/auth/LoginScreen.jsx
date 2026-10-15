@@ -72,7 +72,6 @@ export function LoginScreen({ onLogin, notice: initialNotice = '' }) {
               <small>{(brand.tagline || '').toUpperCase()}</small>
             </div>
           </div>
-          <div className="auth-mode-tabs"><span className="mode-tab active">Sign In to Workspace</span></div>
 
           {error && (
             <div className="login-error-banner">

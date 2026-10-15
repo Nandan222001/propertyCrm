@@ -63,6 +63,7 @@ export function CustomersPage({ customers, bookings, role, search, project, onOp
           )}
         </div>
         <Table
+          label="customers"
           headers={['CUSTOMER', 'MOBILE', 'PLOTS', 'AGENT', 'STATUS', 'ACTIONS']}
           empty="No customers yet"
           rows={rows.map(c => [

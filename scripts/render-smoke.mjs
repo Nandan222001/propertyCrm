@@ -70,7 +70,7 @@ try {
   const fresh = createStore();
   const html = render(fresh);
   if (fresh.getState().auth.session !== '') failures.push(`pristine store must be signed out, got session "${fresh.getState().auth.session}"`);
-  if (!/Sign In to/i.test(html) || /Workspace \//.test(html)) failures.push('pristine browser must show the login screen, not a workspace');
+  if (!/Work Email Address/i.test(html) || /Workspace \//.test(html)) failures.push('pristine browser must show the login screen, not a workspace');
   console.log('  ✓ signed-out login screen');
 } catch (error) {
   failures.push(`signed-out render threw: ${error.message}`);

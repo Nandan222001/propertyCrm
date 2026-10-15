@@ -59,6 +59,7 @@ export function Bookings({ bookings, project, search, tab, TB, role, onNew, onOp
         </div>
 
         <Table
+          label="bookings"
           headers={['BOOKING ID', 'CUSTOMER', 'PROJECT & PLOT', 'DATE', 'VALUE', 'PAID', 'STATUS', 'AGENT', 'ACTIONS']}
           rows={rows.map(b => [
             <b>{b[0]}</b>,
@@ -99,9 +100,7 @@ export function Bookings({ bookings, project, search, tab, TB, role, onNew, onOp
             </div>
           ])}
         />
-        <div className="table-pagination">
-          Showing {rows.length} bookings <span>{role === 'SALES AGENT' ? 'Your bookings only' : 'Role-filtered view'}</span>
-        </div>
+        <div className="table-pagination"><span>{role === 'SALES AGENT' ? 'Your bookings only' : 'Role-filtered view'}</span></div>
       </div>
       {scheduleFor && <PaymentScheduleModal booking={scheduleFor} close={() => setScheduleFor(null)} />}
       {editing && <EditBookingModal booking={editing} canPrice={canApprove(role)} close={() => setEditing(null)} save={onEdit} />}
