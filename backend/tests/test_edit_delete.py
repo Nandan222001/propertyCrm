@@ -17,7 +17,7 @@ def _new_customer(client, headers, email, phone, name="Edit Probe"):
 
 def delete_booking(client, booking_id, headers, password="Demo@12345") -> int:
     """Deleting a booking needs the signed-in user's own password in the body."""
-    return client.request("DELETE", f"/api/v1/bookings/{booking_id}", headers=headers, json={"password": password}).status_code
+    return client.post(f"/api/v1/bookings/{booking_id}/delete", headers=headers, json={"password": password}).status_code
 
 
 def test_agent_edits_and_removes_own_pending_customer_only(client, agent_headers, admin_headers, unique_email, unique_phone):

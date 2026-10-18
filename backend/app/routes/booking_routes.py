@@ -83,7 +83,13 @@ def set_registry_stage(booking_id: int, payload: RegistryStageUpdate, service: c
     return controller.set_registry_stage(booking_id, payload, service)
 
 
-@router.delete("/{booking_id}", summary="Soft-delete a booking")
+@router.post("/{booking_id}/delete", summary="Soft-delete a booking (POST: proxies often strip a DELETE body)")
 def delete_booking(booking_id: int, payload: BookingDeleteRequest, service: controller.BookingServiceDep,
                    _: DELETE = None):
+    return controller.delete_booking(booking_id, payload, service)
+
+
+@router.delete("/{booking_id}", summary="Soft-delete a booking")
+def delete_booking_legacy(booking_id: int, payload: BookingDeleteRequest, service: controller.BookingServiceDep,
+                          _: DELETE = None):
     return controller.delete_booking(booking_id, payload, service)
