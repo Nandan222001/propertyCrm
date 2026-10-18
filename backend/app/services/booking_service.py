@@ -299,7 +299,7 @@ class BookingService(BaseService[Booking]):
                     summary="Booking updated")
         return booking
 
-    def delete_booking(self, booking_id: int, password: str) -> Booking:
+    def delete_booking(self, booking_id: int, password: str, delete_payments: bool = False) -> Booking:
         """Remove a booking that never turned into money; otherwise it must be cancelled, not erased.
 
         Admin only, and only after the admin re-enters their own password."""
@@ -322,14 +322,32 @@ class BookingService(BaseService[Booking]):
             Payment.booking_id == booking.id, Payment.is_deleted.is_(False))).scalar_one()
         bills = self.db.execute(select(func.count(Invoice.id)).where(
             Invoice.booking_id == booking.id, Invoice.is_deleted.is_(False))).scalar_one()
+        if (money or bills) and not delete_payments:
+            raise BusinessRuleError(
+                "This booking has payments or invoices — cancel it instead, or delete them along with the booking",
+                code="booking_has_payments", details={"payments": money, "invoices": bills})
         if money or bills:
-            raise BusinessRuleError("This booking has payments or invoices — cancel it instead of deleting it")
+            self._delete_money_records(booking)
         if booking.status in (BookingStatus.PENDING_APPROVAL.value, BookingStatus.CONFIRMED.value):
             self._transition_plot(self.plots.get_or_404(booking.plot_id), BookingStatus.CANCELLED.value,
                                   customer_id=None, agent_id=booking.agent_id)
         self.bookings.delete(booking, actor=self.actor.name)
         self._audit("crud.delete", booking, before={"status": booking.status}, summary="Booking deleted")
         return booking
+
+    def _delete_money_records(self, booking: Booking) -> None:
+        """Admin chose to erase the booking's payments, invoices and commission along with it (soft-delete)."""
+        from sqlalchemy import select
+
+        from app.models.billing import Invoice
+        from app.models.payment import Commission, Payment
+
+        for model in (Payment, Invoice, Commission):
+            for row in self.db.execute(select(model).where(
+                    model.booking_id == booking.id, model.is_deleted.is_(False))).scalars().all():
+                row.soft_delete(self.actor.name)
+        booking.paid_amount = Decimal("0.00")
+        self.db.flush()
 
     # ------------------------------------------------------------- workflow
     def approve(self, booking_id: int, payload: BookingDecision) -> Booking:

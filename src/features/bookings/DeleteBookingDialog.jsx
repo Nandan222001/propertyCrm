@@ -30,11 +30,14 @@ export function DeleteBookingDialog({ booking, onDelete, onCancel }) {
       setBusy(false);
     }
   };
-  const confirm = async () => {
+  const [withMoney, setWithMoney] = useState(false);
+  const confirm = async (deletePayments = false) => {
     setBusy(true);
-    const problem = await onDelete(booking, password);
+    const problem = await onDelete(booking, password, deletePayments);
     setBusy(false);
     if (!problem) return onCancel();
+    // The booking has payments / invoices: offer to delete those together with it.
+    if (/delete them along with the booking/.test(problem)) { setWithMoney(true); setStep('confirm'); return; }
     setError(problem);
     setPassword('');
     setStep('password');
@@ -65,21 +68,29 @@ export function DeleteBookingDialog({ booking, onDelete, onCancel }) {
   }
   return (
     <ModalShell
-      title="Are you sure?"
+      title={withMoney ? 'Delete payments too?' : 'Are you sure?'}
       onClose={onCancel}
       footer={(
         <>
           <button type="button" className="button button-white" disabled={busy} onClick={onCancel}>No, keep it</button>
-          <button type="button" className="button button-primary danger-btn" disabled={busy} onClick={confirm}>
-            {busy ? 'Deleting…' : 'Yes, delete'}
+          <button type="button" className="button button-primary danger-btn" disabled={busy} onClick={() => confirm(withMoney)}>
+            {busy ? 'Deleting…' : (withMoney ? 'Yes, delete all' : 'Yes, delete')}
           </button>
         </>
       )}
     >
+      {withMoney ? (
+        <p className="confirm-text">
+          Booking {booking[0]} ({booking[1]}, plot {booking[3]}) has payments or invoices. Delete the booking
+          <strong> together with all its payments, invoices and commission</strong>? The collected totals will drop
+          by that amount and this cannot be undone from the screen. To keep the records, choose No and cancel the booking instead.
+        </p>
+      ) : (
       <p className="confirm-text">
         Delete booking {booking[0]} ({booking[1]}, plot {booking[3]})? The plot becomes available again.
-        Bookings with payments or invoices cannot be deleted — cancel those instead.
+        If it has payments or invoices you will be asked whether to delete those too.
       </p>
+      )}
     </ModalShell>
   );
 }

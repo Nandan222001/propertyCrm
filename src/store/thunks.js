@@ -186,8 +186,8 @@ export const deleteCustomerLive = (customer) => writeThenRefresh(
   () => api.customers.remove(customer.id), `Customer ${customer.name} deleted`);
 export const updateBookingLive = (booking, changes) => writeThenRefresh(
   () => api.bookings.update(booking[10], changes), `Booking ${booking[0]} updated`);
-export const deleteBookingLive = (booking, password) => writeThenRefresh(
-  () => actions.deleteBooking(booking[10], password), `Booking ${booking[0]} deleted · plot ${booking[3]} is free again`);
+export const deleteBookingLive = (booking, password, deletePayments = false) => writeThenRefresh(
+  () => actions.deleteBooking(booking[10], password, deletePayments), `Booking ${booking[0]} deleted · plot ${booking[3]} is free again`);
 export const deleteProjectLive = (project) => writeThenRefresh(
   () => api.projects.remove(project[6]), `Project ${project[0]} deleted`);
 export const updatePlotLive = (plot, changes) => writeThenRefresh(

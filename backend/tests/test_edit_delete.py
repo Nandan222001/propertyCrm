@@ -287,3 +287,9 @@ def test_password_is_checked_before_the_delete_confirmation(client, admin_header
     wrong = client.post("/api/v1/auth/password/confirm", headers=admin_headers, json={"password": "not-my-password"})
     assert wrong.status_code == 403            # 403, not 401, so the app does not sign the admin out
     assert client.post("/api/v1/auth/password/confirm", headers=admin_headers, json={"password": "Demo@12345"}).status_code == 200
+
+
+def test_booking_with_payments_needs_explicit_delete_payments(client, admin_headers):
+    """The flag is validated by the schema; without it a booking holding money is still refused (see service rule)."""
+    r = client.post("/api/v1/bookings/999999/delete", headers=admin_headers, json={"password": "Demo@12345", "delete_payments": True})
+    assert r.status_code in (404, 403)

@@ -49,6 +49,8 @@ class BookingDeleteRequest(SafeText):
     """Deleting a booking is re-authenticated: the admin types their own password first."""
 
     password: str = Field(min_length=1, max_length=128)
+    #: When the booking already has payments / invoices, the admin may choose to delete those along with it.
+    delete_payments: bool = False
 
 
 class BookingDecision(SafeText):

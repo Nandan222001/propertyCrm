@@ -74,7 +74,7 @@ def change_status(booking_id: int, payload: BookingStatusUpdate, service: Bookin
 
 
 def delete_booking(booking_id: int, payload: BookingDeleteRequest, service: BookingServiceDep) -> dict:
-    service.delete_booking(booking_id, payload.password)
+    service.delete_booking(booking_id, payload.password, delete_payments=payload.delete_payments)
     return success(None, "Booking deleted")
 
 
