@@ -335,3 +335,18 @@ def test_soft_delete_fits_a_long_actor_name_into_the_32_char_column():
     row = Booking()
     row.soft_delete("A very long administrator display name that exceeds thirty-two characters")
     assert row.is_deleted and len(row.deleted_by) == 32
+
+
+def test_agent_leaderboard_ignores_deleted_bookings(client, agent_headers, admin_headers, agent_approved_customer, available_plot):
+    """The Agents table used to count deleted/rejected bookings, so a profile showed 0 while the row showed deals."""
+    def deals():
+        rows = client.get("/api/v1/agents/leaderboard", headers=admin_headers).json()["data"]
+        return sum(int(r["deals"]) for r in rows)
+
+    booking = client.post("/api/v1/bookings", headers=agent_headers, json={
+        "customer_id": agent_approved_customer["id"], "plot_id": available_plot["id"],
+        "final_price": available_plot["price"]}).json()["data"]
+    assert client.post(f"/api/v1/bookings/{booking['id']}/approve", headers=admin_headers, json={}).status_code == 200
+    with_booking = deals()
+    assert delete_booking(client, booking["id"], admin_headers) == 200
+    assert deals() == with_booking - 1

@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import date
 from decimal import Decimal
 
-from sqlalchemy import func, select
+from sqlalchemy import and_, func, select
 
 from app.core.constants import PaymentStatus
 from app.models.payment import Agent, Commission, Payment, Receipt
@@ -37,7 +37,12 @@ class AgentRepository(BaseRepository[Agent]):
                 func.coalesce(func.sum(Booking.final_price), 0).label("sales"),
                 func.coalesce(func.sum(Booking.paid_amount), 0).label("collected"),
             )
-            .join(Booking, Booking.agent_id == Agent.id, isouter=True)
+            # Only deals that still count: a deleted, rejected, cancelled or still-pending booking is not a sale.
+            .join(Booking, and_(
+                Booking.agent_id == Agent.id,
+                Booking.is_deleted.is_(False),
+                Booking.status.in_(("CONFIRMED", "AGREEMENT", "REGISTERED")),
+            ), isouter=True)
             .where(Agent.is_deleted == 0)
             .group_by(Agent.id, Agent.code, Agent.name)
             .order_by(func.coalesce(func.sum(Booking.final_price), 0).desc())
