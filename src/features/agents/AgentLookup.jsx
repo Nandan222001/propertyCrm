@@ -5,7 +5,8 @@ import { api, hasSession } from '../../api';
 import { parseAmt, fmtINR, openWhatsApp } from '../../utils';
 
 export function agentStats(name, bookings, customers, receipts, rate = 0.02) {
-  const mine = bookings.filter(b => b[8] === name);
+  const same = (a, b) => String(a || '').trim().toLowerCase() === String(b || '').trim().toLowerCase();
+  const mine = bookings.filter(b => same(b[8], name));
   const live = mine.filter(b => b[7] !== 'Pending Approval' && b[7] !== 'Rejected');
   const sales = live.reduce((s, b) => s + parseAmt(b[5]), 0);
   const collected = live.reduce((s, b) => s + parseAmt(b[6]), 0);
@@ -68,6 +69,16 @@ export function AgentLookup({ onPick }) {
 export function AgentInfoModal({ agent, bookings, customers, receipts, close }) {
   const rate = typeof agent[8] === 'number' ? agent[8] : 0.02;
   const s = agentStats(agent[0], bookings, customers, receipts, rate);
+  // The agents table already holds the server's own totals for this agent: show exactly those, so the
+  // profile can never disagree with the row that was clicked.
+  const totals = agent[9];
+  if (totals) {
+    s.deals = totals.deals;
+    s.sales = totals.sales;
+    s.collected = totals.collected;
+    s.outstanding = totals.sales - totals.collected;
+    s.commission = totals.commission;
+  }
   const tiles = [
     ['Deals closed', s.deals], ['Sales value', `₹${fmtINR(s.sales)}`], ['Collected', `₹${fmtINR(s.collected)}`],
     ['Outstanding', `₹${fmtINR(s.outstanding)}`], [`Commission (${Number((rate * 100).toFixed(2))}%)`, `₹${fmtINR(s.commission)}`], ['Awaiting approval', s.pending]

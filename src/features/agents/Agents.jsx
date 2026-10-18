@@ -245,7 +245,7 @@ export function Agents({ search, notify, role, onView, bookings = [], project = 
               <div className="table-actions-cell" key={r.code}>
                 <button
                   className="icon-action" title="View agent profile"
-                  onClick={() => onView && onView([r.name, r.code, r.deals, live ? fmtINR(r.sales) : r.sales, live ? fmtINR(r.collected) : r.collected, live ? fmtINR(r.commission) : r.commission])}
+                  onClick={() => onView && onView([r.name, r.code, r.deals, live ? fmtINR(r.sales) : r.sales, live ? fmtINR(r.collected) : r.collected, live ? fmtINR(r.commission) : r.commission, '', r.phone || '—', Number(r.rate), live ? { deals: r.deals, sales: r.sales, collected: r.collected, commission: r.commission } : null])}
                 >
                   <Eye size={14} />
                 </button>
