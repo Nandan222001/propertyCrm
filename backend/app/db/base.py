@@ -197,4 +197,4 @@ class SoftDeleteMixin:
     def soft_delete(self, actor: str | None = None) -> None:
         self.is_deleted = True
         self.deleted_at = utcnow()
-        self.deleted_by = actor
+        self.deleted_by = actor[:32] if actor else actor   # column is String(32): MySQL rejects longer names

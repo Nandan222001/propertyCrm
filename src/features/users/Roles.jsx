@@ -22,6 +22,7 @@ import { pageCache } from '../../utils/pageCache';
 
 export function Roles({ role, notify, users = [], create, edit, remove, resetPassword }) {
   const [resetting, setResetting] = useState(null);
+  const [roleFilter, setRoleFilter] = useState('ALL');
   // The matrix is read from the server's own permission table, so it can never drift from what is enforced.
   const [grants, setGrants] = useState(() => pageCache.get('role-matrix') ?? null);
   useEffect(() => {
@@ -42,6 +43,8 @@ export function Roles({ role, notify, users = [], create, edit, remove, resetPas
       has('user:manage') ? '✓' : '—',
     ];
   });
+  const rolesInUse = useMemo(() => [...new Set(users.map((u) => u.role))].filter(Boolean).sort(), [users]);
+  const shownUsers = roleFilter === 'ALL' ? users : users.filter((u) => u.role === roleFilter);
   const inactive = users.filter((u) => !['Active', 'Invited'].includes(u.status)).length;
 
   return (
@@ -62,15 +65,23 @@ export function Roles({ role, notify, users = [], create, edit, remove, resetPas
             <h2>Workspace Team Accounts</h2>
             <p>Manage credentials, role assignments, and active account statuses.</p>
           </div>
-          <button className="button button-primary small-button" onClick={create}>
-            <Plus size={14} /> Add Team Member
-          </button>
+          <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+            <select className="select-mini" aria-label="Filter by role" value={roleFilter} onChange={(e) => setRoleFilter(e.target.value)}>
+              <option value="ALL">All roles ({users.length})</option>
+              {rolesInUse.map((r) => (
+                <option key={r} value={r}>{r} ({users.filter((u) => u.role === r).length})</option>
+              ))}
+            </select>
+            <button className="button button-primary small-button" onClick={create}>
+              <Plus size={14} /> Add Team Member
+            </button>
+          </div>
         </div>
 
         <Table
           label="users"
           headers={['USER', 'EMAIL', 'MOBILE', 'ROLE', 'STATUS', 'ACTIONS']}
-          rows={users.map((u, i) => [
+          rows={shownUsers.map((u, i) => [
             <div className="customer-cell" key={u.id}><Avatar name={u.name} i={i} /><b>{u.name}</b></div>,
             u.email,
             u.phone,

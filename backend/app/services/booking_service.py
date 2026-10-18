@@ -316,8 +316,6 @@ class BookingService(BaseService[Booking]):
         if user is None or not verify_password(password, user.password_hash):
             raise PermissionDeniedError("Your password is not correct — the booking was not deleted")
         booking = self.get(booking_id, scope_clause=self.scope_clause())
-        if booking.status in (BookingStatus.AGREEMENT.value, BookingStatus.REGISTERED.value):
-            raise BusinessRuleError("A booking at agreement or registration stage cannot be deleted")
         money = self.db.execute(select(func.count(Payment.id)).where(
             Payment.booking_id == booking.id, Payment.is_deleted.is_(False))).scalar_one()
         bills = self.db.execute(select(func.count(Invoice.id)).where(
@@ -328,7 +326,8 @@ class BookingService(BaseService[Booking]):
                 code="booking_has_payments", details={"payments": money, "invoices": bills})
         if money or bills:
             self._delete_money_records(booking)
-        if booking.status in (BookingStatus.PENDING_APPROVAL.value, BookingStatus.CONFIRMED.value):
+        if booking.status in (BookingStatus.PENDING_APPROVAL.value, BookingStatus.CONFIRMED.value,
+                              BookingStatus.AGREEMENT.value, BookingStatus.REGISTERED.value):
             self._transition_plot(self.plots.get_or_404(booking.plot_id), BookingStatus.CANCELLED.value,
                                   customer_id=None, agent_id=booking.agent_id)
         self.bookings.delete(booking, actor=self.actor.name)

@@ -289,7 +289,49 @@ def test_password_is_checked_before_the_delete_confirmation(client, admin_header
     assert client.post("/api/v1/auth/password/confirm", headers=admin_headers, json={"password": "Demo@12345"}).status_code == 200
 
 
-def test_booking_with_payments_needs_explicit_delete_payments(client, admin_headers):
-    """The flag is validated by the schema; without it a booking holding money is still refused (see service rule)."""
-    r = client.post("/api/v1/bookings/999999/delete", headers=admin_headers, json={"password": "Demo@12345", "delete_payments": True})
-    assert r.status_code in (404, 403)
+def test_booking_with_payments_is_refused_until_admin_chooses_to_delete_them_too(
+        client, agent_headers, admin_headers, agent_approved_customer, available_plot):
+    booking = client.post("/api/v1/bookings", headers=agent_headers, json={
+        "customer_id": agent_approved_customer["id"], "plot_id": available_plot["id"],
+        "final_price": available_plot["price"]}).json()["data"]
+    assert client.post(f"/api/v1/bookings/{booking['id']}/approve", headers=admin_headers, json={}).status_code == 200
+    paid = client.post("/api/v1/payments", headers=admin_headers, json={"booking_id": booking["id"], "amount": "1000"})
+    assert paid.status_code in (200, 201), paid.text
+
+    url = f"/api/v1/bookings/{booking['id']}/delete"
+    refused = client.post(url, headers=admin_headers, json={"password": "Demo@12345"})
+    assert refused.status_code == 409 and "delete them along with the booking" in refused.text
+
+    ok = client.post(url, headers=admin_headers, json={"password": "Demo@12345", "delete_payments": True})
+    assert ok.status_code == 200, ok.text
+    assert client.get(f"/api/v1/bookings/{booking['id']}", headers=admin_headers).status_code == 404
+    plots = client.get(f"/api/v1/plots?search={available_plot['plot_number']}", headers=admin_headers).json()["data"]
+    assert next(p for p in plots if p["id"] == available_plot["id"])["status"] == "AVAILABLE"
+
+
+def test_admin_can_delete_a_booking_at_agreement_and_registered_stage(
+        client, agent_headers, admin_headers, agent_approved_customer, available_plot):
+    def fresh():
+        b = client.post("/api/v1/bookings", headers=agent_headers, json={
+            "customer_id": agent_approved_customer["id"], "plot_id": available_plot["id"],
+            "final_price": available_plot["price"]}).json()["data"]
+        assert client.post(f"/api/v1/bookings/{b['id']}/approve", headers=admin_headers, json={}).status_code == 200
+        return b
+
+    def plot_status():
+        plots = client.get(f"/api/v1/plots?search={available_plot['plot_number']}", headers=admin_headers).json()["data"]
+        return next(p for p in plots if p["id"] == available_plot["id"])["status"]
+
+    for stage in ("AGREEMENT_SIGNED", "REGISTERED"):
+        b = fresh()
+        assert client.post(f"/api/v1/bookings/{b['id']}/registry", headers=admin_headers, json={"stage": stage}).status_code == 200
+        assert delete_booking(client, b["id"], admin_headers) == 200
+        assert plot_status() == "AVAILABLE"
+
+
+def test_soft_delete_fits_a_long_actor_name_into_the_32_char_column():
+    """MySQL (strict mode) rejects a name longer than deleted_by's String(32); SQLite never noticed."""
+    from app.models.booking import Booking
+    row = Booking()
+    row.soft_delete("A very long administrator display name that exceeds thirty-two characters")
+    assert row.is_deleted and len(row.deleted_by) == 32
