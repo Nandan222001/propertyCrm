@@ -100,7 +100,7 @@ def validate_terms(terms: PlanTerms) -> None:
 def build_quote(terms: PlanTerms, price, booking_date: date, *, total_override=None) -> dict:
     """The breakdown and schedule for one booking. ``price`` includes premiums.
 
-    ``total_override`` (an admin's negotiated total) scales every amount proportionally."""
+    ``total_override`` (an admin's negotiated total) adjusts only the balance / EMI amounts (never the upfront ones)."""
     validate_terms(terms)
     price = money(price)
     upfront_in_price = terms.enrollment_fee + terms.allotment_amount
@@ -149,9 +149,19 @@ def build_quote(terms: PlanTerms, price, booking_date: date, *, total_override=N
     total = sum((line["amount"] for line in lines), Decimal("0"))
 
     if total_override is not None and money(total_override) != total:
-        factor = money(total_override) / total
+        # A negotiated total only changes what is still to be paid: the fees and allotment due at booking stay as
+        # they are and the difference is spread over the balance / EMI lines.
+        fixed = sum((line["amount"] for line in lines if line["kind"] == "UPFRONT"), Decimal("0"))
+        rest = sum((line["amount"] for line in lines if line["kind"] != "UPFRONT"), Decimal("0"))
+        new_rest = money(total_override) - fixed
+        if new_rest <= 0 or rest <= 0:
+            raise BusinessRuleError(
+                f"The agreed total must be more than the amount due at booking (₹{fixed:,.2f}); "
+                "the discount applies to the remaining payment only")
+        factor = new_rest / rest
         for line in lines:
-            line["amount"] = money(line["amount"] * factor)
+            if line["kind"] != "UPFRONT":
+                line["amount"] = money(line["amount"] * factor)
         drift = money(total_override) - sum((line["amount"] for line in lines), Decimal("0"))
         lines[-1]["amount"] = money(lines[-1]["amount"] + drift)
         total = money(total_override)

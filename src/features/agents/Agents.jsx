@@ -30,7 +30,7 @@ function EditAgentModal({ agent, close, save }) {
     e.preventDefault();
     const rate = Number(form.rate);
     if (form.name.trim().length < 2) return setError('Enter the agent\'s full name.');
-    if (!/^[A-Za-z0-9-]{2,16}$/.test(form.code.trim())) return setError('Code: 2-16 letters, digits or dashes (e.g. AG-031).');
+    if (!/^[A-Za-z0-9-]{2,16}$/.test(form.code.trim())) return setError('Code: 2-16 letters, digits or dashes (e.g. LRI01).');
     if (form.phone && !isValidMobile(form.phone)) return setError(MOBILE_HINT);
     if (!Number.isFinite(rate) || rate <= 0 || rate > 25) return setError('Commission rate must be between 0.1% and 25%.');
     setBusy(true);
@@ -87,7 +87,7 @@ function AddAgentModal({ suggestedCode, close, save }) {
     e.preventDefault();
     const rate = Number(form.rate);
     if (form.name.trim().length < 2) return setError('Enter the agent\'s full name.');
-    if (!/^[A-Za-z0-9-]{2,16}$/.test(form.code.trim())) return setError('Code: 2-16 letters, digits or dashes (e.g. AG-031).');
+    if (!/^[A-Za-z0-9-]{2,16}$/.test(form.code.trim())) return setError('Code: 2-16 letters, digits or dashes (e.g. LRI01).');
     if (form.name.replace(/[^A-Za-z]/g, '').length < 4) return setError('Enter a name with at least 4 letters.');
     if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(form.email.trim())) return setError('Enter the agent\'s e-mail — it is their sign-in.');
     if (!isValidMobile(form.phone)) return setError(MOBILE_HINT);
@@ -189,7 +189,7 @@ export function Agents({ search, notify, role, onView, bookings = [], project = 
   };
   const nextCode = () => {
     const nums = (rows || []).map((r) => Number(String(r.code).replace(/\D/g, '')) || 0);
-    return `AG-${String(Math.max(0, ...nums) + 1).padStart(3, '0')}`;
+    return `LRI${String(Math.max(0, ...nums) + 1).padStart(2, '0')}`;
   };
 
   // Offline preview keeps the sample table; a live tenant only ever sees its own agents.
