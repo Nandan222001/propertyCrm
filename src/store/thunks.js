@@ -162,7 +162,9 @@ export const saveProject = (form, editing = null) => async (dispatch, getState) 
       : await api.projects.create(projectApiPayload(form));
     if (response?.data) dispatch(projectSaved({ previousName: row[0], row: projectFromApi(response.data) }));
   } catch (error) {
-    dispatch(toastPushed(`Saved locally — sync failed: ${error.message}`));
+    // The server refused it: drop the optimistic row so a retry does not show a duplicate.
+    await dispatch(hydrateWorkspace({ silent: true }));
+    dispatch(toastPushed(`Project not saved: ${error.message}`));
   }
 };
 

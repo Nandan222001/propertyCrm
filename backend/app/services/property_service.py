@@ -76,6 +76,7 @@ class ProjectService(BaseService[Project]):
         self._authorise("create")
         if self.projects.exists(name=payload.name):
             raise ConflictError(f"Project '{payload.name}' already exists")
+        self.projects.release_deleted(self.actor.tenant_id, payload.name)
         project = Project(**payload.model_dump())
         self.projects.create(project)
         self._audit(AuditAction.CREATE, project, summary=f"Project {project.name} created")
@@ -174,6 +175,7 @@ class PlotService(BaseService[Plot]):
         self._authorise("create")
         if self.plots.find_by_number(payload.plot_number, payload.project_id):
             raise ConflictError(f"Plot {payload.plot_number} already exists in this project")
+        self.plots.release_deleted(payload.project_id, [payload.plot_number])
         values = payload.model_dump(exclude={"agent_code"})
         values["status"] = (
             payload.status.value if isinstance(payload.status, PlotStatus) else str(payload.status)
@@ -199,6 +201,7 @@ class PlotService(BaseService[Plot]):
         if clashes:
             shown = ", ".join(clashes[:5]) + (" …" if len(clashes) > 5 else "")
             raise ConflictError(f"{len(clashes)} of these plot numbers already exist in {project.name}: {shown}")
+        self.plots.release_deleted(payload.project_id, numbers)
         created: list[Plot] = []
         for number in numbers:
             plot = Plot(

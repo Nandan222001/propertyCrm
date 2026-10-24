@@ -9,6 +9,12 @@ from app.models.property import Document, Plot, Project
 from app.repositories.base_repository import BaseRepository
 
 
+def _tombstone(value: str, row_id: int, width: int) -> str:
+    """`value` made unique for a deleted row, within the column width."""
+    suffix = f"~del{row_id}"
+    return value[: width - len(suffix)] + suffix
+
+
 class ProjectRepository(BaseRepository[Project]):
     model = Project
     searchable = ("name", "city", "location", "phase", "rera_number")
@@ -20,6 +26,20 @@ class ProjectRepository(BaseRepository[Project]):
         "estimated_revenue": Project.estimated_revenue,
     }
     default_sort = "name"
+
+    def delete(self, entity: Project, *, actor: str | None = None, hard: bool = False) -> None:
+        if not hard:
+            entity.name = _tombstone(entity.name, entity.id, 120)   # frees the name for a new project
+        super().delete(entity, actor=actor, hard=hard)
+
+    def release_deleted(self, tenant_id: int | None, name: str) -> None:
+        """Rename soft-deleted projects still holding `name` (unique per tenant) so it can be reused."""
+        stmt = select(Project).where(Project.is_deleted.is_(True), Project.name == name)
+        if tenant_id is not None:
+            stmt = stmt.where(Project.tenant_id == tenant_id)
+        for old in self.db.execute(stmt).scalars():
+            old.name = _tombstone(old.name, old.id, 120)
+        self.db.flush()
 
     def with_plot_counts(self) -> list[tuple[Project, dict[str, int]]]:
         """Single grouped query — avoids the classic N+1 loop over projects."""
@@ -45,6 +65,19 @@ class PlotRepository(BaseRepository[Plot]):
         "status": Plot.status,
     }
     default_sort = "plot_number"
+
+    def delete(self, entity: Plot, *, actor: str | None = None, hard: bool = False) -> None:
+        if not hard:
+            entity.plot_number = _tombstone(entity.plot_number, entity.id, 24)   # frees the number for reuse
+        super().delete(entity, actor=actor, hard=hard)
+
+    def release_deleted(self, project_id: int, numbers: list[str]) -> None:
+        """Rename soft-deleted plots still holding these numbers (unique per project) so they can be reused."""
+        stmt = select(Plot).where(Plot.project_id == project_id, Plot.is_deleted.is_(True),
+                                  Plot.plot_number.in_(numbers))
+        for old in self.db.execute(stmt).scalars():
+            old.plot_number = _tombstone(old.plot_number, old.id, 24)
+        self.db.flush()
 
     def available_in_project(self, project_id: int) -> list[Plot]:
         return self.list(filters={"project_id": project_id, "status": PlotStatus.AVAILABLE.value}, sort="plot_number:asc")
