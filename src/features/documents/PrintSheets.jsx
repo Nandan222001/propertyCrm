@@ -86,7 +86,7 @@ function BillCopy({ receipt, copy }) {
         </section>
       )}
       <footer className="inv2-sign">
-        <div><i /> Authorised signatory{receipt.agent ? ` · Agent ${receipt.agent}` : ''}</div>
+        <div><i /> Authorised signatory</div>
       </footer>
     </section>
   );
