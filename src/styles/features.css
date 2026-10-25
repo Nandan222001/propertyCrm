@@ -182,7 +182,7 @@
 .rc .inv2-head h2{font-size:17px}
 .rc .inv2-title b{font-size:18px}
 .rc .inv2-boxes{margin-top:10px}
-.rc .inv2-sign{margin-top:22px}
+.rc .inv2-sign{margin-top:22px;justify-content:flex-end}
 
 /* admin dashboard: donut legend + reminders (computed rows) */
 .donut-legend i{display:block;width:8px;height:8px;border-radius:50%}
