@@ -589,6 +589,7 @@ export function App() {
         <BookingModal
           role={role}
           agentName={scoped.agentName}
+          byAdmin={Boolean(auth.isAdmin)}
           customers={domain.customers}
           plots={domain.plots}
           projects={domain.projects}

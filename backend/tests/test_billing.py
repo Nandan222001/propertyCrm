@@ -405,3 +405,26 @@ def test_branding_is_public_and_comes_from_configuration(client):
     response = client.get("/api/v1/branding")
     assert response.status_code == 200
     assert response.json()["data"] == {"name": settings.BRAND_NAME, "tagline": settings.BRAND_TAGLINE}
+
+
+def test_booking_amount_is_received_in_the_chosen_payment_mode(client, admin_headers, approved_customer, available_plot):
+    created = client.post(
+        "/api/v1/bookings",
+        json={"customer_id": approved_customer["id"], "plot_id": available_plot["id"], "final_price": "1000000",
+              "token_amount": "50000", "payment_mode": "cheque", "payment_reference": "CHQ 004512"},
+        headers=admin_headers,
+    )
+    assert created.status_code == 201, created.text
+    receipts = client.get("/api/v1/receipts", headers=admin_headers, params={"page_size": 200}).json()["data"]
+    mine = [r for r in receipts if r["booking_id"] == created.json()["data"]["id"]]
+    assert [(r["mode"], r["reference"]) for r in mine] == [("CHEQUE", "CHQ 004512")]
+
+
+def test_booking_rejects_an_unknown_payment_mode(client, admin_headers, approved_customer, available_plot):
+    bad = client.post(
+        "/api/v1/bookings",
+        json={"customer_id": approved_customer["id"], "plot_id": available_plot["id"], "final_price": "1000000",
+              "token_amount": "50000", "payment_mode": "barter"},
+        headers=admin_headers,
+    )
+    assert bad.status_code == 422

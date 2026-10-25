@@ -75,10 +75,9 @@ function BillCopy({ receipt, copy }) {
         </div>
       </div>
       <section className="inv2-section">
-        <small>PAYMENT MODE</small>
-        {isTokenAdvance
-          ? <p><b>Token advance</b> · Paid by {receipt.customer}</p>
-          : <p><b>{receipt.mode}</b>{receipt.reference ? ` · ${receipt.reference}` : ''}</p>}
+        <small>{isTokenAdvance ? 'PAID BY' : 'PAYMENT MODE'}</small>
+        <p><b>{isTokenAdvance ? receipt.customer : receipt.mode}</b></p>
+        {receipt.reference && !/^token advance/i.test(receipt.reference) && <p>Transaction details: {receipt.reference}</p>}
       </section>
       <footer className="inv2-sign">
         <div><i /> Authorised signatory</div>

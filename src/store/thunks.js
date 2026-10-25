@@ -225,6 +225,7 @@ const createBookingLive = (form) => async (dispatch, getState) => {
     const response = await api.bookings.create({
       customer_id: customer.id, plot_id: plot[9], final_price: parseAmt(form.amount),
       token_amount: parseAmt(form.paid || 0), payment_plan: form.plan,
+      ...(parseAmt(form.paid || 0) > 0 && form.mode ? { payment_mode: form.mode, ...(form.txn ? { payment_reference: form.txn } : {}) } : {}),
       ...(form.planId ? { plan_id: form.planId } : {}),
     });
     const booking = response.data;
@@ -329,7 +330,7 @@ export const createCustomer = (form) => async (dispatch, getState) => {
     // The server's row (real id, real approval status) is the one the admin sees in Approvals.
     try {
       // A sales agent's own agent profile is applied by the server; only send a code we can resolve.
-      const agentCode = (getState().domain.agents || []).find((a) => a[0] === form.agent)?.[1];
+      const agentCode = form.agentCode || (getState().domain.agents || []).find((a) => a[0] === form.agent)?.[1];
       const projectId = getState().domain.projects.find((p) => p[0] === form.project)?.[6];
       const response = await api.customers.create({
         name: form.name, phone: form.mobile, email: form.email, address: form.address,
@@ -339,7 +340,7 @@ export const createCustomer = (form) => async (dispatch, getState) => {
       dispatch(rowUpserted({ key: 'customers', row: adaptCustomer(response.data) }));
       dispatch(modalClosed());
       const login = response.data.portal_login || '';
-      dispatch(toastPushed(`Customer ${form.name} sent to admin for approval. Portal ${login.startsWith('login created')
+      dispatch(toastPushed(`Customer ${form.name} ${response.data.status === 'APPROVED' ? 'added' : 'sent to admin for approval'}. Portal ${login.startsWith('login created')
         ? 'login created: their e-mail + a starting password (first 4 letters of the name + last 5 digits of the mobile), not displayed.'
         : login || 'login not created.'}`));
     } catch (error) {

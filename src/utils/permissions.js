@@ -15,7 +15,7 @@ export const isPlatformAdmin = (role) => role === ROLES.SUPER_ADMIN;
 export const isCustomer = (role) => role === ROLES.CUSTOMER;
 export const canCreateBooking = (role) => isAdmin(role) || role === ROLES.SALES_AGENT;
 export const canApprove = (role) => isAdmin(role);
-export const canCreateCustomer = (role) => role === ROLES.SALES_AGENT;
+export const canCreateCustomer = (role) => isAdmin(role) || role === ROLES.SALES_AGENT;
 /** Edit / remove from the Actions column. The server enforces the same rules (and scopes an agent to their own rows). */
 export const canEditCustomer = (role) => isAdmin(role) || role === ROLES.SALES_AGENT || role === ROLES.SALES_MANAGER;
 export const canDeleteCustomer = (role, customer) => isAdmin(role) || (role === ROLES.SALES_AGENT && customer?.status !== 'Approved');

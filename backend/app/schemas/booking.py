@@ -17,6 +17,8 @@ class BookingCreate(SafeText):
     plot_id: int = Field(gt=0)
     final_price: Money
     token_amount: Money = Decimal("0")
+    payment_mode: str | None = Field(default=None, max_length=24, description="How the amount paid at booking was received")
+    payment_reference: str | None = Field(default=None, max_length=80, description="Transaction id / cheque no. of that payment")
     discount_amount: Money = Decimal("0")
     payment_plan: str | None = Field(default=None, max_length=80)
     plan_id: int | None = Field(default=None, gt=0, description="The project's payment scheme chosen for this booking")
@@ -28,6 +30,15 @@ class BookingCreate(SafeText):
     @classmethod
     def _date(cls, value):
         return to_date(value, field="booking date") if value else None
+
+    @field_validator("payment_mode", mode="before")
+    @classmethod
+    def _mode(cls, value):
+        if value in (None, ""):
+            return None
+        from app.schemas.finance import PAYMENT_MODES
+
+        return normalise_enum(value, tuple(m for m in PAYMENT_MODES if m != "TOKEN_ADVANCE"), field="payment mode")
 
     @model_validator(mode="after")
     def _money_rules(self) -> BookingCreate:

@@ -56,7 +56,7 @@ export function CustomersPage({ customers, bookings, role, search, project, onOp
         <div className="crud-heading">
           <div>
             <h2>Customer directory</h2>
-            <p>{canCreateCustomer(role) ? 'You can add customers; the admin approves each one.' : 'New customers are created by sales agents and approved by the admin.'}</p>
+            <p>{isAdmin(role) ? 'You can add customers directly; they are approved automatically.' : canCreateCustomer(role) ? 'You can add customers; the admin approves each one.' : 'New customers are created by sales agents and approved by the admin.'}</p>
           </div>
           {canCreateCustomer(role) && (
             <button className="button button-primary small-btn" onClick={onAdd}><Plus size={13} /> Add Customer</button>

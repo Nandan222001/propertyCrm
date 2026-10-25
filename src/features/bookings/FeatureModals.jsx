@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { X, ChevronRight } from 'lucide-react';
-import { actions, hasSession } from '../../api';
+import { api, actions, hasSession } from '../../api';
 import { PlanBreakdown } from '../projects/PlanBreakdown';
 import { parseAmt, fmtINR, isAdmin, isValidMobile, normaliseMobile, MOBILE_HINT } from '../../utils';
 import { limitMobile, MOBILE_INPUT } from '../../utils/phone';
@@ -92,7 +92,7 @@ export function BookingModal({ role, agentName, customers, plots, projects = [],
     if (parseAmt(tokenValue) > parseAmt(finalPrice)) return setError('The amount paid at booking cannot exceed the final price.');
     save({
       customer, project, plot: selected[0], amount: fmtINR(parseAmt(finalPrice)), paid: fmtINR(parseAmt(tokenValue)),
-      plan: plan?.name || 'Standard', planId: plan ? plan.id : undefined, agent: agentMode ? agentName : d.agent,
+      mode: d.mode || 'UPI', txn: (d.txn || '').trim(), plan: plan?.name || 'Standard', planId: plan ? plan.id : undefined, agent: agentMode ? agentName : d.agent,
     });
   }
 
@@ -128,6 +128,12 @@ export function BookingModal({ role, agentName, customers, plots, projects = [],
           </Field>
           <Field label={plan ? 'Due at booking (₹)' : 'Amount paid at booking (₹)'} hint={plan ? (priceLocked ? 'Application fee + enrollment + allotment of the chosen scheme' : 'Application fee + enrollment + allotment (admin may adjust)') : undefined}>
             <input name="paid" value={tokenValue} onChange={e => setTokenEdit(e.target.value)} inputMode="numeric" readOnly={Boolean(plan) && priceLocked} placeholder="0" />
+          </Field>
+          <Field label="Payment mode" hint="Shown on the payment receipt">
+            <select name="mode" defaultValue="UPI">{['UPI', 'NEFT', 'RTGS', 'Cheque', 'Cash', 'Card'].map(x => <option key={x}>{x}</option>)}</select>
+          </Field>
+          <Field label="Transaction details" hint="UPI / bank transaction id or cheque number — shown on the receipt">
+            <input name="txn" maxLength={80} placeholder="e.g. TXN123456" />
           </Field>
           {hasPlans ? (
             <Field label="Payment scheme (optional)" hint={plan ? 'Every amount below follows this scheme' : 'Only choose a scheme if the customer wants one; otherwise the plot is booked at its full price.'}>
@@ -227,8 +233,13 @@ export function PaymentModal({ bookings, pays, close, save }) {
 }
 
 // --------------------------------------------------------------- customer
-export function CustomerModal({ agentName, customers, projects = [], defaultProject = '', close, save }) {
+export function CustomerModal({ agentName, byAdmin = false, customers, projects = [], defaultProject = '', close, save }) {
   const [error, setError] = useState('');
+  const [agents, setAgents] = useState([]);                 // the admin may tag the customer to an agent
+  useEffect(() => {
+    if (!byAdmin || !hasSession()) return;
+    api.agents.list({ page_size: 200 }).then((r) => setAgents((r.data || []).filter((a) => a.is_active !== false))).catch(() => {});
+  }, [byAdmin]);
   function submit(e) {
     e.preventDefault();
     const d = Object.fromEntries(new FormData(e.currentTarget));
@@ -236,16 +247,23 @@ export function CustomerModal({ agentName, customers, projects = [], defaultProj
     const mobile = normaliseMobile(d.mobile);
     if (customers.some(c => c.mobile === mobile)) return setError('A customer with this mobile number already exists.');
     if (projects.length && !d.project) return setError('Choose the project this customer is for.');
-    save({ name: d.name.trim(), mobile, email: d.email.trim(), address: d.address.trim(), agent: agentName, project: d.project || '' });
+    save({ name: d.name.trim(), mobile, email: d.email.trim(), address: d.address.trim(), agent: byAdmin ? '' : agentName, agentCode: byAdmin ? (d.agent || '') : '', project: d.project || '' });
   }
   return (
-    <Shell kicker="ERP · CUSTOMERS" title="Add New Customer" sub="Only sales agents add customers. The admin approves every new customer." close={close}>
+    <Shell kicker="ERP · CUSTOMERS" title="Add New Customer" sub={byAdmin ? 'Added by the admin: the customer is approved straight away.' : 'Sales agents add customers. The admin approves every new customer.'} close={close}>
       <form onSubmit={submit}>
         <div className="form-grid">
           <Field label="Full name"><input name="name" required placeholder="Full name" /></Field>
           <Field label="Mobile (WhatsApp)"><input name="mobile" required {...MOBILE_INPUT} onInput={(e) => { e.target.value = limitMobile(e.target.value); }} placeholder="10-digit mobile number" /></Field>
           <Field label="Email"><input name="email" type="email" required placeholder="E-mail address" /></Field>
-          <Field label="Sales agent"><input value={agentName} readOnly /></Field>
+          {byAdmin ? (
+            <Field label="Sales agent (optional)">
+              <select name="agent" defaultValue="">
+                <option value="">No agent</option>
+                {agents.map((a) => <option key={a.id} value={a.code}>{a.name} ({a.code})</option>)}
+              </select>
+            </Field>
+          ) : <Field label="Sales agent"><input value={agentName} readOnly /></Field>}
           {projects.length > 0 && (
             <Field label="Project">
               <select name="project" defaultValue={defaultProject}>
@@ -259,7 +277,7 @@ export function CustomerModal({ agentName, customers, projects = [], defaultProj
         {error && <p className="form-error">{error}</p>}
         <div className="modal-actions">
           <button type="button" className="button button-white" onClick={close}>Cancel</button>
-          <button type="submit" className="button button-primary">Submit for Approval <ChevronRight size={14} /></button>
+          <button type="submit" className="button button-primary">{byAdmin ? 'Add Customer' : 'Submit for Approval'} <ChevronRight size={14} /></button>
         </div>
       </form>
     </Shell>

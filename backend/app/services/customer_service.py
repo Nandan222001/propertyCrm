@@ -151,8 +151,12 @@ class CustomerService(BaseService[Customer]):
 
         values = payload.model_dump(exclude={"agent_code"})
         values["agent_id"] = agent_id
-        values["status"] = ApprovalStatus.PENDING_APPROVAL.value
-        # Agents must never be able to self-approve their own data entry.
+        # Agents must never be able to self-approve their own data entry; an approver's own entry is approved at once.
+        by_approver = self.actor.can(Permission.CUSTOMER_APPROVE)
+        values["status"] = (ApprovalStatus.APPROVED if by_approver else ApprovalStatus.PENDING_APPROVAL).value
+        if by_approver:
+            values["approved_by_id"] = self.actor.user_id
+            values["approved_at"] = utcnow()
         values["consent_given_at"] = utcnow() if payload.consent_given else None
 
         customer = Customer(**self.customers.prepare_pii(values))
@@ -170,12 +174,13 @@ class CustomerService(BaseService[Customer]):
                 )
             )
         self._audit(AuditAction.CREATE, customer, after={"status": customer.status, "agent_id": agent_id},
-                    summary="Customer created (pending approval)")
+                    summary="Customer created" + ("" if by_approver else " (pending approval)"))
         self.portal_login = self._provision_portal_login(customer, payload.email, payload.phone)
         # Tell the approvers — and only them — that something is waiting for sign-off.
-        emit(self.db, title="Customer awaiting approval",
-             body=f"{customer.name} was added by {self.actor.name} and needs admin approval.",
-             category="APPROVAL", audience_role=Role.ADMIN.value)
+        if not by_approver:
+            emit(self.db, title="Customer awaiting approval",
+                 body=f"{customer.name} was added by {self.actor.name} and needs admin approval.",
+                 category="APPROVAL", audience_role=Role.ADMIN.value)
         return customer
 
     # ---------------------------------------------------------- portal login

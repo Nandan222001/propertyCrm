@@ -47,6 +47,8 @@ class Booking(Base, PkMixin, PublicIdMixin, TenantMixin, TimestampMixin, SoftDel
     booking_date: Mapped[date] = mapped_column(Date, nullable=False, default=date.today)
     final_price: Mapped[Decimal] = mapped_column(Numeric(18, 2), nullable=False)
     token_amount: Mapped[Decimal] = mapped_column(Numeric(18, 2), default=Decimal("0"), nullable=False)
+    token_payment_mode: Mapped[str | None] = mapped_column(String(24))   # how the booking amount was paid (UPI, Cash…)
+    token_payment_reference: Mapped[str | None] = mapped_column(String(80))   # its transaction id / cheque number
     paid_amount: Mapped[Decimal] = mapped_column(Numeric(18, 2), default=Decimal("0"), nullable=False)
     discount_amount: Mapped[Decimal] = mapped_column(Numeric(18, 2), default=Decimal("0"), nullable=False)
     gst_amount: Mapped[Decimal] = mapped_column(Numeric(18, 2), default=Decimal("0"), nullable=False)
