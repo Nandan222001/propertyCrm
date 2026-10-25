@@ -223,7 +223,7 @@ export function PaymentModal({ bookings, pays, close, save }) {
           <Field label="Payment mode">
             <select name="mode" defaultValue="UPI">{['UPI', 'NEFT', 'Cheque', 'Cash', 'Card'].map(x => <option key={x}>{x}</option>)}</select>
           </Field>
-          <Field label="Reference / cheque no."><input name="reference" placeholder="TXN123456" /></Field>
+          <Field label="Transaction details" hint="UPI / bank transaction id or cheque number — shown on the receipt"><input name="reference" maxLength={80} placeholder="e.g. TXN123456" /></Field>
           <Field label="Next due date"><input name="due" type="date" /></Field>
         </div>
         {error && <p className="form-error">{error}</p>}
