@@ -2,7 +2,6 @@ import React from 'react';
 import { createPortal } from 'react-dom';
 import { Printer, X, MessageCircle, Send, Copy, CheckCircle2 } from 'lucide-react';
 import { COMPANY } from '../../data/appConfig';
-import { getSettings } from '../../utils/settings';
 import { amountInWords, parseAmt, fmtINR } from '../../utils';
 
 // Modal shell. Everything inside `.print-area` is what window.print() outputs.
@@ -31,7 +30,6 @@ export function PrintModal({ title, close, actions, children }) {
 
 function BillCopy({ receipt, copy }) {
   const amount = parseAmt(receipt.amount);
-  const bank = getSettings().bank;
   const money = (value) => `Rs. ${value}`;
   return (
     <section className="bill-copy rc">
@@ -57,7 +55,6 @@ function BillCopy({ receipt, copy }) {
           <dl>
             <dt>Receipt no.:</dt><dd>{receipt.no}</dd>
             <dt>Date:</dt><dd>{receipt.date}</dd>
-            <dt>Payment mode:</dt><dd>{receipt.mode}{receipt.reference ? ` · ${receipt.reference}` : ''}</dd>
           </dl>
         </div>
       </div>
@@ -76,15 +73,10 @@ function BillCopy({ receipt, copy }) {
           <div className="inv2-grand"><span>AMOUNT RECEIVED</span><span>{money(fmtINR(amount))}</span></div>
         </div>
       </div>
-      {bank.bankName && (
-        <section className="inv2-section">
-          <small>PAY TO</small>
-          <p>
-            <b>{bank.accountName || COMPANY.name}</b> · {bank.bankName}
-            {bank.accountNumber ? ` · A/c ${bank.accountNumber}` : ''}{bank.ifsc ? ` · IFSC ${bank.ifsc}` : ''}{bank.upi ? ` · UPI ${bank.upi}` : ''}
-          </p>
-        </section>
-      )}
+      <section className="inv2-section">
+        <small>PAYMENT MODE</small>
+        <p><b>{receipt.mode}</b>{receipt.reference ? ` · ${receipt.reference}` : ''}</p>
+      </section>
       <footer className="inv2-sign">
         <div><i /> Authorised signatory</div>
       </footer>
