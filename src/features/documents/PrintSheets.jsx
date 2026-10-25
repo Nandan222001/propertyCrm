@@ -31,6 +31,7 @@ export function PrintModal({ title, close, actions, children }) {
 function BillCopy({ receipt, copy }) {
   const amount = parseAmt(receipt.amount);
   const money = (value) => `Rs. ${value}`;
+  const isTokenAdvance = /^token[\s_-]*advance$/i.test(String(receipt.mode || '').trim());
   return (
     <section className="bill-copy rc">
       <header className="inv2-head">
@@ -75,7 +76,9 @@ function BillCopy({ receipt, copy }) {
       </div>
       <section className="inv2-section">
         <small>PAYMENT MODE</small>
-        <p><b>{receipt.mode}</b>{receipt.reference ? ` · ${receipt.reference}` : ''}</p>
+        {isTokenAdvance
+          ? <p><b>Token advance</b> · Paid by {receipt.customer}</p>
+          : <p><b>{receipt.mode}</b>{receipt.reference ? ` · ${receipt.reference}` : ''}</p>}
       </section>
       <footer className="inv2-sign">
         <div><i /> Authorised signatory</div>
