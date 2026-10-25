@@ -35,7 +35,7 @@ export const adaptCustomer = (c) => ({
 });
 
 export const REGISTRY_LABEL = {
-  NOT_STARTED: 'Not started', DOCUMENTS_PENDING: 'Documents pending', AGREEMENT_SIGNED: 'Agreement signed',
+  NOT_STARTED: 'Booked', DOCUMENTS_PENDING: 'Documents pending', AGREEMENT_SIGNED: 'Agreement signed',
   SUB_REGISTRAR_APPOINTMENT: 'Sub-registrar appointment', REGISTERED: 'Registered',
 };
 export const REGISTRY_CODE = Object.fromEntries(Object.entries(REGISTRY_LABEL).map(([code, label]) => [label, code]));
@@ -97,7 +97,7 @@ export function adaptWorkspace({
       };
     }),
 
-    registry: Object.fromEntries(bookings.map((b) => [b.booking_number, REGISTRY_LABEL[b.registry_stage] || 'Not started'])),
+    registry: Object.fromEntries(bookings.map((b) => [b.booking_number, REGISTRY_LABEL[b.registry_stage] || 'Booked'])),
 
     invoices, // already API-shaped: the Billing page consumes them as-is
   };

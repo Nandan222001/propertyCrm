@@ -148,7 +148,7 @@ export function CustomerProfile({
       {mine.length === 0 && <p className="empty-note panel">No plots booked yet.</p>}
       <div className="portal-grid">
         {mine.map(b => {
-          const reg = registry[b[0]] || 'Not started';
+          const reg = registry[b[0]] || 'Booked';
           const idx = Math.max(0, REGISTRY_STEPS.indexOf(reg));
           const pct = parseAmt(b[5]) ? Math.min(100, Math.round(parseAmt(b[6]) / parseAmt(b[5]) * 100)) : 0;
           return (
@@ -163,7 +163,7 @@ export function CustomerProfile({
                 <div><small>Paid ({pct}%)</small><b className="green-text">₹{b[6]}</b></div>
                 <div><small>Pending</small><b className="amber-text">₹{fmtINR(parseAmt(b[5]) - parseAmt(b[6]))}</b></div>
               </div>
-              <div className="reg-steps" title={reg}>{REGISTRY_STEPS.map((s, i) => <i key={s} className={i <= idx && reg !== 'Not started' ? 'done' : ''} />)}</div>
+              <div className="reg-steps" title={reg}>{REGISTRY_STEPS.map((s, i) => <i key={s} className={i <= idx && reg !== 'Booked' ? 'done' : ''} />)}</div>
               <div className="reg-label">
                 <b>Registry:</b>{' '}
                 {!portal && isAdmin(role) ? (

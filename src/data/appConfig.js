@@ -7,7 +7,7 @@
 /** The signed-in organisation's letterhead, kept in step with its saved settings (see utils/settings). */
 export const COMPANY = { name: '', address: '', gstin: '', phone: '', email: '' };
 
-export const REGISTRY_STEPS = ['Not started', 'Documents pending', 'Agreement signed', 'Sub-registrar appointment', 'Registered'];
+export const REGISTRY_STEPS = ['Booked', 'Documents pending', 'Agreement signed', 'Sub-registrar appointment', 'Registered'];
 
 export const roleConfigs = {
   'SUPER ADMIN': {

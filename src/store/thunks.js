@@ -215,7 +215,8 @@ export const deleteAgentLive = (agent) => writeThenRefresh(
 /** Live booking: the server decides the status (approver => confirmed, agent => pending) and the plot hold. */
 const createBookingLive = (form) => async (dispatch, getState) => {
   const { domain } = getState();
-  const customer = domain.customers.find((c) => c.name === form.customer);
+  const customer = (form.customerId != null && domain.customers.find((c) => c.id === form.customerId))
+    || domain.customers.find((c) => c.name === form.customer);
   const plot = domain.plots.find((p) => p[0] === form.plot && p[8] === form.project);
   if (!customer || typeof customer.id !== 'number' || !plot || typeof plot[9] !== 'number') {
     dispatch(toastPushed('Could not book: the customer or plot is no longer available. Refresh and try again.'));

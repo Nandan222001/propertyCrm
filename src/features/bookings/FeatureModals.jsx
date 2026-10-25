@@ -40,7 +40,11 @@ export function BookingModal({ role, agentName, customers, plots, projects = [],
   const priceLocked = !isAdmin(role);   // the server enforces the same rule: only an approver can set a different price
   // Live data is already limited to the agent's own customers by the server; offline we match by name.
   const myCustomers = customers.filter(c => c.status === 'Approved' && (!agentMode || hasSession() || c.agent === agentName));
-  const [customer, setCustomer] = useState(myCustomers[0]?.name || '');
+  // Chosen by id: two customers can share a name (e.g. one removed and added again).
+  const keyOf = (c) => String(c.id ?? c.name);
+  const [customerKey, setCustomerKey] = useState(myCustomers[0] ? keyOf(myCustomers[0]) : '');
+  const chosen = myCustomers.find((c) => keyOf(c) === customerKey) || null;
+  const customer = chosen?.name || '';
   const [project, setProject] = useState(preset?.project || projects[0]?.[0] || '');
   const free = useMemo(() => plots.filter(p => p[8] === project && p[5] === 'AVAILABLE'), [plots, project]);
   const [plotNo, setPlotNo] = useState(preset?.plot || '');
@@ -91,7 +95,7 @@ export function BookingModal({ role, agentName, customers, plots, projects = [],
     if (parseAmt(finalPrice) <= 0) return setError('Enter the final price.');
     if (parseAmt(tokenValue) > parseAmt(finalPrice)) return setError('The amount paid at booking cannot exceed the final price.');
     save({
-      customer, project, plot: selected[0], amount: fmtINR(parseAmt(finalPrice)), paid: fmtINR(parseAmt(tokenValue)),
+      customer, customerId: typeof chosen?.id === 'number' ? chosen.id : undefined, project, plot: selected[0], amount: fmtINR(parseAmt(finalPrice)), paid: fmtINR(parseAmt(tokenValue)),
       mode: d.mode || 'UPI', txn: (d.txn || '').trim(), plan: plan?.name || 'Standard', planId: plan ? plan.id : undefined, agent: agentMode ? agentName : d.agent,
     });
   }
@@ -107,9 +111,9 @@ export function BookingModal({ role, agentName, customers, plots, projects = [],
       <form onSubmit={submit}>
         <div className="form-grid">
           <Field label="Customer" hint={agentMode ? 'Only your approved customers' : undefined}>
-            <select value={customer} onChange={e => setCustomer(e.target.value)}>
+            <select value={customerKey} onChange={e => setCustomerKey(e.target.value)}>
               {myCustomers.length === 0 && <option value="">No approved customers</option>}
-              {myCustomers.map(c => <option key={c.id} value={c.name}>{c.name} · {c.mobile}</option>)}
+              {myCustomers.map(c => <option key={keyOf(c)} value={keyOf(c)}>{c.name} · {c.mobile}</option>)}
             </select>
           </Field>
           <Field label="Project">
