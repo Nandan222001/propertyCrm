@@ -418,6 +418,7 @@ export function App() {
                   return;
                 }
                 dispatch(customerSelected(
+                  (typeof booking[11] === 'number' && domain.customers.find((c) => c.id === booking[11])) ||
                   domain.customers.find((c) => c.name === name) || { name, mobile: '', email: '', address: '', agent: '' },
                 ));
                 go(PAGES.CUSTOMER_DETAIL);

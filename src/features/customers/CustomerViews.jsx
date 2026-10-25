@@ -69,7 +69,7 @@ export function CustomersPage({ customers, bookings, role, search, project, onOp
           rows={rows.map(c => [
             <div className="customer-cell"><Avatar name={c.name} /><b>{c.name}</b></div>,
             c.mobile,
-            bookings.filter(b => b[1] === c.name && b[7] !== 'Rejected').map(b => b[3]).join(', ') || '—',
+            bookings.filter(b => (typeof c.id === 'number' && typeof b[11] === 'number' ? b[11] === c.id : b[1] === c.name) && b[7] !== 'Rejected').map(b => b[3]).join(', ') || '—',
             c.agent,
             <StatusBadge>{c.status}</StatusBadge>,
             <div className="row-actions">
@@ -110,9 +110,11 @@ export function CustomerProfile({
   onRegistry, onOpenBill, onPrintBooking, notify
 }) {
   const [schedule, setSchedule] = useState(null);
-  const mine = bookings.filter(b => b[1] === customer.name && b[7] !== 'Rejected');
-  const ledger = pays.filter(p => p[0] === customer.name);
-  const bills = receipts.filter(r => r.customer === customer.name && (!portal || r.shared));
+  // Two customers can share a name: match on the customer id whenever the live data carries it.
+  const byId = typeof customer.id === 'number';
+  const mine = bookings.filter(b => (byId && typeof b[11] === 'number' ? b[11] === customer.id : b[1] === customer.name) && b[7] !== 'Rejected');
+  const ledger = pays.filter(p => (byId ? mine.some(b => b[0] === p[9]) : p[0] === customer.name));
+  const bills = receipts.filter(r => (byId && typeof r.customerId === 'number' ? r.customerId === customer.id : r.customer === customer.name) && (!portal || r.shared));
   const total = mine.reduce((s, b) => s + parseAmt(b[5]), 0);
   const paid = mine.reduce((s, b) => s + parseAmt(b[6]), 0);
   const agentName = mine[0]?.[8] || customer.agent;

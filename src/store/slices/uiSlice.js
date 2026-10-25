@@ -42,7 +42,8 @@ const uiSlice = createSlice({
       state.page = action.payload;
       state.search = '';
       state.mobileOpen = false;
-      if (action.payload !== PAGES.CUSTOMER_DETAIL) state.customerSelected = null;
+      // customerSelected is deliberately kept here: the URL sync can fire a transient pageChanged for the old
+      // route right after a profile is opened, and clearing it then showed the first customer instead.
       if (action.payload === PAGES.PROJECTS) state.tab = 'Projects';
       if (action.payload === PAGES.BOOKINGS) state.tab = 'All bookings';
     },
@@ -100,6 +101,11 @@ const uiSlice = createSlice({
     agentInfoSet(state, action) {
       state.agentInfo = action.payload || null;
     },
+  },
+  extraReducers: (builder) => {
+    // A new session never inherits the previous user's open profile.
+    const clearSelection = (state) => { state.customerSelected = null; };
+    builder.addCase('auth/signedOut', clearSelection).addCase('auth/signedIn', clearSelection);
   },
 });
 

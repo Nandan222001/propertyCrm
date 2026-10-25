@@ -84,6 +84,7 @@ export function adaptWorkspace({
         no: r.receipt_number,
         date: dateLabel(r.issued_on),
         customer: customerById.get(r.customer_id)?.name || booking?.customer_name || dash,
+        customerId: r.customer_id ?? null,
         plot: booking?.plot_number || dash,
         project: booking?.project_name || dash,
         finalPrice: fmtINR(r.final_price),
