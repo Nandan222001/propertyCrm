@@ -391,8 +391,7 @@ function InvoiceSheet({ invoice, customer }) {
         <section className="inv2-section"><p><b>CANCELLED — {invoice.cancellation_reason}</b></p></section>
       )}
 
-      <footer className="inv2-sign">
-        <div><i /> Customer signature</div>
+      <footer className="inv2-sign" style={{ justifyContent: 'flex-end' }}>
         <div><i /> Authorised signatory</div>
       </footer>
       <p className="inv2-foot">Computer-generated tax invoice · {invoice.invoice_number}</p>

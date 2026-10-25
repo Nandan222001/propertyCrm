@@ -389,11 +389,9 @@ class _InvoicePDF:
         self.y = max(self.y, MARGIN + 58)
         self._hr()
         baseline = self.y - 34
-        self._text(MARGIN + 6, baseline, "Customer signature", size=8, color=MUTED)
         owner = self.payload["company"].get("name")
         self._text(PAGE_W - MARGIN - 6, baseline, f"For {owner} — Authorised signatory" if owner else "Authorised signatory",
                    size=8, color=MUTED, align="right")
-        self._text(MARGIN + 6, baseline - 12, "________________________", size=8, color=MUTED)
         self._text(PAGE_W - MARGIN - 6, baseline - 12, "________________________", size=8,
                    color=MUTED, align="right")
         self.y = baseline - 24

@@ -310,9 +310,7 @@ function paintInvoice(painter, payload) {
   /* signatures */
   p.y = Math.max(p.y, MARGIN + 58);
   p.line(MARGIN, p.y, PAGE_W - MARGIN, p.y);
-  p.text(MARGIN + 6, p.y - 34, 'Customer signature', { size: 8, color: MUTED });
   p.text(PAGE_W - MARGIN - 6, p.y - 34, 'Authorised signatory', { size: 8, color: MUTED, align: 'right' });
-  p.text(MARGIN + 6, p.y - 46, '________________________', { size: 8, color: MUTED });
   p.text(PAGE_W - MARGIN - 6, p.y - 46, '________________________', { size: 8, color: MUTED, align: 'right' });
 
   /* footer */
