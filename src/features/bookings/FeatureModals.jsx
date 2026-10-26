@@ -88,6 +88,8 @@ export function BookingModal({ role, agentName, customers, plots, projects = [],
   useEffect(() => { setTokenEdit(null); }, [planId, plotApiId]);
 
   // Step 1 of the booking: the customer's open applications (application fee + enrollment already received).
+  // "Allot plot" on an application row: that application's customer and project are fixed.
+  const locked = preset?.applicationId != null;
   const needsApplication = hasSession();                 // every booking starts with an application (step 1)
   const [applications, setApplications] = useState(needsApplication ? null : []);
   const [applicationId, setApplicationId] = useState('');
@@ -108,7 +110,8 @@ export function BookingModal({ role, agentName, customers, plots, projects = [],
   }, [applications]);
   const myApplications = (applications || []).filter((a) => typeof chosen?.id === 'number' && a.customer_id === chosen.id);
   useEffect(() => {
-    const best = myApplications.find((a) => a.project_name === project) || myApplications[0];
+    const best = (locked && myApplications.find((a) => a.id === preset.applicationId))
+      || myApplications.find((a) => a.project_name === project) || myApplications[0];
     setApplicationId(best ? String(best.id) : '');
     if (best && !preset?.project && best.project_name !== project && projects.some((p) => p[0] === best.project_name)) setProject(best.project_name);
   }, [customerKey, applications]);
@@ -165,13 +168,13 @@ export function BookingModal({ role, agentName, customers, plots, projects = [],
       <form onSubmit={submit}>
         <div className="form-grid">
           <Field label="Customer" hint={needsApplication ? 'Customers who have already paid the application fee and enrollment (step 1)' : (agentMode ? 'Only your approved customers' : undefined)}>
-            <select value={customerKey} onChange={e => setCustomerKey(e.target.value)}>
+            <select value={customerKey} onChange={e => setCustomerKey(e.target.value)} disabled={locked}>
               {eligible.length === 0 && <option value="">{needsApplication ? 'No customer has applied yet' : 'No approved customers'}</option>}
               {eligible.map(c => <option key={keyOf(c)} value={keyOf(c)}>{c.name} · {c.mobile}</option>)}
             </select>
           </Field>
           <Field label="Project">
-            <select value={project} onChange={e => { setProject(e.target.value); setPlotNo(''); setPrice(''); }}>
+            <select value={project} onChange={e => { setProject(e.target.value); setPlotNo(''); setPrice(''); }} disabled={locked}>
               {projects.map(p => <option key={p[0]}>{p[0]}</option>)}
             </select>
           </Field>
@@ -187,13 +190,6 @@ export function BookingModal({ role, agentName, customers, plots, projects = [],
           <Field label="Amount paid at booking (₹)" hint={plan ? 'Allotment amount — counts towards the plot price; the scheme\'s discount applies to the rest' : 'Allotment amount — counts towards the plot price'}>
             <input name="paid" value={tokenValue} onChange={e => setTokenEdit(e.target.value)} inputMode="numeric" placeholder="0" />
           </Field>
-          {myApplications.length > 0 && (
-            <Field label="Application (step 1)" hint="The application fee and enrollment already received from this customer — closed when this plot is allotted">
-              <select value={applicationId} onChange={e => setApplicationId(e.target.value)}>
-                {myApplications.map(a => <option key={a.id} value={a.id}>{a.receipt_number} · {a.project_name} · ₹{fmtINR(Number(a.total))}</option>)}
-              </select>
-            </Field>
-          )}
           <Field label="Payment mode" hint="Shown on the payment receipt">
             <select name="mode" defaultValue="UPI">{['UPI', 'NEFT', 'RTGS', 'Cheque', 'Cash', 'Card'].map(x => <option key={x}>{x}</option>)}</select>
           </Field>

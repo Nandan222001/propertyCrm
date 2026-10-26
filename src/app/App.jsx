@@ -298,7 +298,7 @@ export function App() {
             )}
 
             {auth.canCreateBooking && [PAGES.OVERVIEW, PAGES.BOOKINGS, PAGES.PROJECTS].includes(page) && (
-              <button className="button button-primary" onClick={() => dispatch(modalOpened({ modal: 'booking' }))}>
+              <button className="button button-primary" onClick={() => dispatch(modalOpened({ modal: hasSession() ? 'application' : 'booking' }))}>
                 <Plus size={15} /> {role === ROLES.SALES_AGENT ? 'Quick Book Plot' : 'New Booking'}
               </button>
             )}
@@ -342,14 +342,14 @@ export function App() {
             <>
               {role === ROLES.SUPER_ADMIN && <PlatformDashboard tenants={tenants} go={go} userName={auth.user?.name} />}
               {role === ROLES.ADMIN && (
-                <AdminDashboard bookings={domain.bookings} pays={domain.payments} receipts={domain.receipts} plots={domain.plots} project={ui.project} go={go} D={(kind, preset) => dispatch(modalOpened({ modal: kind, preset }))} notify={notify} />
+                <AdminDashboard bookings={domain.bookings} pays={domain.payments} receipts={domain.receipts} plots={domain.plots} project={ui.project} go={go} D={(kind, preset) => dispatch(modalOpened({ modal: kind === 'booking' && !preset && hasSession() ? 'application' : kind, preset }))} notify={notify} />
               )}
               {role === ROLES.ADMIN && <PortfolioInsights go={go} projects={domain.projects} plots={domain.plots} bookings={scoped.bookings} receipts={scoped.receipts} />}
               {role === ROLES.SALES_MANAGER && (
-                <SalesManagerDashboard go={go} D={(kind, preset) => dispatch(modalOpened({ modal: kind, preset }))} notify={notify} bookings={scoped.bookings} customers={scoped.customers || domain.customers} project={ui.project} />
+                <SalesManagerDashboard go={go} D={(kind, preset) => dispatch(modalOpened({ modal: kind === 'booking' && !preset && hasSession() ? 'application' : kind, preset }))} notify={notify} bookings={scoped.bookings} customers={scoped.customers || domain.customers} project={ui.project} />
               )}
               {role === ROLES.SALES_AGENT && (
-                <SalesAgentDashboard agentName={auth.user?.name} go={go} D={(kind, preset) => dispatch(modalOpened({ modal: kind, preset }))} notify={notify} bookings={scoped.bookings} plots={domain.plots} project={ui.project} />
+                <SalesAgentDashboard agentName={auth.user?.name} go={go} D={(kind, preset) => dispatch(modalOpened({ modal: kind === 'booking' && !preset && hasSession() ? 'application' : kind, preset }))} notify={notify} bookings={scoped.bookings} plots={domain.plots} project={ui.project} />
               )}
               {role === ROLES.CUSTOMER && (
                 <CustomerProfile
@@ -366,7 +366,7 @@ export function App() {
                 />
               )}
               {role === ROLES.ACCOUNTS && (
-                <AccountsDashboard go={go} D={(kind, preset) => dispatch(modalOpened({ modal: kind, preset }))} notify={notify} pays={domain.payments} receipts={scoped.receipts} />
+                <AccountsDashboard go={go} D={(kind, preset) => dispatch(modalOpened({ modal: kind === 'booking' && !preset && hasSession() ? 'application' : kind, preset }))} notify={notify} pays={domain.payments} receipts={scoped.receipts} />
               )}
             </>
           )}
@@ -411,9 +411,11 @@ export function App() {
               bookings={scoped.bookings}
               notify={notify}
               appsReload={applicationsReload}
+              receipts={scoped.receipts}
+              onOpenBill={(receipt) => dispatch(billOpened(receipt.no))}
               onNewApplication={() => dispatch(modalOpened({ modal: 'application' }))}
               onPrintApplication={setPrintedApplication}
-              onAllot={(application) => dispatch(modalOpened({ modal: 'booking', preset: { project: application.project_name, customerId: application.customer_id } }))}
+              onAllot={(application) => dispatch(modalOpened({ modal: 'booking', preset: { project: application.project_name, customerId: application.customer_id, applicationId: application.id } }))}
               project={ui.project}
               search={ui.search}
               tab={ui.tab}
@@ -626,7 +628,7 @@ export function App() {
           }}
         />
       )}
-      {printedApplication && <BillModal receipt={asReceipt(printedApplication)} close={() => setPrintedApplication(null)} />}
+      {printedApplication && <BillModal receipt={asReceipt(printedApplication, domain.customers.find((c) => c.id === printedApplication.customer_id))} close={() => setPrintedApplication(null)} />}
       {ui.modal === 'payment' && (
         <PaymentModal
           bookings={domain.bookings}

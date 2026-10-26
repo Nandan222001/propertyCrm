@@ -48,7 +48,7 @@ class ApplicationService(BaseService[Application]):
             project_id=application.project_id, project_name=application.project.name if application.project else None,
             agent_id=application.agent_id,
             application_fee=application.application_fee, enrollment_fee=application.enrollment_fee, total=application.total,
-            payment_mode=application.payment_mode, reference=application.reference, paid_to=application.paid_to,
+            payment_type=application.payment_type, payment_mode=application.payment_mode, reference=application.reference, paid_to=application.paid_to,
             received_on=application.received_on, status=application.status, booking_id=application.booking_id,
             booking_number=application.booking.booking_number if application.booking else None,
             created_at=application.created_at, updated_at=application.updated_at,
@@ -73,7 +73,7 @@ class ApplicationService(BaseService[Application]):
             receipt_number=self.applications.next_number(year=received_on.year),
             customer_id=customer.id, project_id=project.id, agent_id=customer.agent_id or self.actor.agent_id,
             application_fee=payload.application_fee, enrollment_fee=payload.enrollment_fee,
-            payment_mode=payload.payment_mode, reference=(payload.reference or None),
+            payment_type=payload.payment_type, payment_mode=payload.payment_mode, reference=(payload.reference or None),
             paid_to=(payload.paid_to or "").strip() or None, received_on=received_on, status="OPEN",
             recorded_by_id=self.actor.user_id,
         )

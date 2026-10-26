@@ -22,6 +22,7 @@ class Application(Base, PkMixin, PublicIdMixin, TenantMixin, TimestampMixin, Sof
     agent_id: Mapped[int | None] = mapped_column(ForeignKey("agents.id", ondelete="SET NULL"), index=True)
     application_fee: Mapped[Decimal] = mapped_column(Numeric(18, 2), default=Decimal("0"), nullable=False)
     enrollment_fee: Mapped[Decimal] = mapped_column(Numeric(18, 2), default=Decimal("0"), nullable=False)
+    payment_type: Mapped[str] = mapped_column(String(40), nullable=False, default="Application Fee + Enrollment")
     payment_mode: Mapped[str] = mapped_column(String(24), nullable=False, default="UPI")
     reference: Mapped[str | None] = mapped_column(String(80))
     paid_to: Mapped[str | None] = mapped_column(String(80))

@@ -11,11 +11,22 @@ from app.core.validators import normalise_enum, to_date
 from app.schemas.common import SafeText, TimestampedResponse
 
 
+PAYMENT_TYPES = ("Application Fee + Enrollment", "Allotment", "Installment")
+
+
+def normalise_choice(value: str) -> str:
+    for option in PAYMENT_TYPES:
+        if str(value).strip().lower() == option.lower():
+            return option
+    raise ValueError(f"payment type must be one of: {', '.join(PAYMENT_TYPES)}")
+
+
 class ApplicationCreate(SafeText):
     customer_id: int = Field(gt=0)
     project_id: int = Field(gt=0)
     application_fee: Decimal = Field(default=Decimal("0"), ge=0, le=Decimal("100000000"))
     enrollment_fee: Decimal = Field(default=Decimal("0"), ge=0, le=Decimal("100000000"))
+    payment_type: str = Field(default="Application Fee + Enrollment", max_length=40)
     payment_mode: str = Field(default="UPI", max_length=24)
     reference: str | None = Field(default=None, max_length=80)
     paid_to: str | None = Field(default=None, max_length=80)
@@ -25,6 +36,11 @@ class ApplicationCreate(SafeText):
     @classmethod
     def _date(cls, value):
         return to_date(value, field="date") if value else None
+
+    @field_validator("payment_type", mode="before")
+    @classmethod
+    def _type(cls, value):
+        return normalise_choice(value or PAYMENT_TYPES[0])
 
     @field_validator("payment_mode", mode="before")
     @classmethod
@@ -51,6 +67,7 @@ class ApplicationResponse(TimestampedResponse):
     application_fee: Decimal
     enrollment_fee: Decimal
     total: Decimal
+    payment_type: str = "Application Fee + Enrollment"
     payment_mode: str
     reference: str | None = None
     paid_to: str | None = None

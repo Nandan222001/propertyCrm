@@ -449,7 +449,7 @@ export const recordPayment = ({ booking, finalPrice, amount, mode, reference, pa
   const receipt = {
     no: nextReference(getSettings().tax.receiptPrefix || 'RCT', receipts.map((r) => r.no)),
     date: todayLabel(), shared: false, mode, reference: reference || '', paidTo: paidTo || '',
-    customer: booking[1], plot: booking[3], project: booking[2],
+    customer: booking[1], bookingNo: booking[0], plot: booking[3], project: booking[2],
     finalPrice: fmtINR(finalPrice), amount: fmtINR(amount), balance: fmtINR(Math.max(balance, 0)), agent: booking[8],
   };
   dispatch(rowUpserted({ key: 'receipts', row: receipt }));

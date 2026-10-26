@@ -41,32 +41,38 @@ function BillCopy({ receipt, copy }) {
         <div>
           <h2>{COMPANY.name}</h2>
           <p>{COMPANY.address}</p>
-          <p>Phone: {COMPANY.phone}</p>
+          <p>Phone: {COMPANY.phone}{COMPANY.email ? ` | e-mail: ${COMPANY.email}` : ''}</p>
         </div>
         <div className="inv2-title">
-          <b>PAYMENT RECEIPT</b>
+          <b>PAYMENT<br />RECEIPT</b>
           <span className="inv2-status inv2-paid">{copy}</span>
         </div>
       </header>
       <div className="rc-parties">
         <div className="rc-from inv2-box">
           <h3>Received with thanks from:</h3>
-          <p>{receipt.customer}</p>
-          <p>Project: {receipt.project}</p>
-          <p>Plot No: {receipt.plot}</p>
+          <p>Customer Name: <b>{receipt.customer}</b></p>
+          <p>Mobile NO- <b>{receipt.mobile}</b></p>
+          <p>Customer Address: <b>{receipt.address}</b></p>
+          <p>Project: <b>{receipt.project}</b></p>
+          <p>Plot No: <b>{receipt.plot}</b></p>
+          {receipt.bookingNo && <p>Booking ID- <b>{receipt.bookingNo}</b></p>}
         </div>
         <dl className="rc-details inv2-box">
-          <dt>Receipt Details</dt><dd>{receipt.no}</dd>
+          <dt className="rc-dh">Receipt Details</dt>
+          <dt>Receipt No:</dt><dd>{receipt.no}</dd>
           <dt>Date &amp; Time:</dt><dd>{receipt.dateTime || receipt.date}</dd>
-          <dt>Payment Type:</dt><dd>{isTokenAdvance ? 'Token Advance' : 'Instalment Payment'}</dd>
           <dt>Payment Mode:</dt><dd>{modeLabel(receipt.mode)}</dd>
           {reference && <><dt>Transaction Details:</dt><dd>{reference}</dd></>}
           <dt>In Favour Of:</dt><dd>{receipt.paidTo || COMPANY.name}</dd>
         </dl>
       </div>
       <div className="rc-total">
-        <p>Amount In Words: <b>{amountInWords(amount)}</b></p>
-        <div className="rc-grand"><span>AMOUNT RECEIVED</span><span>{money(fmtINR(amount))}</span></div>
+        <div className="rc-words">
+          <p>Payment Type: <b>{receipt.paymentType || (isTokenAdvance ? 'Token Advance' : 'Instalment Payment')}</b></p>
+          <p>Amount In Words: <b>{amountInWords(amount)}</b></p>
+        </div>
+        <div className="rc-grand">AMOUNT RECEIVED: {money(fmtINR(amount))}</div>
       </div>
       <footer className="inv2-sign">
         <div><i /> Checked by</div>

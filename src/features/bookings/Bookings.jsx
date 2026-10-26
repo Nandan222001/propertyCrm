@@ -21,7 +21,7 @@ import { PaymentScheduleModal } from './PaymentScheduleModal';
 import { RoleContextBanner } from '../../components/layout/RoleContextBanner';
 import { ApplicationsPanel } from './Applications';
 
-export function Bookings({ bookings, project, search, tab, TB, role, onNew, onNewApplication, onAllot, onPrintApplication, appsReload = 0, notify, onOpenCustomer, onApprove, onReject, onPrint, onWhatsApp, onEdit, onDelete }) {
+export function Bookings({ bookings, project, search, tab, TB, role, onNew, onNewApplication, onAllot, onPrintApplication, receipts, onOpenBill, appsReload = 0, notify, onOpenCustomer, onApprove, onReject, onPrint, onWhatsApp, onEdit, onDelete }) {
   const [editing, setEditing] = useState(null);
   const [removing, setRemoving] = useState(null);
   const [scheduleFor, setScheduleFor] = useState(null);
@@ -72,6 +72,7 @@ export function Bookings({ bookings, project, search, tab, TB, role, onNew, onNe
           <ApplicationsPanel
             project={project} search={search} canCreate={canCreateBooking(role)} reloadKey={appsReload}
             onNewApplication={onNewApplication} onAllot={onAllot} onPrint={onPrintApplication} notify={notify}
+            bookings={bookings} receipts={receipts} onOpenBill={onOpenBill}
           />
         ) : (
         <>
