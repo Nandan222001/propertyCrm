@@ -32,7 +32,7 @@ const Field = ({ label, children, hint, wide }) => (
 );
 
 // ---------------------------------------------------------------- booking
-export function BookingModal({ role, agentName, customers, plots, projects = [], close, save, preset }) {
+export function BookingModal({ role, agentName, customers, plots, projects = [], close, save, preset, onStartStep1 }) {
   // The agents this tenant really has (taken from its own customers).
   const fromCustomers = [...new Set(customers.map((c) => c.agent).filter(Boolean))].sort();
   const agentOptions = fromCustomers;
@@ -42,7 +42,7 @@ export function BookingModal({ role, agentName, customers, plots, projects = [],
   const myCustomers = customers.filter(c => c.status === 'Approved' && (!agentMode || hasSession() || c.agent === agentName));
   // Chosen by id: two customers can share a name (e.g. one removed and added again).
   const keyOf = (c) => String(c.id ?? c.name);
-  const [customerKey, setCustomerKey] = useState(myCustomers[0] ? keyOf(myCustomers[0]) : '');
+  const [customerKey, setCustomerKey] = useState(preset?.customerId != null ? String(preset.customerId) : (myCustomers[0] ? keyOf(myCustomers[0]) : ''));
   const chosen = myCustomers.find((c) => keyOf(c) === customerKey) || null;
   const customer = chosen?.name || '';
   const [project, setProject] = useState(preset?.project || projects[0]?.[0] || '');
@@ -71,33 +71,87 @@ export function BookingModal({ role, agentName, customers, plots, projects = [],
     return () => { live = false; };
   }, [projectId]);
   const plotApiId = selected?.[9];
+  useEffect(() => { setQuote(null); setQuoteError(''); }, [planId, plotApiId]);
+  // The amount paid at booking is the allotment: it counts towards the price and the scheme's discount applies to the
+  // rest, so the scheme is worked out again whenever it changes.
+  const allotment = parseAmt(tokenEdit ?? '');
   useEffect(() => {
-    setQuote(null); setQuoteError(''); setTokenEdit(null);
     if (!planId || typeof plotApiId !== 'number') return undefined;
     let live = true;
-    actions.quotePlan({ plan_id: Number(planId), plot_id: plotApiId })
-      .then((r) => { if (live) setQuote(r.data); })
-      .catch((e) => { if (live) setQuoteError(e.message); });
+    const timer = setTimeout(() => {
+      actions.quotePlan({ plan_id: Number(planId), plot_id: plotApiId, allotment_amount: allotment })
+        .then((r) => { if (live) { setQuote({ ...r.data, forAllotment: allotment }); setQuoteError(''); } })
+        .catch((e) => { if (live) { setQuote(null); setQuoteError(e.message); } });
+    }, 300);
+    return () => { live = false; clearTimeout(timer); };
+  }, [planId, plotApiId, allotment]);
+  useEffect(() => { setTokenEdit(null); }, [planId, plotApiId]);
+
+  // Step 1 of the booking: the customer's open applications (application fee + enrollment already received).
+  const needsApplication = hasSession();                 // every booking starts with an application (step 1)
+  const [applications, setApplications] = useState(needsApplication ? null : []);
+  const [applicationId, setApplicationId] = useState('');
+  useEffect(() => {
+    if (!needsApplication) return undefined;
+    let live = true;
+    api.applications.list({ page_size: 200 })
+      .then((r) => { if (live) setApplications((r.data || []).filter((a) => a.status === 'OPEN')); })
+      .catch(() => { if (live) setApplications([]); });
     return () => { live = false; };
-  }, [planId, plotApiId]);
+  }, [needsApplication]);
+  // Only customers who have already paid the application fee + enrollment can be allotted a plot.
+  const withApplication = new Set((applications || []).map((a) => a.customer_id));
+  const eligible = needsApplication ? myCustomers.filter((c) => withApplication.has(c.id)) : myCustomers;
+  useEffect(() => {
+    if (applications === null || !needsApplication) return;
+    if (!eligible.some((c) => keyOf(c) === customerKey)) setCustomerKey(eligible[0] ? keyOf(eligible[0]) : '');
+  }, [applications]);
+  const myApplications = (applications || []).filter((a) => typeof chosen?.id === 'number' && a.customer_id === chosen.id);
+  useEffect(() => {
+    const best = myApplications.find((a) => a.project_name === project) || myApplications[0];
+    setApplicationId(best ? String(best.id) : '');
+    if (best && !preset?.project && best.project_name !== project && projects.some((p) => p[0] === best.project_name)) setProject(best.project_name);
+  }, [customerKey, applications]);
   const hasPlans = plans.length > 0;
   const plan = plans.find(p => String(p.id) === planId);
 
   const finalPrice = price || (plan ? (quote ? fmtINR(Number(quote.total_payable)) : '') : (selected?.[10] ?? selected?.[4])) || '';
-  const tokenValue = tokenEdit ?? (plan ? (quote ? fmtINR(Number(quote.upfront_total)) : '') : '');
+  const tokenValue = tokenEdit ?? '';
 
   function submit(e) {
     e.preventDefault();
     const d = Object.fromEntries(new FormData(e.currentTarget));
     if (!customer) return setError('Select an approved customer first. Agents add customers from the Customers page.');
+    if (needsApplication && !applicationId) return setError('This customer has not applied yet. Take the application fee and enrollment first (step 1).');
     if (!selected) return setError('No available plot in this project.');
-    if (plan && !quote) return setError(quoteError || 'Wait for the payment scheme to be calculated.');
+    if (plan && (!quote || quote.forAllotment !== allotment)) return setError(quoteError || 'Wait for the payment scheme to be calculated.');
     if (parseAmt(finalPrice) <= 0) return setError('Enter the final price.');
     if (parseAmt(tokenValue) > parseAmt(finalPrice)) return setError('The amount paid at booking cannot exceed the final price.');
     save({
       customer, customerId: typeof chosen?.id === 'number' ? chosen.id : undefined, project, plot: selected[0], amount: fmtINR(parseAmt(finalPrice)), paid: fmtINR(parseAmt(tokenValue)),
       mode: d.mode || 'UPI', txn: (d.txn || '').trim(), paidTo: (d.paidTo || '').trim(), plan: plan?.name || 'Standard', planId: plan ? plan.id : undefined, agent: agentMode ? agentName : d.agent,
+      applicationId: applicationId ? Number(applicationId) : undefined,
     });
+  }
+
+  if (needsApplication && (applications === null || eligible.length === 0)) {
+    return (
+      <Shell kicker="ERP · BOOKINGS · STEP 2" title="Allot a plot" sub="A plot is booked in two steps." close={close}>
+        {applications === null ? <p className="empty-note">Checking applications…</p> : (
+          <>
+            <p className="field-hint" style={{ fontSize: 13, lineHeight: 1.6 }}>
+              <b>Step 1</b> — the customer pays the application fee and enrollment fee and gets a receipt.<br />
+              <b>Step 2</b> — when the customer is ready, the plot is allotted here against that application.<br /><br />
+              No customer has completed step 1 yet. Start with step 1.
+            </p>
+            <div className="modal-actions">
+              <button type="button" className="button button-white" onClick={close}>Close</button>
+              {onStartStep1 && <button type="button" className="button button-primary" onClick={onStartStep1}>Start step 1 — New Application</button>}
+            </div>
+          </>
+        )}
+      </Shell>
+    );
   }
 
   return (
@@ -110,10 +164,10 @@ export function BookingModal({ role, agentName, customers, plots, projects = [],
     >
       <form onSubmit={submit}>
         <div className="form-grid">
-          <Field label="Customer" hint={agentMode ? 'Only your approved customers' : undefined}>
+          <Field label="Customer" hint={needsApplication ? 'Customers who have already paid the application fee and enrollment (step 1)' : (agentMode ? 'Only your approved customers' : undefined)}>
             <select value={customerKey} onChange={e => setCustomerKey(e.target.value)}>
-              {myCustomers.length === 0 && <option value="">No approved customers</option>}
-              {myCustomers.map(c => <option key={keyOf(c)} value={keyOf(c)}>{c.name} · {c.mobile}</option>)}
+              {eligible.length === 0 && <option value="">{needsApplication ? 'No customer has applied yet' : 'No approved customers'}</option>}
+              {eligible.map(c => <option key={keyOf(c)} value={keyOf(c)}>{c.name} · {c.mobile}</option>)}
             </select>
           </Field>
           <Field label="Project">
@@ -130,9 +184,16 @@ export function BookingModal({ role, agentName, customers, plots, projects = [],
           <Field label="Final price for customer (₹)" hint={priceLocked ? (plan ? 'Fixed by the payment scheme — only the admin can change it' : 'Fixed at the plot\'s listed price — only the admin can change it') : undefined}>
             <input value={finalPrice} onChange={e => setPrice(e.target.value)} inputMode="numeric" readOnly={priceLocked} />
           </Field>
-          <Field label={plan ? 'Due at booking (₹)' : 'Amount paid at booking (₹)'} hint={plan ? (priceLocked ? 'Application fee + enrollment + allotment of the chosen scheme' : 'Application fee + enrollment + allotment (admin may adjust)') : undefined}>
-            <input name="paid" value={tokenValue} onChange={e => setTokenEdit(e.target.value)} inputMode="numeric" readOnly={Boolean(plan) && priceLocked} placeholder="0" />
+          <Field label="Amount paid at booking (₹)" hint={plan ? 'Allotment amount — counts towards the plot price; the scheme\'s discount applies to the rest' : 'Allotment amount — counts towards the plot price'}>
+            <input name="paid" value={tokenValue} onChange={e => setTokenEdit(e.target.value)} inputMode="numeric" placeholder="0" />
           </Field>
+          {myApplications.length > 0 && (
+            <Field label="Application (step 1)" hint="The application fee and enrollment already received from this customer — closed when this plot is allotted">
+              <select value={applicationId} onChange={e => setApplicationId(e.target.value)}>
+                {myApplications.map(a => <option key={a.id} value={a.id}>{a.receipt_number} · {a.project_name} · ₹{fmtINR(Number(a.total))}</option>)}
+              </select>
+            </Field>
+          )}
           <Field label="Payment mode" hint="Shown on the payment receipt">
             <select name="mode" defaultValue="UPI">{['UPI', 'NEFT', 'RTGS', 'Cheque', 'Cash', 'Card'].map(x => <option key={x}>{x}</option>)}</select>
           </Field>

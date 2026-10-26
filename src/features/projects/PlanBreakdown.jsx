@@ -15,13 +15,10 @@ export function PlanBreakdown({ quote }) {
     <div className="plan-breakdown">
       <dl className="plan-summary">
         <div><dt>Plot price</dt><dd>{money(quote.price)}</dd></div>
-        {Number(quote.application_fee) > 0 && <div><dt>Application fee (extra)</dt><dd>{money(quote.application_fee)}</dd></div>}
-        {Number(quote.enrollment_fee) > 0 && <div><dt>Enrollment</dt><dd>{money(quote.enrollment_fee)}</dd></div>}
-        {Number(quote.allotment_amount) > 0 && <div><dt>Allotment amount</dt><dd>{money(quote.allotment_amount)}</dd></div>}
+        {Number(quote.allotment_amount) > 0 && <div><dt>Allotment (paid at booking)</dt><dd>{money(quote.allotment_amount)}</dd></div>}
         <div><dt>Balance to pay</dt><dd>{money(quote.balance)}</dd></div>
-        {Number(quote.discount_amount) > 0 && <div className="good"><dt>Discount ({Number(quote.discount_percent)}% of balance)</dt><dd>− {money(quote.discount_amount)}</dd></div>}
+        {Number(quote.discount_amount) > 0 && <div className="good"><dt>Discount ({Number(quote.discount_percent)}% of balance after allotment)</dt><dd>− {money(quote.discount_amount)}</dd></div>}
         <div className="total"><dt>Total payable</dt><dd>{money(quote.total_payable)}</dd></div>
-        <div><dt>Due at booking</dt><dd>{money(quote.upfront_total)}</dd></div>
       </dl>
       <p className="muted-text plan-count">Complete payment schedule · {lines.length} payments</p>
       <div className="table-scroll plan-schedule-scroll">

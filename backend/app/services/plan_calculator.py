@@ -4,12 +4,13 @@ Given a scheme and the price of a plot (including any premium) this produces the
 instalment schedule a booking is made on. The shape follows a developer's brochure:
 
     price                       what the plot costs (rate x area, plus premiums)
-    application fee             charged ON TOP of the price
-    enrollment + allotment      paid at booking and COUNTED towards the price
-    balance                     price - enrollment - allotment, paid as the scheme says
+    allotment                   paid when the plot is allotted (the booking) and COUNTED towards the price
+    balance                     price - allotment, paid as the scheme says
     discount                    a % of the balance (e.g. for paying outright or in a few EMIs)
 
-    total payable = application fee + enrollment + allotment + (balance - discount)
+    total payable = allotment + (balance - discount)
+
+The application fee and enrollment fee are taken in an earlier step (an Application) and are separate from the price.
 
 Rounding is to the paisa and the *last* instalment absorbs the remainder, so the schedule always adds up to
 the total payable exactly.
@@ -97,17 +98,24 @@ def validate_terms(terms: PlanTerms) -> None:
                 f"Choose exactly {count} different EMI numbers (between 1 and {terms.emi_count}) for the special EMIs")
 
 
-def build_quote(terms: PlanTerms, price, booking_date: date, *, total_override=None) -> dict:
+def build_quote(terms: PlanTerms, price, booking_date: date, *, allotment=0, total_override=None) -> dict:
     """The breakdown and schedule for one booking. ``price`` includes premiums.
+
+    ``allotment`` is the amount paid when the plot is allotted (the booking itself): it counts towards the price and
+    the discount applies to what is left. The application fee and enrollment fee are taken earlier, in their own
+    step, and are never part of a plot's price.
 
     ``total_override`` (an admin's negotiated total) adjusts only the balance / EMI amounts (never the upfront ones)."""
     validate_terms(terms)
     price = money(price)
-    upfront_in_price = terms.enrollment_fee + terms.allotment_amount
+    allotment = money(allotment or 0)
+    if allotment < 0:
+        raise BusinessRuleError("The allotment amount cannot be negative")
+    upfront_in_price = allotment
     balance = price - upfront_in_price
     if balance <= 0:
         raise BusinessRuleError(
-            f"Enrollment and allotment (₹{upfront_in_price:,.2f}) must be less than the plot price (₹{price:,.2f})")
+            f"The allotment amount (₹{upfront_in_price:,.2f}) must be less than the plot price (₹{price:,.2f})")
     discount = money(balance * terms.discount_percent / 100)
     payable_balance = balance - discount
 
@@ -116,12 +124,8 @@ def build_quote(terms: PlanTerms, price, booking_date: date, *, total_override=N
     def add(label: str, kind: str, due: date, amount: Decimal) -> None:
         lines.append({"label": label, "kind": kind, "due_date": due, "amount": money(amount)})
 
-    if terms.application_fee > 0:
-        add("Application fee", "UPFRONT", booking_date, terms.application_fee)
-    if terms.enrollment_fee > 0:
-        add("Enrollment", "UPFRONT", booking_date, terms.enrollment_fee)
-    if terms.allotment_amount > 0:
-        add("Allotment amount", "UPFRONT", booking_date, terms.allotment_amount)
+    if allotment > 0:
+        add("Allotment amount", "UPFRONT", booking_date, allotment)
 
     if terms.kind == "OUTRIGHT":
         add(f"Balance (within {terms.outright_days} days)", "BALANCE",
@@ -143,7 +147,7 @@ def build_quote(terms: PlanTerms, price, booking_date: date, *, total_override=N
         lines.extend(emi_lines)
 
     total = sum((line["amount"] for line in lines), Decimal("0"))
-    expected = terms.application_fee + upfront_in_price + payable_balance
+    expected = upfront_in_price + payable_balance
     if lines and lines[-1]["kind"] in ("EMI", "BALANCE"):
         lines[-1]["amount"] = money(lines[-1]["amount"] + (expected - total))   # the last line absorbs rounding
     total = sum((line["amount"] for line in lines), Decimal("0"))
@@ -171,8 +175,7 @@ def build_quote(terms: PlanTerms, price, booking_date: date, *, total_override=N
     upfront = sum((row["amount"] for row in lines if row["kind"] == "UPFRONT"), Decimal("0"))
     return {
         "plan_name": terms.name, "kind": terms.kind, "price": price,
-        "application_fee": terms.application_fee, "enrollment_fee": terms.enrollment_fee,
-        "allotment_amount": terms.allotment_amount, "balance": balance,
+        "allotment_amount": allotment, "balance": balance,
         "discount_percent": terms.discount_percent, "discount_amount": discount,
         "total_payable": total, "upfront_total": upfront, "schedule": lines,
     }

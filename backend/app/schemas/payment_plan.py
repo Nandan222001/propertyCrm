@@ -65,6 +65,7 @@ class QuoteRequest(RequestModel):
     plot_id: int | None = Field(default=None, gt=0)
     price: Money | None = None
     booking_date: date | None = None
+    allotment_amount: Money = Decimal("0")     # what is paid at booking; the discount applies to the rest
 
 
 class InstallmentResponse(ORMModel):

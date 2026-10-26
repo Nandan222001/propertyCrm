@@ -39,13 +39,15 @@ const uiSlice = createSlice({
       if (value) state.loadingKeys[key] = true; else delete state.loadingKeys[key];
     },
     pageChanged(state, action) {
+      const changed = state.page !== action.payload;
       state.page = action.payload;
       state.search = '';
       state.mobileOpen = false;
       // customerSelected is deliberately kept here: the URL sync can fire a transient pageChanged for the old
       // route right after a profile is opened, and clearing it then showed the first customer instead.
-      if (action.payload === PAGES.PROJECTS) state.tab = 'Projects';
-      if (action.payload === PAGES.BOOKINGS) state.tab = 'All bookings';
+      // The tab is reset only when the page really changes (a repeat for the same page keeps the chosen tab).
+      if (changed && action.payload === PAGES.PROJECTS) state.tab = 'Projects';
+      if (changed && action.payload === PAGES.BOOKINGS) state.tab = 'All bookings';
     },
     sidebarToggled(state, action) {
       state.mobileOpen = action.payload ?? !state.mobileOpen;

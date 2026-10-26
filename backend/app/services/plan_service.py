@@ -164,7 +164,7 @@ class PlanService:
             price = request.price
         else:
             raise BusinessRuleError("Give a plot or a price to calculate on")
-        return build_quote(terms, price, request.booking_date or date.today())
+        return build_quote(terms, price, request.booking_date or date.today(), allotment=request.allotment_amount)
 
     # ------------------------------------------------------------ schedules
     def attach_schedule(self, booking: Booking, plan: PaymentPlan, quote: dict) -> None:

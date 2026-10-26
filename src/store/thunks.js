@@ -228,8 +228,10 @@ const createBookingLive = (form) => async (dispatch, getState) => {
       token_amount: parseAmt(form.paid || 0), payment_plan: form.plan,
       ...(parseAmt(form.paid || 0) > 0 && form.mode ? { payment_mode: form.mode, ...(form.txn ? { payment_reference: form.txn } : {}), ...(form.paidTo ? { payment_paid_to: form.paidTo } : {}) } : {}),
       ...(form.planId ? { plan_id: form.planId } : {}),
+      ...(form.applicationId ? { application_id: form.applicationId } : {}),
     });
     const booking = response.data;
+    window.dispatchEvent(new Event('erp:applications-changed'));
     dispatch(modalClosed());
     await dispatch(hydrateWorkspace({ silent: true }));
     dispatch(toastPushed(booking.status === 'CONFIRMED'

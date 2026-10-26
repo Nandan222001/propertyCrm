@@ -56,6 +56,7 @@ import { Administration } from '../features/admin/Administration';
 import { RecordModal } from '../features/admin/RecordModal';
 import { CustomerProfile, CustomersPage, DocumentsPage } from '../features/customers/CustomerViews';
 import { BookingModal, CustomerModal, PaymentModal } from '../features/bookings/FeatureModals';
+import { ApplicationModal, asReceipt } from '../features/bookings/Applications';
 import { BillModal, BookingFormModal } from '../features/documents/PrintSheets';
 import { AgentInfoModal, AgentLookup } from '../features/agents/AgentLookup';
 import {
@@ -80,6 +81,8 @@ export function App() {
   const teamUsers = useAppSelector(selectUsers);
   const loginNotice = useAppSelector((state) => state.auth.loginNotice);
   const [changingPassword, setChangingPassword] = useState(false);
+  const [printedApplication, setPrintedApplication] = useState(null);   // the receipt of the application just taken
+  const [applicationsReload, setApplicationsReload] = useState(0);
   // "Skip for now" on the first-sign-in prompt lasts until the next sign-in.
   const [passwordPromptSkipped, setPasswordPromptSkipped] = useState(false);
   useEffect(() => { if (!auth.session) setPasswordPromptSkipped(false); }, [auth.session]);
@@ -406,6 +409,11 @@ export function App() {
           {page === PAGES.BOOKINGS && (
             <Bookings
               bookings={scoped.bookings}
+              notify={notify}
+              appsReload={applicationsReload}
+              onNewApplication={() => dispatch(modalOpened({ modal: 'application' }))}
+              onPrintApplication={setPrintedApplication}
+              onAllot={(application) => dispatch(modalOpened({ modal: 'booking', preset: { project: application.project_name, customerId: application.customer_id } }))}
               project={ui.project}
               search={ui.search}
               tab={ui.tab}
@@ -601,8 +609,25 @@ export function App() {
           preset={ui.bookingPreset}
           close={() => dispatch(modalClosed())}
           save={(form) => dispatch(createBooking({ ...form, agent: scoped.agentName }))}
+          onStartStep1={() => dispatch(modalOpened({ modal: 'application' }))}
         />
       )}
+      {ui.modal === 'application' && (
+        <ApplicationModal
+          customers={domain.customers}
+          projects={domain.projects}
+          defaultProject={ui.project === 'All projects' ? '' : ui.project}
+          notify={notify}
+          close={() => dispatch(modalClosed())}
+          saved={(application) => {
+            setApplicationsReload((n) => n + 1);
+            setPrintedApplication(application);
+            go(PAGES.BOOKINGS);
+            dispatch(tabChanged('Applications'));
+          }}
+        />
+      )}
+      {printedApplication && <BillModal receipt={asReceipt(printedApplication)} close={() => setPrintedApplication(null)} />}
       {ui.modal === 'payment' && (
         <PaymentModal
           bookings={domain.bookings}
@@ -621,7 +646,7 @@ export function App() {
           save={(form) => dispatch(createCustomer(form))}
         />
       )}
-      {ui.modal && !['booking', 'payment', 'customer'].includes(ui.modal) && (
+      {ui.modal && !['booking', 'payment', 'customer', 'application'].includes(ui.modal) && (
         <RecordModal
           kind={ui.modal}
           close={() => dispatch(modalClosed())}

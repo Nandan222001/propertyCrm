@@ -172,17 +172,16 @@ class BookingService(BaseService[Booking]):
             if plan.project_id != plot.project_id or not plan.is_active:
                 raise BusinessRuleError("This payment scheme is not available for the plot's project")
         if plan is not None:
-            quote = build_quote(PlanTerms.from_model(plan), list_price, booking_day)
+            # What is paid at booking is the allotment amount: it counts towards the price and the discount applies to the rest.
+            quote = build_quote(PlanTerms.from_model(plan), list_price, booking_day, allotment=payload.token_amount)
             expected = quote["total_payable"]
             if payload.final_price != expected:
                 if not approver:
                     raise BusinessRuleError(
                         f"The final price is fixed at ₹{expected:,.2f} for the '{plan.name}' scheme on plot "
                         f"{plot.plot_number}. Only an admin can set a different price.")
-                quote = build_quote(PlanTerms.from_model(plan), list_price, booking_day, total_override=payload.final_price)
-            if not approver and payload.token_amount != quote["upfront_total"]:
-                raise BusinessRuleError(
-                    f"The amount due at booking is fixed at ₹{quote['upfront_total']:,.2f} for the '{plan.name}' scheme.")
+                quote = build_quote(PlanTerms.from_model(plan), list_price, booking_day, allotment=payload.token_amount,
+                                   total_override=payload.final_price)
         elif not approver and payload.final_price != list_price:
             raise BusinessRuleError(
                 f"The final price is fixed at the listed price of ₹{list_price:,.2f} for plot {plot.plot_number}. "
@@ -228,6 +227,11 @@ class BookingService(BaseService[Booking]):
             approved_by_id=self.actor.user_id if approved else None,
         )
         self.bookings.create(booking)
+        if payload.application_id is not None:
+            # Step 2 of the booking: this allotment closes the customer's application (step 1).
+            from app.services.application_service import ApplicationService
+
+            ApplicationService(self.db, self.actor).allot(payload.application_id, booking)
         if plan is not None:
             plans.attach_schedule(booking, plan, quote)
         self._transition_plot(plot, status, customer_id=customer.id, agent_id=agent_id,
@@ -330,6 +334,9 @@ class BookingService(BaseService[Booking]):
                               BookingStatus.AGREEMENT.value, BookingStatus.REGISTERED.value):
             self._transition_plot(self.plots.get_or_404(booking.plot_id), BookingStatus.CANCELLED.value,
                                   customer_id=None, agent_id=booking.agent_id)
+        from app.services.application_service import ApplicationService
+
+        ApplicationService(self.db, self.actor).reopen_for_booking(booking.id)
         self.bookings.delete(booking, actor=self.actor.name)
         self._audit("crud.delete", booking, before={"status": booking.status}, summary="Booking deleted")
         return booking
@@ -413,6 +420,9 @@ class BookingService(BaseService[Booking]):
                             reason=booking.rejection_reason, ip_address=self.actor.ip_address)
         self._audit("workflow.reject", booking, before={"status": previous},
                     after={"status": booking.status}, summary=f"Booking rejected: {booking.rejection_reason}")
+        from app.services.application_service import ApplicationService
+
+        ApplicationService(self.db, self.actor).reopen_for_booking(booking.id)
         self._tell_agent(booking, "rejected", "warning")
         return booking
 

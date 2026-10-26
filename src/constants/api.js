@@ -29,6 +29,7 @@ export const ENDPOINTS = {
   plots: { list: '/plots', item: (id) => `/plots/${id}` },
   customers: { list: '/customers', item: (id) => `/customers/${id}`, decision: (id) => `/customers/${id}/decision` },
   bookings: { list: '/bookings', item: (id) => `/bookings/${id}`, approve: (id) => `/bookings/${id}/approve`, reject: (id) => `/bookings/${id}/reject`, approvals: '/bookings/approvals', remove: (id) => `/bookings/${id}/delete` },
+  applications: { list: '/applications', item: (id) => `/applications/${id}` },
   payments: { list: '/payments', item: (id) => `/payments/${id}` },
   receipts: { list: '/receipts', item: (id) => `/receipts/${id}`, copy: (id) => `/receipts/${id}/copy` },
   invoices: {

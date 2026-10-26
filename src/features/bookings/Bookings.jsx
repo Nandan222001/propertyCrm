@@ -13,17 +13,22 @@ import { parseAmt, fmtINR, amountInWords, agentKey, todayLabel, openWhatsApp, wa
 import { Table } from '../../components/common/DataTable';
 import { Badge } from '../../components/common/Badge';
 import { Mini } from '../../components/common/StatTile';
+import { hasSession } from '../../api';
 import { Avatar } from '../../components/common/Avatar';
 import { DeleteBookingDialog } from './DeleteBookingDialog';
 import { EditBookingModal } from './EditBookingModal';
 import { PaymentScheduleModal } from './PaymentScheduleModal';
 import { RoleContextBanner } from '../../components/layout/RoleContextBanner';
+import { ApplicationsPanel } from './Applications';
 
-export function Bookings({ bookings, project, search, tab, TB, role, onNew, onOpenCustomer, onApprove, onReject, onPrint, onWhatsApp, onEdit, onDelete }) {
+export function Bookings({ bookings, project, search, tab, TB, role, onNew, onNewApplication, onAllot, onPrintApplication, appsReload = 0, notify, onOpenCustomer, onApprove, onReject, onPrint, onWhatsApp, onEdit, onDelete }) {
   const [editing, setEditing] = useState(null);
   const [removing, setRemoving] = useState(null);
   const [scheduleFor, setScheduleFor] = useState(null);
+  // Booking is two steps: 1) the application fee + enrollment (an Application), 2) allotting a plot (the booking form).
+  const live = hasSession();
   const statuses = ['All bookings', 'Confirmed', 'Pending Approval', 'Processing', 'Agreement', 'Rejected'];
+  const onApplications = tab === 'Applications';
   const rows = bookings.filter(b => {
     const textMatch = b.join(' ').toLowerCase().includes(search.toLowerCase());
     const projMatch = project === 'All projects' || b[2] === project;
@@ -46,18 +51,30 @@ export function Bookings({ bookings, project, search, tab, TB, role, onNew, onOp
 
       <div className="panel section-panel">
         <div className="tabs">
-          {statuses.map(s => (
+          {[...statuses, ...(customerView ? [] : ['Applications'])].map(s => (
             <button key={s} className={tab === s ? 'active' : ''} onClick={() => TB(s)}>
               {s}
             </button>
           ))}
           {canCreateBooking(role) && (
-            <button className="button button-primary small-btn" onClick={onNew} style={{ marginLeft: 'auto' }}>
-              <Plus size={12} /> New Booking
-            </button>
+            <>
+              <button className="button button-white small-btn" onClick={onNew} style={{ marginLeft: 'auto' }} title="Step 2: allot a plot to a customer who has applied">
+                <Plus size={12} /> Allot Plot
+              </button>
+              <button className="button button-primary small-btn" onClick={() => (live ? onNewApplication() : onNew())} title="Step 1: application fee + enrollment">
+                <Plus size={12} /> New Booking
+              </button>
+            </>
           )}
         </div>
 
+        {onApplications ? (
+          <ApplicationsPanel
+            project={project} search={search} canCreate={canCreateBooking(role)} reloadKey={appsReload}
+            onNewApplication={onNewApplication} onAllot={onAllot} onPrint={onPrintApplication} notify={notify}
+          />
+        ) : (
+        <>
         <Table
           label="bookings"
           headers={['BOOKING ID', 'CUSTOMER', 'PROJECT & PLOT', 'DATE', 'VALUE', 'PAID', 'STATUS', 'AGENT', 'ACTIONS']}
@@ -101,6 +118,8 @@ export function Bookings({ bookings, project, search, tab, TB, role, onNew, onOp
           ])}
         />
         <div className="table-pagination"><span>{role === 'SALES AGENT' ? 'Your bookings only' : 'Role-filtered view'}</span></div>
+        </>
+        )}
       </div>
       {scheduleFor && <PaymentScheduleModal booking={scheduleFor} close={() => setScheduleFor(null)} />}
       {editing && <EditBookingModal booking={editing} canPrice={canApprove(role)} close={() => setEditing(null)} save={onEdit} />}

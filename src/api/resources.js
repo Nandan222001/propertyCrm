@@ -13,6 +13,7 @@ const COLLECTION_PATHS = {
   plots: ENDPOINTS.plots,
   customers: ENDPOINTS.customers,
   bookings: ENDPOINTS.bookings,
+  applications: ENDPOINTS.applications,
   payments: ENDPOINTS.payments,
   receipts: ENDPOINTS.receipts,
   invoices: ENDPOINTS.invoices,

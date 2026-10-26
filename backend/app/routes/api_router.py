@@ -16,6 +16,7 @@ from app.routes.booking_routes import router as booking_router
 from app.routes.commission_routes import router as commission_router
 from app.routes.customer_routes import router as customer_router
 from app.routes.dashboard_routes import router as dashboard_router
+from app.routes.application_routes import router as application_router
 from app.routes.expense_routes import router as expense_router
 from app.routes.health_routes import router as health_router
 from app.routes.notification_routes import router as notification_router
@@ -55,6 +56,7 @@ for router in (
     agent_router,
     commission_router,
     expense_router,
+    application_router,
     notification_router,
     report_router,
     dashboard_router,

@@ -12,13 +12,13 @@ const KINDS = [
   ['EMI_SPECIAL', 'EMI with special EMIs — regular EMIs plus larger ones in chosen months'],
 ];
 const BLANK = {
-  name: '', kind: 'EMI', application_fee: '', enrollment_fee: '', allotment_amount: '', discount_percent: '',
+  name: '', kind: 'EMI', discount_percent: '',
   outright_days: '30', emi_count: '', special_count: '', special_percent: '', special_months: '', is_active: true,
 };
 
 const toForm = (p) => ({
-  name: p.name, kind: p.kind, application_fee: String(Number(p.application_fee) || ''), enrollment_fee: String(Number(p.enrollment_fee) || ''),
-  allotment_amount: String(Number(p.allotment_amount) || ''), discount_percent: String(Number(p.discount_percent) || ''),
+  name: p.name, kind: p.kind,
+  discount_percent: String(Number(p.discount_percent) || ''),
   outright_days: p.outright_days ? String(p.outright_days) : '30', emi_count: p.emi_count ? String(p.emi_count) : '',
   special_count: p.special_count ? String(p.special_count) : '', special_percent: p.special_percent ? String(Number(p.special_percent)) : '',
   special_months: (p.special_months || []).join(', '), is_active: p.is_active,
@@ -27,8 +27,7 @@ const toForm = (p) => ({
 const toBody = (f) => {
   const num = (v) => (String(v).trim() === '' ? 0 : parseAmt(v));
   const body = {
-    name: f.name.trim(), kind: f.kind, application_fee: num(f.application_fee), enrollment_fee: num(f.enrollment_fee),
-    allotment_amount: num(f.allotment_amount), discount_percent: Number(f.discount_percent) || 0, is_active: f.is_active,
+    name: f.name.trim(), kind: f.kind, discount_percent: Number(f.discount_percent) || 0, is_active: f.is_active,
   };
   if (f.kind === 'OUTRIGHT') body.outright_days = Number(f.outright_days) || undefined;
   else body.emi_count = Number(f.emi_count) || undefined;
@@ -145,14 +144,13 @@ export function PaymentPlansModal({ project, plots = [], close, notify }) {
       {editing === null && (
         <>
           {plans === null && <p className="empty-note">Loading…</p>}
-          {plans && plans.length === 0 && <p className="empty-note">No payment scheme yet. Add the schemes from your brochure — an outright scheme, an EMI scheme, and so on. You choose every number: how many EMIs, the fees, the discount.</p>}
+          {plans && plans.length === 0 && <p className="empty-note">No payment scheme yet. Add the schemes from your brochure — an outright scheme, an EMI scheme, and so on. You choose every number: how many EMIs and the discount.</p>}
           <div className="plan-list">
             {(plans || []).map((p) => (
               <div className="plan-card" key={p.id}>
                 <div>
                   <b>{p.name}</b> <Badge>{p.is_active ? 'Active' : 'Hidden'}</Badge>
                   <p className="muted-text">{summary(p)}</p>
-                  <p className="muted-text">Due at booking: ₹{fmtINR(Number(p.application_fee) + Number(p.enrollment_fee) + Number(p.allotment_amount))}</p>
                 </div>
                 <div className="table-actions-cell">
                   <button type="button" className="button button-white small-btn" onClick={() => toggle(p)}>{p.is_active ? 'Hide' : 'Show'}</button>
@@ -177,15 +175,9 @@ export function PaymentPlansModal({ project, plots = [], close, notify }) {
               <small className="field-hint">The name agents and customers see when choosing how to pay.</small></label>
             <label className="span-2">How is the balance paid?
               <select value={form.kind} onChange={set('kind')}>{KINDS.map(([k, t]) => <option key={k} value={k}>{t}</option>)}</select>
-              <small className="field-hint">The balance is the plot price minus the enrollment and allotment amounts below.</small></label>
-            <label>Application fee (₹) — extra<input value={form.application_fee} onChange={set('application_fee')} inputMode="numeric" placeholder="e.g. 500" />
-              <small className="field-hint">Charged on top of the plot price. Leave blank for none.</small></label>
-            <label>Enrollment (₹)<input value={form.enrollment_fee} onChange={set('enrollment_fee')} inputMode="numeric" placeholder="e.g. 5,000" />
-              <small className="field-hint">Paid at booking. Counts towards the plot price.</small></label>
-            <label>Allotment amount (₹)<input value={form.allotment_amount} onChange={set('allotment_amount')} inputMode="numeric" placeholder="e.g. 1,00,000" />
-              <small className="field-hint">Paid at booking. Counts towards the plot price.</small></label>
+              <small className="field-hint">The balance is the plot price minus the allotment paid at booking. The application fee and enrollment are taken earlier, separately.</small></label>
             <label>Discount on the balance (%)<input value={form.discount_percent} onChange={set('discount_percent')} inputMode="decimal" placeholder="e.g. 10 (or leave blank)" />
-              <small className="field-hint">Taken off the balance for this scheme only. 0 or blank = no discount.</small></label>
+              <small className="field-hint">Taken off what is left after the allotment amount paid at booking. 0 or blank = no discount.</small></label>
             {form.kind === 'OUTRIGHT' && <label>Pay the balance within (days)<input value={form.outright_days} onChange={set('outright_days')} inputMode="numeric" placeholder="e.g. 30" />
               <small className="field-hint">The whole balance is due this many days after booking.</small></label>}
             {form.kind !== 'OUTRIGHT' && <label>Number of monthly EMIs<input value={form.emi_count} onChange={set('emi_count')} inputMode="numeric" placeholder="any number, e.g. 12 or 24" />
@@ -222,7 +214,7 @@ export function PaymentPlansModal({ project, plots = [], close, notify }) {
                 </select>
               </label>
               {!sample && <label>Plot price (₹)<input value={samplePrice} onChange={(e) => setSamplePrice(e.target.value)} inputMode="numeric" placeholder="e.g. 11,00,000" />
-                <small className="field-hint">Only used for this preview. It must be more than enrollment + allotment.</small></label>}
+                <small className="field-hint">Only used for this preview.</small></label>}
             </div>
             {quoteError && <p className="form-error">To see the preview, {quoteError.charAt(0).toLowerCase() + quoteError.slice(1)}</p>}
             {quote ? <PlanBreakdown quote={quote} /> : !quoteError && <p className="muted-text">Calculating…</p>}
