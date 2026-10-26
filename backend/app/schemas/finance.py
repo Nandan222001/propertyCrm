@@ -92,6 +92,8 @@ class CommissionResponse(TimestampedResponse):
     agent_id: int
     agent_name: str | None = None
     booking_id: int | None = None
+    payment_id: int | None = None
+    received_on: date | None = None
     deal_value: Decimal
     rate: Decimal
     gross_amount: Decimal
@@ -102,11 +104,16 @@ class CommissionResponse(TimestampedResponse):
     paid_at: datetime | None = None
 
 
+class PaymentCancel(SafeText):
+    reason: str = Field(min_length=3, max_length=255)
+
+
 class PaymentCreate(SafeText):
     booking_id: int = Field(gt=0)
     amount: Money
     mode: str = Field(default="UPI", max_length=24)
     reference: str | None = Field(default=None, max_length=80)
+    paid_to: str | None = Field(default=None, max_length=80, description="Who the money was paid to")
     received_on: date | None = None
     due_date: date | None = None
     final_price: Money | None = Field(default=None, description="Reconfirm the price at collection time")
@@ -181,6 +188,8 @@ class ReceiptResponse(TimestampedResponse):
     balance: Decimal
     mode: str
     reference: str | None = None
+    paid_to: str | None = None
+    payment_status: str | None = None
     is_shared_with_customer: bool = False
 
 

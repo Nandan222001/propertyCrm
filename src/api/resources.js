@@ -87,6 +87,7 @@ actions.agentLeaderboard = () => authedRequest(`${ENDPOINTS.agents.list}/leaderb
 actions.notificationQueue = () => authedRequest(ENDPOINTS.notifications.list);
 actions.notificationAction = (id) => authedRequest(`${ENDPOINTS.notifications.item(id)}/action`, { method: 'POST', body: {} });
 
+actions.cancelPayment = (id, reason) => authedRequest(`${ENDPOINTS.payments.item(id)}/cancel`, { method: 'POST', body: { reason } });
 actions.commissionDecision = (id, body) => authedRequest(`${ENDPOINTS.commissions.item(id)}/decision`, { method: 'POST', body });
 
 actions.shareReceipt = (id) => authedRequest(`${ENDPOINTS.receipts.item(id)}/share`, { method: 'POST', body: {} });

@@ -28,10 +28,13 @@ export function PrintModal({ title, close, actions, children }) {
   return host ? createPortal(modal, host) : modal;
 }
 
+const modeLabel = (mode) => String(mode || '').replace(/[_-]+/g, ' ').toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase());
+
 function BillCopy({ receipt, copy }) {
   const amount = parseAmt(receipt.amount);
   const money = (value) => `Rs. ${value}`;
   const isTokenAdvance = /^token[\s_-]*advance$/i.test(String(receipt.mode || '').trim());
+  const reference = receipt.reference && !/^token advance/i.test(receipt.reference) ? receipt.reference : '';
   return (
     <section className="bill-copy rc">
       <header className="inv2-head">
@@ -45,41 +48,28 @@ function BillCopy({ receipt, copy }) {
           <span className="inv2-status inv2-paid">{copy}</span>
         </div>
       </header>
-      <div className="inv2-boxes">
-        <div className="inv2-box">
-          <small>RECEIVED FROM</small>
-          <b>{receipt.customer}</b>
-          <p>{receipt.project} · Plot {receipt.plot}</p>
+      <div className="rc-parties">
+        <div className="rc-from inv2-box">
+          <h3>Received with thanks from:</h3>
+          <p>{receipt.customer}</p>
+          <p>Project: {receipt.project}</p>
+          <p>Plot No: {receipt.plot}</p>
         </div>
-        <div className="inv2-box">
-          <small>RECEIPT DETAILS</small>
-          <dl>
-            <dt>Receipt no.:</dt><dd>{receipt.no}</dd>
-            <dt>Date:</dt><dd>{receipt.date}</dd>
-          </dl>
-        </div>
+        <dl className="rc-details inv2-box">
+          <dt>Receipt Details</dt><dd>{receipt.no}</dd>
+          <dt>Date &amp; Time:</dt><dd>{receipt.dateTime || receipt.date}</dd>
+          <dt>Payment Type:</dt><dd>{isTokenAdvance ? 'Token Advance' : 'Instalment Payment'}</dd>
+          <dt>Payment Mode:</dt><dd>{modeLabel(receipt.mode)}</dd>
+          {reference && <><dt>Transaction Details:</dt><dd>{reference}</dd></>}
+          <dt>In Favour Of:</dt><dd>{receipt.paidTo || COMPANY.name}</dd>
+        </dl>
       </div>
-      <table className="inv2-items">
-        <thead>
-          <tr><th>DESCRIPTION</th><th className="num">AMOUNT</th></tr>
-        </thead>
-        <tbody>
-          <tr><td>Final price (customer)</td><td className="num">{money(receipt.finalPrice)}</td></tr>
-          <tr><td>Balance after this payment</td><td className="num">{money(receipt.balance)}</td></tr>
-        </tbody>
-      </table>
-      <div className="inv2-totals-wrap">
-        <p className="inv2-words">Received with thanks: <b>{amountInWords(amount)}</b></p>
-        <div className="inv2-totals">
-          <div className="inv2-grand"><span>AMOUNT RECEIVED</span><span>{money(fmtINR(amount))}</span></div>
-        </div>
+      <div className="rc-total">
+        <p>Amount In Words: <b>{amountInWords(amount)}</b></p>
+        <div className="rc-grand"><span>AMOUNT RECEIVED</span><span>{money(fmtINR(amount))}</span></div>
       </div>
-      <section className="inv2-section">
-        <small>{isTokenAdvance ? 'PAID BY' : 'PAYMENT MODE'}</small>
-        <p><b>{isTokenAdvance ? receipt.customer : receipt.mode}</b></p>
-        {receipt.reference && !/^token advance/i.test(receipt.reference) && <p>Transaction details: {receipt.reference}</p>}
-      </section>
       <footer className="inv2-sign">
+        <div><i /> Checked by</div>
         <div><i /> Authorised signatory</div>
       </footer>
     </section>

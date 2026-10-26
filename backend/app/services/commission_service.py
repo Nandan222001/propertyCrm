@@ -74,12 +74,17 @@ class CommissionService(BaseService[Commission]):
         )
 
     def serialise(self, commission: Commission) -> CommissionResponse:
+        from app.models.payment import Payment
+
+        payment = self.db.get(Payment, commission.payment_id) if commission.payment_id else None
         return CommissionResponse(
+            received_on=payment.received_on if payment is not None else None,
             id=commission.id,
             public_id=commission.public_id,
             agent_id=commission.agent_id,
             agent_name=commission.agent.name if commission.agent else None,
             booking_id=commission.booking_id,
+            payment_id=commission.payment_id,
             deal_value=commission.deal_value,
             rate=commission.rate,
             gross_amount=commission.gross_amount,
@@ -97,13 +102,16 @@ class CommissionService(BaseService[Commission]):
         return {key: str(value) for key, value in totals.items()}
 
     # --------------------------------------------------------------- create
-    def ensure_for_booking(self, booking) -> Commission | None:
-        """Idempotent: called on every confirmed booking, creates at most one row."""
+    def accrue_for_payment(self, booking, payment) -> Commission | None:
+        """The agent earns their rate on every payment the customer makes, until the booking is paid up.
+
+        Idempotent per payment. A booking that still carries an older whole-deal commission is left alone so the
+        same money is never commissioned twice."""
         if booking.agent_id is None:
             return None
-        existing = self.commissions.get_by(booking_id=booking.id)
-        if existing is not None:
-            return existing
+        existing = self.commissions.list(filters={"booking_id": booking.id}, limit=1000)
+        if any(c.payment_id is None or c.payment_id == payment.id for c in existing):
+            return next((c for c in existing if c.payment_id == payment.id), None)
 
         agent = self.agents.get(booking.agent_id)
         if agent is None:
@@ -112,12 +120,14 @@ class CommissionService(BaseService[Commission]):
 
         default_rate = Decimal(setting_text(self.db, "tax", "defaultCommission")) / 100
         rate = commission_rate_for(Decimal(agent.commission_rate), default_rate)
-        gross, tds, net = split_commission(Decimal(booking.final_price), rate, self._tds_rate())
+        received = Decimal(payment.amount)
+        gross, tds, net = split_commission(received, rate, self._tds_rate())
 
         commission = Commission(
             agent_id=agent.id,
             booking_id=booking.id,
-            deal_value=Decimal(booking.final_price),
+            payment_id=payment.id,
+            deal_value=received,
             rate=rate,
             gross_amount=gross,
             tds_amount=tds,
@@ -127,14 +137,14 @@ class CommissionService(BaseService[Commission]):
         self.commissions.create(commission)
         self.audit.log(
             action=AuditAction.CREATE, resource=self.resource, resource_id=commission.public_id,
-            summary=f"Commission ₹{net} accrued at {rate}", actor=self.actor,
+            summary=f"Commission ₹{net} accrued on a ₹{received} payment at {rate}", actor=self.actor,
         )
         return commission
 
     def create_manual(self, payload: CommissionCreate) -> Commission:
         self._authorise("create")
         agent = self.agents.get_or_404(payload.agent_id)
-        if payload.booking_id and self.commissions.get_by(booking_id=payload.booking_id):
+        if payload.booking_id and self.commissions.list(filters={"booking_id": payload.booking_id}, limit=1):
             raise BusinessRuleError("A commission already exists for this booking")
         gross, tds, net = split_commission(payload.deal_value, payload.rate, self._tds_rate())
         commission = Commission(

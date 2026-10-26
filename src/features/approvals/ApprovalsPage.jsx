@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Check, X, MessageCircle, Eye, ChevronLeft, ChevronRight } from 'lucide-react';
 import { StatusBadge } from '../customers/CustomerViews';
+import { rowMatchesSearch } from '../../utils/search';
 
 const PAGE_SIZE = 10;
 const PENDING = 'Pending Approval';
@@ -41,12 +42,12 @@ function Pager({ paged, label }) {
   );
 }
 
-export function ApprovalsPage({ bookings, customers, onApproveBooking, onRejectBooking, onApproveCustomer, onRejectCustomer, onWhatsApp, onPrintBooking }) {
+export function ApprovalsPage({ bookings, customers, search = '', onApproveBooking, onRejectBooking, onApproveCustomer, onRejectCustomer, onWhatsApp, onPrintBooking }) {
   const pendingBookings = bookings.filter(b => b[7] === PENDING);
   const pendingCustomers = customers.filter(c => c.status === PENDING);
   const [tab, setTab] = useState('bookings');
-  const bookingPaged = usePaged(pendingFirst(bookings, (b) => b[7]));
-  const customerPaged = usePaged(pendingFirst(customers, (c) => c.status));
+  const bookingPaged = usePaged(pendingFirst(bookings.filter((b) => rowMatchesSearch(b, search)), (b) => b[7]));
+  const customerPaged = usePaged(pendingFirst(customers.filter((c) => rowMatchesSearch(c, search)), (c) => c.status));
 
   return (
     <>

@@ -41,15 +41,14 @@ def test_masking_helpers():
     assert mask_name("Rajesh Sharma").startswith("R")
 
 
-def test_pii_is_masked_by_default_for_agents(client, agent_headers):
+def test_agents_see_the_name_and_phone_of_their_customers(client, agent_headers):
     response = client.get("/api/v1/customers", headers=agent_headers)
-    if response.status_code != 200:
-        return
+    assert response.status_code == 200
     for customer in response.json()["data"]:
-        if customer.get("email"):
-            assert "***" in customer["email"], "agents must not see raw e-mails"
+        assert not customer["masked"]
+        assert "*" not in customer["name"]
         if customer.get("phone"):
-            assert "*" in customer["phone"]
+            assert "*" not in customer["phone"]
 
 
 def test_permitted_role_can_reveal_pii(client, admin_headers):

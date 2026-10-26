@@ -34,6 +34,11 @@ def record_payment(payload: PaymentCreate, service: PaymentServiceDep) -> dict:
     )
 
 
+def cancel_payment(payment_id: int, reason: str, service: PaymentServiceDep) -> dict:
+    payment = service.cancel_payment(payment_id, reason)
+    return success(service.serialise(payment).model_dump(), f"₹{payment.amount} payment cancelled")
+
+
 def ledger(page: PaginationDep, service: PaymentServiceDep) -> dict:
     result = service.ledger(page)
     return success([row.model_dump() for row in result.items], meta=result.meta.model_dump())

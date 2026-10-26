@@ -10,7 +10,7 @@ import {
 } from 'lucide-react';
 import { ConfirmDialog } from '../../components/common/ConfirmDialog';
 import { actions } from '../../api';
-import { parseAmt, fmtINR, amountInWords, agentKey, todayLabel, openWhatsApp, waLink, isAdmin, canCreateBooking, canApprove, canCreateCustomer, canRecordPayment, canManageBills, isCustomer, isPendingStatus } from '../../utils';
+import { parseAmt, fmtINR, amountInWords, agentKey, todayLabel, openWhatsApp, waLink, isAdmin, canCreateBooking, canApprove, canCreateCustomer, canRecordPayment, canManageBills, isCustomer, isPendingStatus , rowMatchesSearch } from '../../utils';
 
 import { Table } from '../../components/common/DataTable';
 import { Badge } from '../../components/common/Badge';
@@ -20,7 +20,7 @@ import { RoleContextBanner } from '../../components/layout/RoleContextBanner';
 import { usePageLoading } from '../../hooks';
 import { pageCache } from '../../utils/pageCache';
 
-export function Roles({ role, notify, users = [], create, edit, remove, resetPassword }) {
+export function Roles({ role, search = '', notify, users = [], create, edit, remove, resetPassword }) {
   const [resetting, setResetting] = useState(null);
   const [roleFilter, setRoleFilter] = useState('ALL');
   // The matrix is read from the server's own permission table, so it can never drift from what is enforced.
@@ -44,7 +44,7 @@ export function Roles({ role, notify, users = [], create, edit, remove, resetPas
     ];
   });
   const rolesInUse = useMemo(() => [...new Set(users.map((u) => u.role))].filter(Boolean).sort(), [users]);
-  const shownUsers = roleFilter === 'ALL' ? users : users.filter((u) => u.role === roleFilter);
+  const shownUsers = (roleFilter === 'ALL' ? users : users.filter((u) => u.role === roleFilter)).filter((u) => rowMatchesSearch(u, search));
   const inactive = users.filter((u) => !['Active', 'Invited'].includes(u.status)).length;
 
   return (

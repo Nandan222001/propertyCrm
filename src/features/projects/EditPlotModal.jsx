@@ -12,6 +12,11 @@ export function EditPlotModal({ plot, close, save }) {
   });
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const facingKey = String(form.facing).trim().toLowerCase().replace(/-/g, ' ');
+  const isNE = facingKey === 'north east' || facingKey === 'ne';
+  const isEast = facingKey === 'east';
+  // These two premiums come from the plot's facing, so ticking one sets the Facing (unticking clears it to choose again).
+  const setFacingPremium = (facing, on) => setForm({ ...form, facing: on ? facing : (plot[3] && plot[3] !== facing ? plot[3] : '') });
   const set = (key) => (e) => setForm({ ...form, [key]: e.target.value });
 
   const submit = async (e) => {
@@ -19,6 +24,7 @@ export function EditPlotModal({ plot, close, save }) {
     const area = Number(form.area);
     const price = Number(form.price);
     if (!form.layout.trim()) return setError('Enter the layout name.');
+    if (!form.facing) return setError('Choose the facing (untick North-East / East by picking another facing).');
     if (!(area > 0)) return setError('Area must be more than zero.');
     if (!(price > 0)) return setError('Price must be more than zero.');
     const changes = {};
@@ -55,7 +61,9 @@ export function EditPlotModal({ plot, close, save }) {
           <label><input type="checkbox" checked={form.corner} onChange={(e) => setForm({ ...form, corner: e.target.checked })} /> Corner plot</label>
           <label><input type="checkbox" checked={form.commercial} onChange={(e) => setForm({ ...form, commercial: e.target.checked })} /> Commercial plot</label>
           <label><input type="checkbox" checked={form.park} onChange={(e) => setForm({ ...form, park: e.target.checked })} /> Park / plantation facing</label>
-          <small className="field-hint">The premium amounts are set on the project. Facing north-east or east adds its premium automatically.{plot[11] > 0 ? ` Current premium on this plot: ₹${fmtINR(plot[11])}.` : ''}</small>
+          <label><input type="checkbox" checked={isNE} onChange={(e) => setFacingPremium('North-East', e.target.checked)} /> North-East facing</label>
+          <label><input type="checkbox" checked={isEast} onChange={(e) => setFacingPremium('East', e.target.checked)} /> East facing</label>
+          <small className="field-hint">The premium amounts are set on the project. North-East and East facing follow the Facing field above.{plot[11] > 0 ? ` Current premium on this plot: ₹${fmtINR(plot[11])}.` : ''}</small>
         </fieldset>
         {plot[5] !== 'AVAILABLE' && <p className="field-hint">This plot is {String(plot[5]).toLowerCase()}; the booking keeps the price it was agreed at.</p>}
         {error && <p className="form-error">{error}</p>}

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Bell, LogOut, Menu, Search, Shield } from 'lucide-react';
+import { Menu, Search, Shield } from 'lucide-react';
 
 /** Top app bar: breadcrumb, global search, role pill and identity. */
 export function Topbar({
@@ -32,19 +32,13 @@ export function Topbar({
           <kbd>⌘K</kbd>
         </div>
 
-        <button className="top-icon" onClick={() => onNavigate('Notifications')} title="View alerts">
-          <Bell size={17} />
-          {(unread === null || unread > 0) && <em />}
-        </button>
-
         <div className="top-divider" />
 
-        <div className="top-user" onClick={onLogout} title="Click to log out">
+        <div className="top-user">
           <div className="avatar avatar-indigo">
             {(user?.name || 'NA').split(' ').slice(0, 2).map((x) => x[0]).join('').toUpperCase()}
           </div>
           <span>{user?.name || 'Workspace User'}</span>
-          <LogOut size={13} className="logout-inline-icon" />
         </div>
       </div>
     </header>

@@ -4,7 +4,7 @@ import { ConfirmDialog } from '../../components/common/ConfirmDialog';
 import { EditCustomerModal } from './EditCustomerModal';
 import { PaymentScheduleModal } from '../bookings/PaymentScheduleModal';
 import { COMPANY, REGISTRY_STEPS } from '../../data/appConfig';
-import { parseAmt, fmtINR, openWhatsApp, isAdmin, canCreateCustomer, canApprove, canEditCustomer, canDeleteCustomer } from '../../utils';
+import { parseAmt, fmtINR, openWhatsApp, isAdmin, canCreateCustomer, canApprove, canEditCustomer, canDeleteCustomer , rowMatchesSearch } from '../../utils';
 
 const statusClass = (s) => {
   const t = String(s).toLowerCase();
@@ -220,13 +220,14 @@ export function CustomerProfile({
 }
 
 // ------------------------------------------------------------ documents page
-export function DocumentsPage({ docs, notify, onOpenDocument }) {
+export function DocumentsPage({ docs: allDocs, search = '', notify, onOpenDocument }) {
+  const docs = allDocs.filter((d) => rowMatchesSearch(d, search));
   return (
     <div className="panel section-panel">
       <div className="panel-head">
         <div><h2>Documents</h2><p>Generated from bookings and receipts</p></div>
       </div>
-      {docs.length === 0 && <p className="empty-note">No documents available.</p>}
+      {docs.length === 0 && <p className="empty-note">{allDocs.length ? 'No documents match your search.' : 'No documents available.'}</p>}
       <div className="documents-list">
         {docs.map(d => (
           <div className="document-row" key={d.key}>

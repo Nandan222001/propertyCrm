@@ -411,13 +411,15 @@ def test_booking_amount_is_received_in_the_chosen_payment_mode(client, admin_hea
     created = client.post(
         "/api/v1/bookings",
         json={"customer_id": approved_customer["id"], "plot_id": available_plot["id"], "final_price": "1000000",
-              "token_amount": "50000", "payment_mode": "cheque", "payment_reference": "CHQ 004512"},
+              "token_amount": "50000", "payment_mode": "cheque", "payment_reference": "CHQ 004512",
+              "payment_paid_to": "Office cash"},
         headers=admin_headers,
     )
     assert created.status_code == 201, created.text
     receipts = client.get("/api/v1/receipts", headers=admin_headers, params={"page_size": 200}).json()["data"]
     mine = [r for r in receipts if r["booking_id"] == created.json()["data"]["id"]]
     assert [(r["mode"], r["reference"]) for r in mine] == [("CHEQUE", "CHQ 004512")]
+    assert [r["paid_to"] for r in mine] == ["Office cash"]
 
 
 def test_booking_rejects_an_unknown_payment_mode(client, admin_headers, approved_customer, available_plot):

@@ -155,6 +155,7 @@ export function Projects({ plots, search, project, filter, F, tab, TB, notify, p
             headers={['PLOT NO.', 'PROJECT', 'LAYOUT', 'AREA (SQ.FT)', 'FACING', 'PRICE', 'STATUS', 'CUSTOMER', 'AGENT', 'ACTIONS']}
             empty="No plots yet — the admin adds them with Add Plots"
             rows={plotRows}
+            paginate={false}
           />
         )}
       </div>

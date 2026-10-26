@@ -15,6 +15,13 @@ const dateLabel = (iso) => {
   return Number.isNaN(d.getTime()) ? dash : d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
 };
 
+const dateTimeLabel = (iso) => {
+  const d = iso ? new Date(iso) : null;
+  if (!d || Number.isNaN(d.getTime())) return '';
+  const day = d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+  return `${day}, ${d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`;
+};
+
 const BOOKING_STATUS = {
   PENDING_APPROVAL: 'Pending Approval', CONFIRMED: 'Confirmed', AGREEMENT: 'Agreement',
   REGISTERED: 'Registered', CANCELLED: 'Cancelled', REJECTED: 'Rejected',
@@ -83,6 +90,7 @@ export function adaptWorkspace({
         id: r.id,
         no: r.receipt_number,
         date: dateLabel(r.issued_on),
+        dateTime: dateTimeLabel(r.created_at) || dateLabel(r.issued_on),
         customer: customerById.get(r.customer_id)?.name || booking?.customer_name || dash,
         customerId: r.customer_id ?? null,
         plot: booking?.plot_number || dash,
@@ -92,6 +100,9 @@ export function adaptWorkspace({
         balance: fmtINR(r.balance),
         mode: r.mode,
         reference: r.reference || '',
+        paidTo: r.paid_to || '',
+        paymentId: r.payment_id ?? null,
+        cancelled: r.payment_status === 'CANCELLED',
         agent: booking?.agent_name || '',
         shared: Boolean(r.is_shared_with_customer),
       };

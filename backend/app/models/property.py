@@ -64,7 +64,7 @@ class Project(Base, PkMixin, PublicIdMixin, TenantMixin, TimestampMixin, SoftDel
 class Plot(Base, PkMixin, PublicIdMixin, TenantMixin, TimestampMixin, SoftDeleteMixin):
     __tablename__ = "plots"
 
-    plot_number: Mapped[str] = mapped_column(String(24), nullable=False, index=True)
+    plot_number: Mapped[str] = mapped_column(String(40), nullable=False, index=True)
     project_id: Mapped[int] = mapped_column(
         ForeignKey("projects.id", ondelete="CASCADE"), nullable=False, index=True
     )

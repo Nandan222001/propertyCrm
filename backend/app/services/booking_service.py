@@ -218,6 +218,7 @@ class BookingService(BaseService[Booking]):
             token_amount=payload.token_amount,
             token_payment_mode=payload.payment_mode,
             token_payment_reference=(payload.payment_reference or None),
+            token_payment_paid_to=(payload.payment_paid_to or "").strip() or None,
             discount_amount=payload.discount_amount,
             paid_amount=Decimal("0.00"),
             payment_plan=plan.name if plan is not None else payload.payment_plan,
@@ -249,11 +250,7 @@ class BookingService(BaseService[Booking]):
                  body=f"{booking.booking_number} · Plot {plot.plot_number} was submitted by {self.actor.name}.",
                  category="APPROVAL", audience_role=Role.ADMIN.value, booking_id=booking.id)
 
-        # An admin-confirmed booking accrues the commission immediately.
-        if approved and booking.agent_id is not None:
-            from app.services.commission_service import CommissionService
-
-            CommissionService(self.db, self.actor).ensure_for_booking(booking)
+        # The agent's commission is accrued per customer payment (see PaymentService), not on the booking.
 
         # Token advance received at booking time becomes a ledger entry.
         if approved and payload.token_amount > 0:
@@ -266,6 +263,7 @@ class BookingService(BaseService[Booking]):
                     amount=payload.token_amount,
                     mode=payload.payment_mode or "TOKEN_ADVANCE",
                     reference=(payload.payment_reference or None) if payload.payment_mode else "Token advance at booking",
+                    paid_to=booking.token_payment_paid_to,
                     notes="Auto-generated token receipt",
                 )
             )
@@ -379,12 +377,6 @@ class BookingService(BaseService[Booking]):
                     after={"status": booking.status}, summary=f"Booking {booking.booking_number} approved")
         self._tell_agent(booking, "approved", "info")
 
-        # Accrue the agent commission on confirmation (idempotent).
-        if booking.agent_id is not None:
-            from app.services.commission_service import CommissionService
-
-            CommissionService(self.db, self.actor).ensure_for_booking(booking)
-
         if booking.token_amount > 0 and not self.payments.list(filters={"booking_id": booking.id}, limit=1):
             from app.schemas.finance import PaymentCreate
             from app.services.payment_service import PaymentService
@@ -392,7 +384,8 @@ class BookingService(BaseService[Booking]):
             PaymentService(self.db, self.actor).record_payment(
                 PaymentCreate(booking_id=booking.id, amount=booking.token_amount,
                               mode=booking.token_payment_mode or "TOKEN_ADVANCE",
-                              reference=booking.token_payment_reference if booking.token_payment_mode else "Token advance on approval", notes="Token receipt on approval")
+                              reference=booking.token_payment_reference if booking.token_payment_mode else "Token advance on approval",
+                              paid_to=booking.token_payment_paid_to, notes="Token receipt on approval")
             )
         return booking
 

@@ -14,6 +14,7 @@ from __future__ import annotations
 from datetime import date, timedelta
 from decimal import Decimal
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.constants import AuditAction, PaymentStatus, Permission
@@ -211,6 +212,7 @@ class PaymentService(BaseService[Payment]):
             amount=payload.amount,
             mode=payload.mode,
             reference=payload.reference,
+            paid_to=(payload.paid_to or "").strip() or None,
             received_on=received_on,
             due_date=payload.due_date or schedule_due or (None if fully_paid else received_on + timedelta(days=setting_int(self.db, "tax", "installmentDays"))),
             status=PAYMENT_STATUS_FOR[fully_paid],
@@ -239,6 +241,7 @@ class PaymentService(BaseService[Payment]):
             balance=max(balance_after, Decimal("0")),
             mode=payload.mode,
             reference=payload.reference,
+            paid_to=(payload.paid_to or "").strip() or None,
         )
         self.receipts.create(receipt)
 
@@ -247,7 +250,38 @@ class PaymentService(BaseService[Payment]):
             "receipt": receipt.receipt_number, "balance": str(receipt.balance),
         }, summary=f"₹{payload.amount} collected via {payload.mode}")
 
-        self._maybe_create_commission(booking)
+        self._maybe_create_commission(booking, payment)
+        return payment
+
+    def cancel_payment(self, payment_id: int, reason: str) -> Payment:
+        """Reverse a payment entered by mistake: the booking's balance and schedule are restored and the agent's
+        commission on it is cancelled (it no longer counts)."""
+        if not self.actor.can(Permission.PAYMENT_APPROVE):
+            raise PermissionDeniedError("Only an approver can cancel a payment")
+        payment = self.payments.get_or_404(payment_id)
+        if payment.status == PaymentStatus.CANCELLED.value:
+            raise BusinessRuleError("This payment is already cancelled")
+        from app.models.payment import Commission
+
+        commissions = list(self.db.execute(
+            select(Commission).where(Commission.payment_id == payment.id, Commission.is_deleted == 0)).scalars())
+        if any(c.status == "PAID" for c in commissions):
+            raise BusinessRuleError("The agent's commission on this payment has already been paid out, so it cannot be cancelled")
+
+        booking = self.bookings.get_or_404(payment.booking_id)
+        before = {"status": payment.status, "paid": str(booking.paid_amount)}
+        payment.status = PaymentStatus.CANCELLED.value
+        payment.notes = (f"{payment.notes}\n" if payment.notes else "") + f"Cancelled: {reason}"
+        booking.paid_amount = max(Decimal(booking.paid_amount) - Decimal(payment.amount), Decimal("0"))
+        if booking.plan_id is not None:
+            PlanService(self.db, self.actor).release_payment(booking.id, payment.amount)
+        if booking.plot is not None and booking.plot.status == "SOLD" and booking.balance > 0:
+            booking.plot.status = "BOOKED"
+        for commission in commissions:
+            commission.status = "CANCELLED"
+        self.db.flush()
+        self._audit(AuditAction.REJECT, payment, before=before, after={"status": payment.status},
+                    summary=f"₹{payment.amount} payment on {booking.booking_number} cancelled: {reason}")
         return payment
 
     def set_next_due(self, booking_number: str, due: date) -> dict:
@@ -346,11 +380,11 @@ class PaymentService(BaseService[Payment]):
             return PaymentStatus.PARTIALLY_PAID.value
         return PaymentStatus.PENDING.value
 
-    def _maybe_create_commission(self, booking) -> None:
-        """Create the agent commission when the booking is confirmed (idempotent)."""
+    def _maybe_create_commission(self, booking, payment) -> None:
+        """Accrue the agent's commission on this payment once the booking is confirmed (idempotent)."""
         from app.services.commission_service import CommissionService
 
         if booking.agent_id is None or booking.status not in ("CONFIRMED", "AGREEMENT", "REGISTERED"):
             return
         service = CommissionService(self.db, self.actor)
-        service.ensure_for_booking(booking)
+        service.accrue_for_payment(booking, payment)

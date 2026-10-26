@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
 import { ArrowUpRight, ChevronRight, Download, Plus, Search, CalendarDays } from 'lucide-react';
 import { fmtINR } from '../../utils/money';
-import { compactINR, inventoryStats, monthlySeries, salesStats } from '../../utils/dashboardStats';
+import { CHART_RANGES, chartRangeDates, compactINR, inventoryStats, rangeSeries, salesStats } from '../../utils/dashboardStats';
 
-export function AdminDashboard({ bookings: allBookings = [], pays: allPays = [], plots: allPlots = [], project = 'All projects', go, D, notify }) {
+export function AdminDashboard({ bookings: allBookings = [], pays: allPays = [], plots: allPlots = [], receipts: allReceipts = null, project = 'All projects', go, D, notify }) {
   const [chartRange, setChartRange] = useState('Last 6 months');
+  const [custom, setCustom] = useState({ from: '', to: '' });
 
   // The project chosen in the sidebar scopes every figure on the overview.
   const all = project === 'All projects';
@@ -13,7 +14,10 @@ export function AdminDashboard({ bookings: allBookings = [], pays: allPays = [],
   const plots = all ? allPlots : allPlots.filter((x) => x[8] === project);
   const sales = salesStats(bookings);
   const inventory = inventoryStats(plots);
-  const series = monthlySeries(bookings, chartRange === 'Last quarter' ? 3 : chartRange === 'This year' ? 12 : 6);
+  const receipts = allReceipts && (all ? allReceipts : allReceipts.filter((r) => r.project === project));
+  const dates = chartRangeDates(chartRange, custom);
+  const series = rangeSeries(bookings, receipts, ...(dates || chartRangeDates('Last 6 months')));
+  const labelEvery = Math.max(Math.ceil(series.buckets.length / 12), 1);
   const money = (n) => compactINR(n);
   const yTop = compactINR(series.max);
 
@@ -59,18 +63,26 @@ export function AdminDashboard({ bookings: allBookings = [], pays: allPays = [],
               <h2>Sales & Collections Velocity</h2>
               <p>Gross booking value vs reconciled bank cash collection</p>
             </div>
-            <select className="select-mini" value={chartRange} onChange={e => setChartRange(e.target.value)}>
-              <option>Last 6 months</option>
-              <option>This year</option>
-              <option>Last quarter</option>
-            </select>
+            <div className="chart-range">
+              <select className="select-mini" value={chartRange} onChange={e => setChartRange(e.target.value)} aria-label="Chart period">
+                {CHART_RANGES.map((r) => <option key={r}>{r}</option>)}
+              </select>
+              {chartRange === 'Custom range' && (
+                <>
+                  <input type="date" className="select-mini" value={custom.from} max={custom.to || undefined} onChange={(e) => setCustom({ ...custom, from: e.target.value })} aria-label="From date" />
+                  <span>to</span>
+                  <input type="date" className="select-mini" value={custom.to} min={custom.from || undefined} onChange={(e) => setCustom({ ...custom, to: e.target.value })} aria-label="To date" />
+                </>
+              )}
+            </div>
           </div>
+          {chartRange === 'Custom range' && !dates && <p className="field-hint">Pick both dates (the first on or before the second) — showing the last 6 months meanwhile.</p>}
           <div className="chart-legend">
             <span><i className="legend-dot indigo-dot" />Sales value</span>
             <span><i className="legend-dot green-dot" />Collection</span>
           </div>
           {series.max === 0 ? (
-            <p className="empty-note">No bookings in this period yet.</p>
+            <p className="empty-note">No sales or collections in this period.</p>
           ) : (
             <>
               <div className="chart-wrap">
@@ -81,7 +93,7 @@ export function AdminDashboard({ bookings: allBookings = [], pays: allPays = [],
                   <div className="grid-lines"><i /><i /><i /><i /></div>
                   <div className="bars">
                     {series.buckets.map((m) => (
-                      <div className="bar-group" key={m.key} title={`${m.label}: sales ₹${fmtINR(m.sales)} · collected ₹${fmtINR(m.collected)}`}>
+                      <div className="bar-group" key={m.key} title={`${series.unit === 'week' ? 'Week of ' : ''}${m.label}: sales ₹${fmtINR(m.sales)} · collected ₹${fmtINR(m.collected)}`}>
                         <div className="bar" style={{ height: `${m.salesPct}%` }} />
                         <div className="bar collection" style={{ height: `${m.collectedPct}%` }} />
                       </div>
@@ -90,7 +102,7 @@ export function AdminDashboard({ bookings: allBookings = [], pays: allPays = [],
                 </div>
               </div>
               <div className="x-labels">
-                {series.buckets.map((m) => <span key={m.key}>{m.label}</span>)}
+                {series.buckets.map((m, i) => <span key={m.key}>{i % labelEvery === 0 ? m.label : ''}</span>)}
               </div>
             </>
           )}

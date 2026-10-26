@@ -18,6 +18,7 @@ class BookingCreate(SafeText):
     final_price: Money
     token_amount: Money = Decimal("0")
     payment_mode: str | None = Field(default=None, max_length=24, description="How the amount paid at booking was received")
+    payment_paid_to: str | None = Field(default=None, max_length=80, description="Who the amount paid at booking was paid to")
     payment_reference: str | None = Field(default=None, max_length=80, description="Transaction id / cheque no. of that payment")
     discount_amount: Money = Decimal("0")
     payment_plan: str | None = Field(default=None, max_length=80)

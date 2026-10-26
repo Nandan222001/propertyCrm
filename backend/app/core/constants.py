@@ -154,6 +154,7 @@ ROLE_PERMISSIONS: dict[Role, frozenset[Permission]] = {
             Permission.CUSTOMER_DELETE,
             Permission.COMMISSION_VIEW, Permission.DASHBOARD_VIEW,
             Permission.DOCUMENT_VIEW, Permission.NOTIFICATION_VIEW,
+            Permission.PII_REVEAL,   # agents see the name / phone of the customers they handle
         }
     ),
     Role.ACCOUNTS: frozenset(
@@ -214,6 +215,7 @@ class PaymentStatus(StrEnum):
     PARTIALLY_PAID = "PARTIALLY_PAID"
     PAID = "PAID"
     OVERDUE = "OVERDUE"
+    CANCELLED = "CANCELLED"   # reversed: no longer counts as money received
 
 
 class InvoiceStatus(StrEnum):

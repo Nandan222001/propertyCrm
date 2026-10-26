@@ -74,14 +74,14 @@ class PlotBase(SafeText):
 
 
 class PlotCreate(PlotBase):
-    plot_number: str = Field(min_length=1, max_length=24)
+    plot_number: str = Field(min_length=1, max_length=40)
     project_id: int = Field(gt=0)
     agent_code: str | None = Field(default=None, max_length=16)
 
     @field_validator("plot_number")
     @classmethod
     def _plot_number(cls, value: str) -> str:
-        cleaned = clean_text(value, max_length=24).upper()
+        cleaned = clean_text(value, max_length=40).upper()
         if not cleaned:
             raise ValueError("plot number is required")
         return cleaned
@@ -91,7 +91,7 @@ class PlotBulkCreate(PlotBase):
     """Add a run of plots to a project: ``A-1`` … ``A-20`` from prefix ``A-``, start 1, count 20."""
 
     project_id: int = Field(gt=0)
-    prefix: str = Field(default="", max_length=12)
+    prefix: str = Field(default="", max_length=30)
     start: int = Field(default=1, ge=0, le=99999)
     count: int = Field(ge=1, le=500)
     status: PlotStatus = PlotStatus.AVAILABLE
@@ -99,7 +99,7 @@ class PlotBulkCreate(PlotBase):
     @field_validator("prefix")
     @classmethod
     def _prefix(cls, value: str) -> str:
-        return clean_text(value, max_length=12).upper()
+        return clean_text(value, max_length=30).upper()
 
 
 class PlotUpdate(SafeText):

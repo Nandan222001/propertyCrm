@@ -226,7 +226,7 @@ const createBookingLive = (form) => async (dispatch, getState) => {
     const response = await api.bookings.create({
       customer_id: customer.id, plot_id: plot[9], final_price: parseAmt(form.amount),
       token_amount: parseAmt(form.paid || 0), payment_plan: form.plan,
-      ...(parseAmt(form.paid || 0) > 0 && form.mode ? { payment_mode: form.mode, ...(form.txn ? { payment_reference: form.txn } : {}) } : {}),
+      ...(parseAmt(form.paid || 0) > 0 && form.mode ? { payment_mode: form.mode, ...(form.txn ? { payment_reference: form.txn } : {}), ...(form.paidTo ? { payment_paid_to: form.paidTo } : {}) } : {}),
       ...(form.planId ? { plan_id: form.planId } : {}),
     });
     const booking = response.data;
@@ -397,14 +397,14 @@ export const setFollowUp = (id, value) => (dispatch) => dispatch(followUpSet({ i
 
 // --------------------------------------------------------------- payments
 /** Live payment: the server updates the booking, ledger, plot and issues the numbered receipt. */
-const recordPaymentLive = ({ booking, finalPrice, amount, mode, reference, due }) => async (dispatch) => {
+const recordPaymentLive = ({ booking, finalPrice, amount, mode, reference, paidTo, due }) => async (dispatch) => {
   if (typeof booking[10] !== 'number') {
     dispatch(toastPushed('Could not record the payment: this booking is not synced yet. Refresh and try again.'));
     return;
   }
   try {
     const response = await api.payments.create({
-      booking_id: booking[10], amount, mode: String(mode).toUpperCase(), reference: reference || undefined,
+      booking_id: booking[10], amount, mode: String(mode).toUpperCase(), reference: reference || undefined, paid_to: paidTo || undefined,
       final_price: finalPrice, ...(due ? { due_date: due } : {}),
     });
     dispatch(modalClosed());
@@ -415,8 +415,8 @@ const recordPaymentLive = ({ booking, finalPrice, amount, mode, reference, due }
   }
 };
 
-export const recordPayment = ({ booking, finalPrice, amount, mode, reference, due }) => (dispatch, getState) => {
-  if (getState().auth.mode === 'live') return dispatch(recordPaymentLive({ booking, finalPrice, amount, mode, reference, due }));
+export const recordPayment = ({ booking, finalPrice, amount, mode, reference, paidTo, due }) => (dispatch, getState) => {
+  if (getState().auth.mode === 'live') return dispatch(recordPaymentLive({ booking, finalPrice, amount, mode, reference, paidTo, due }));
   const { receipts, payments } = getState().domain;
   const paid = parseAmt(booking[6]) + amount;
   const balance = finalPrice - paid;
@@ -446,7 +446,7 @@ export const recordPayment = ({ booking, finalPrice, amount, mode, reference, du
 
   const receipt = {
     no: nextReference(getSettings().tax.receiptPrefix || 'RCT', receipts.map((r) => r.no)),
-    date: todayLabel(), shared: false, mode, reference: reference || '',
+    date: todayLabel(), shared: false, mode, reference: reference || '', paidTo: paidTo || '',
     customer: booking[1], plot: booking[3], project: booking[2],
     finalPrice: fmtINR(finalPrice), amount: fmtINR(amount), balance: fmtINR(Math.max(balance, 0)), agent: booking[8],
   };
@@ -474,6 +474,18 @@ export const setPaymentStatus = (payment, status) => (dispatch) => {
   dispatch(paymentStatusSet({ customer: payment[0], plot: payment[1], status }));
   dispatch(toastPushed(`${payment[0]} · Plot ${payment[1]} marked ${status.toLowerCase()}`));
   clientAudit('payment.status_changed', { customer: payment[0], plot: payment[1], status });
+};
+
+/** Cancel a payment entered by mistake: the balance, the schedule and the agent's commission on it are reversed. */
+export const cancelPaymentLive = (receipt, reason) => async (dispatch) => {
+  try {
+    await actions.cancelPayment(receipt.paymentId, reason);
+    await dispatch(hydrateWorkspace({ silent: true }));
+    dispatch(toastPushed(`Payment ${receipt.no} cancelled · ₹${receipt.amount} no longer counts`));
+    return '';
+  } catch (error) {
+    return error.message || 'Could not cancel the payment.';
+  }
 };
 
 export const markReceiptShared = (receipt) => async (dispatch, getState) => {

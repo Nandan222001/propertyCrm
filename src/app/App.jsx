@@ -22,7 +22,7 @@ import {
 import { hasSession } from '../api';
 import {
   createBooking, createCustomer, decideBooking, decideCustomer, deleteRecord, hydrateWorkspace, restoreSession,
-  markReceiptShared, recordPayment, saveProject, setInvoiceStatus, setPaymentStatus, setNextDueDate, changeMyPassword, saveRecord, setFollowUp, updateCustomerLive, deleteCustomerLive, updateBookingLive, deleteBookingLive, deleteProjectLive, deletePlotLive, updatePlotLive, addPlotsLive, resetUserPasswordLive,
+  markReceiptShared, cancelPaymentLive, recordPayment, saveProject, setInvoiceStatus, setPaymentStatus, setNextDueDate, changeMyPassword, saveRecord, setFollowUp, updateCustomerLive, deleteCustomerLive, updateBookingLive, deleteBookingLive, deleteProjectLive, deletePlotLive, updatePlotLive, addPlotsLive, resetUserPasswordLive,
   setRegistryStatus, actionNotification, loadNotifications, signIn, signOut, saveInvoice, issueInvoice, cancelInvoice, payInvoice,
   shareInvoice, downloadInvoicePdf,
 } from '../store/thunks';
@@ -339,7 +339,7 @@ export function App() {
             <>
               {role === ROLES.SUPER_ADMIN && <PlatformDashboard tenants={tenants} go={go} userName={auth.user?.name} />}
               {role === ROLES.ADMIN && (
-                <AdminDashboard bookings={domain.bookings} pays={domain.payments} plots={domain.plots} project={ui.project} go={go} D={(kind, preset) => dispatch(modalOpened({ modal: kind, preset }))} notify={notify} />
+                <AdminDashboard bookings={domain.bookings} pays={domain.payments} receipts={domain.receipts} plots={domain.plots} project={ui.project} go={go} D={(kind, preset) => dispatch(modalOpened({ modal: kind, preset }))} notify={notify} />
               )}
               {role === ROLES.ADMIN && <PortfolioInsights go={go} projects={domain.projects} plots={domain.plots} bookings={scoped.bookings} receipts={scoped.receipts} />}
               {role === ROLES.SALES_MANAGER && (
@@ -370,6 +370,7 @@ export function App() {
 
           {page === PAGES.APPROVALS && (
             <ApprovalsPage
+              search={ui.search}
               bookings={domain.bookings}
               customers={domain.customers}
               onApproveBooking={(booking) => dispatch(decideBooking(booking, 'approve'))}
@@ -445,6 +446,7 @@ export function App() {
               role={role}
               onOpenBill={(receipt) => dispatch(billOpened(receipt.no))}
               onShare={shareReceipt}
+              onCancelPayment={auth.mode === 'live' ? (receipt, reason) => dispatch(cancelPaymentLive(receipt, reason)) : undefined}
               onStatus={(payment, status) => dispatch(setPaymentStatus(payment, status))}
               onDueDate={auth.mode === 'live' ? (payment, date) => dispatch(setNextDueDate(payment, date)) : undefined}
               onRemind={(row) => openWhatsApp(
@@ -533,6 +535,7 @@ export function App() {
           {page === PAGES.DOCUMENTS && (
             <DocumentsPage
               docs={documents}
+              search={ui.search}
               notify={notify}
               onOpenDocument={(doc) => (doc.receiptNo
                 ? dispatch(billOpened(doc.receiptNo))
@@ -542,6 +545,7 @@ export function App() {
           {page === PAGES.NOTIFICATIONS && (
             <Notifications
               items={notifications.items}
+              search={ui.search}
               live={auth.mode === 'live'}
               onAction={(item) => dispatch(actionNotification(item))}
               fups={domain.followUps}
@@ -556,6 +560,7 @@ export function App() {
           {page === PAGES.USERS && (
             <Roles
               role={role}
+              search={ui.search}
               notify={notify}
               users={teamUsers}
               create={() => dispatch(modalOpened({ modal: 'user' }))}

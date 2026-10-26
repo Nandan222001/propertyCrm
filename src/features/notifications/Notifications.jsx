@@ -1,4 +1,5 @@
 import React from 'react';
+import { rowMatchesSearch } from '../../utils/search';
 import { PAGES } from '../../constants/navigation';
 import { RoleContextBanner } from '../../components/layout/RoleContextBanner';
 
@@ -20,8 +21,8 @@ const when = (iso) => {
   return Number.isNaN(d.getTime()) ? '' : d.toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
 };
 
-export function Notifications({ items, live, role, fups = {}, FUP, onAction, notify, onNavigate, allowedPages = [] }) {
-  const list = live ? items : [];
+export function Notifications({ items, search = '', live, role, fups = {}, FUP, onAction, notify, onNavigate, allowedPages = [] }) {
+  const list = (live ? items : []).filter((item) => rowMatchesSearch(item, search));
 
   const act = (item) => {
     if (live) onAction(item);
@@ -44,7 +45,7 @@ export function Notifications({ items, live, role, fups = {}, FUP, onAction, not
         </div>
 
         <div className="notifications-list">
-          {list.length === 0 && <p className="empty-note">You&apos;re all caught up — nothing needs your attention.</p>}
+          {list.length === 0 && <p className="empty-note">{search ? 'No notifications match your search.' : 'You&apos;re all caught up — nothing needs your attention.'}</p>}
           {list.map((item) => (
             <div className="notification-row" key={item.id}>
               <span className={`status-dot ${dot(item.severity)}`} />

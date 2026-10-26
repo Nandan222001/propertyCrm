@@ -107,14 +107,16 @@ class PaymentRepository(BaseRepository[Payment]):
         return None
 
     def total_collected(self, scope_clause=None) -> Decimal:
-        stmt = select(func.coalesce(func.sum(Payment.amount), 0)).where(Payment.is_deleted == 0)
+        stmt = select(func.coalesce(func.sum(Payment.amount), 0)).where(
+            Payment.is_deleted == 0, Payment.status != PaymentStatus.CANCELLED.value)
         if scope_clause is not None:
             stmt = stmt.where(scope_clause)
         return Decimal(str(self.db.execute(stmt).scalar_one() or 0))
 
     def collected_between(self, start: date, end: date) -> Decimal:
         stmt = select(func.coalesce(func.sum(Payment.amount), 0)).where(
-            Payment.is_deleted == 0, Payment.received_on.between(start, end)
+            Payment.is_deleted == 0, Payment.status != PaymentStatus.CANCELLED.value,
+            Payment.received_on.between(start, end)
         )
         return Decimal(str(self.db.execute(stmt).scalar_one() or 0))
 

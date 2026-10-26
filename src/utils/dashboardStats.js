@@ -70,3 +70,74 @@ export function monthlySeries(bookings = [], months = 6, now = new Date()) {
     })),
   };
 }
+
+const DAY = 24 * 60 * 60 * 1000;
+const startOfDay = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
+
+/**
+ * Sales (bookings, by booking date) and collections (receipts, by receipt date; cancelled payments left out)
+ * between `from` and `to`, both days included. Short ranges are bucketed by day, medium ones by week, long ones by month.
+ * Without receipts, collections fall back to what each booking has paid so far (on its booking date).
+ */
+export function rangeSeries(bookings = [], receipts = null, from, to) {
+  const start = startOfDay(from);
+  const end = startOfDay(to);
+  const days = Math.max(Math.round((end - start) / DAY) + 1, 1);
+  const unit = days <= 31 ? 'day' : days <= 140 ? 'week' : 'month';
+
+  const buckets = [];
+  if (unit === 'month') {
+    for (let d = new Date(start.getFullYear(), start.getMonth(), 1); d <= end; d = new Date(d.getFullYear(), d.getMonth() + 1, 1)) {
+      buckets.push({ at: d, next: new Date(d.getFullYear(), d.getMonth() + 1, 1), label: d.toLocaleDateString('en-GB', { month: 'short' }) });
+    }
+  } else {
+    const step = unit === 'day' ? 1 : 7;
+    for (let d = start; d <= end; d = new Date(d.getTime() + step * DAY)) {
+      const next = new Date(d.getTime() + step * DAY);
+      buckets.push({ at: d, next, label: d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) });
+    }
+  }
+  const rows = buckets.map((b, i) => ({ ...b, key: `${unit}-${i}`, sales: 0, collected: 0 }));
+  const place = (date, field, amount) => {
+    if (!date || date < start || date >= new Date(end.getTime() + DAY)) return;
+    const bucket = rows.find((r) => date >= r.at && date < r.next);
+    if (bucket) bucket[field] += amount;
+  };
+
+  bookings.filter(COUNTED).forEach((b) => {
+    const d = parseBookingDate(b[4]);
+    place(d, 'sales', parseAmt(b[5]));
+    if (!receipts) place(d, 'collected', parseAmt(b[6]));
+  });
+  (receipts || []).filter((r) => !r.cancelled).forEach((r) => place(parseBookingDate(r.date), 'collected', parseAmt(r.amount)));
+
+  const max = Math.max(...rows.map((x) => Math.max(x.sales, x.collected)), 0);
+  return {
+    max, unit, days,
+    buckets: rows.map((x) => ({
+      ...x,
+      salesPct: max ? Math.max((x.sales / max) * 100, x.sales ? 4 : 0) : 0,
+      collectedPct: max ? Math.max((x.collected / max) * 100, x.collected ? 4 : 0) : 0,
+    })),
+  };
+}
+
+/** The ranges offered on the overview chart; `custom` takes the dates the user picks. */
+export const CHART_RANGES = ['Last 7 days', 'Last 30 days', 'Last 90 days', 'Last 6 months', 'This year', 'Custom range'];
+
+export function chartRangeDates(range, custom = {}, now = new Date()) {
+  const today = startOfDay(now);
+  const back = (n) => new Date(today.getTime() - (n - 1) * DAY);
+  switch (range) {
+    case 'Last 7 days': return [back(7), today];
+    case 'Last 30 days': return [back(30), today];
+    case 'Last 90 days': return [back(90), today];
+    case 'This year': return [new Date(today.getFullYear(), 0, 1), today];
+    case 'Custom range': {
+      const from = custom.from ? new Date(`${custom.from}T00:00:00`) : null;
+      const to = custom.to ? new Date(`${custom.to}T00:00:00`) : null;
+      return from && to && from <= to ? [from, to] : null;
+    }
+    default: return [new Date(today.getFullYear(), today.getMonth() - 5, 1), today];   // Last 6 months
+  }
+}

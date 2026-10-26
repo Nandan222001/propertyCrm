@@ -47,7 +47,7 @@ export function AddPlotsModal({ projects, defaultProject = '', close, save }) {
               {real.map((p) => <option key={p[0]}>{p[0]}</option>)}
             </select>
           </label>
-          <label>Plot number prefix<input value={form.prefix} onChange={set('prefix')} placeholder="e.g. A-" /></label>
+          <label>Plot number prefix<input value={form.prefix} onChange={set('prefix')} maxLength={30} placeholder="e.g. A-" /></label>
           <label>Starting number<input value={form.start} onChange={set('start')} inputMode="numeric" /></label>
           <label>How many plots<input value={form.count} onChange={set('count')} inputMode="numeric" placeholder="e.g. 20" autoFocus /></label>
           <label>Layout<input value={form.layout} onChange={set('layout')} placeholder="Layout name" /></label>

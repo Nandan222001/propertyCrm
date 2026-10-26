@@ -216,6 +216,19 @@ class PlanService:
             remaining -= take
         self.db.flush()
 
+    def release_payment(self, booking_id: int, amount: Decimal) -> None:
+        """A payment was cancelled: take its money back off the latest paid lines of the schedule."""
+        remaining = Decimal(amount)
+        for line in reversed(self.installments(booking_id)):
+            if remaining <= 0:
+                break
+            take = min(line.paid_amount, remaining)
+            if take <= 0:
+                continue
+            line.paid_amount = money(line.paid_amount - take)
+            remaining -= take
+        self.db.flush()
+
     def rescale(self, booking: Booking, new_total) -> None:
         """The agreed total changed: scale the lines nobody has paid on so the schedule still adds up."""
         lines = self.installments(booking.id)

@@ -96,7 +96,7 @@ export function BookingModal({ role, agentName, customers, plots, projects = [],
     if (parseAmt(tokenValue) > parseAmt(finalPrice)) return setError('The amount paid at booking cannot exceed the final price.');
     save({
       customer, customerId: typeof chosen?.id === 'number' ? chosen.id : undefined, project, plot: selected[0], amount: fmtINR(parseAmt(finalPrice)), paid: fmtINR(parseAmt(tokenValue)),
-      mode: d.mode || 'UPI', txn: (d.txn || '').trim(), plan: plan?.name || 'Standard', planId: plan ? plan.id : undefined, agent: agentMode ? agentName : d.agent,
+      mode: d.mode || 'UPI', txn: (d.txn || '').trim(), paidTo: (d.paidTo || '').trim(), plan: plan?.name || 'Standard', planId: plan ? plan.id : undefined, agent: agentMode ? agentName : d.agent,
     });
   }
 
@@ -139,6 +139,8 @@ export function BookingModal({ role, agentName, customers, plots, projects = [],
           <Field label="Transaction details" hint="UPI / bank transaction id or cheque number — shown on the receipt">
             <input name="txn" maxLength={80} placeholder="e.g. TXN123456" />
           </Field>
+          <Field label="Paid to" hint="Who received the money — shown as 'In favour of' on the receipt"><input name="paidTo" maxLength={80} list="paid-to-options" placeholder="e.g. Company bank account" /><datalist id="paid-to-options"><option value="Company bank account" /><option value="Office cash" /><option value="Director" /><option value="Agent" /></datalist></Field>
+          
           {hasPlans ? (
             <Field label="Payment scheme (optional)" hint={plan ? 'Every amount below follows this scheme' : 'Only choose a scheme if the customer wants one; otherwise the plot is booked at its full price.'}>
               <select value={planId} onChange={e => { setPlanId(e.target.value); setPrice(''); }}>
@@ -197,7 +199,7 @@ export function PaymentModal({ bookings, pays, close, save }) {
     if (finalPrice < paidBefore) return setError('Final price cannot be below the amount already paid.');
     if (parseAmt(amount) <= 0) return setError('Enter the amount received.');
     if (parseAmt(amount) > balanceBefore) return setError(`Amount exceeds the balance of ₹${fmtINR(balanceBefore)}.`);
-    save({ booking: b, finalPrice, amount: parseAmt(amount), mode: d.mode, reference: d.reference, due: d.due });
+    save({ booking: b, finalPrice, amount: parseAmt(amount), mode: d.mode, reference: d.reference, paidTo: (d.paidTo || '').trim(), due: d.due });
   }
 
   return (
@@ -224,6 +226,7 @@ export function PaymentModal({ bookings, pays, close, save }) {
             <select name="mode" defaultValue="UPI">{['UPI', 'NEFT', 'Cheque', 'Cash', 'Card'].map(x => <option key={x}>{x}</option>)}</select>
           </Field>
           <Field label="Transaction details" hint="UPI / bank transaction id or cheque number — shown on the receipt"><input name="reference" maxLength={80} placeholder="e.g. TXN123456" /></Field>
+          <Field label="Paid to" hint="Who received the money — shown as 'In favour of' on the receipt"><input name="paidTo" maxLength={80} list="paid-to-options" placeholder="e.g. Company bank account" /><datalist id="paid-to-options"><option value="Company bank account" /><option value="Office cash" /><option value="Director" /><option value="Agent" /></datalist></Field>
           <Field label="Next due date"><input name="due" type="date" /></Field>
         </div>
         {error && <p className="form-error">{error}</p>}

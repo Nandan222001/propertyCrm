@@ -15,8 +15,9 @@ import { Badge } from '../../components/common/Badge';
 import { Mini } from '../../components/common/StatTile';
 import { RoleContextBanner } from '../../components/layout/RoleContextBanner';
 
-export function Payments({ pays, receipts, project, search, filter, F, D, notify, role, onOpenBill, onShare, onRemind, onStatus, onDueDate }) {
+export function Payments({ pays, receipts, project, search, filter, F, D, notify, role, onOpenBill, onShare, onRemind, onStatus, onDueDate, onCancelPayment }) {
   const [dueFor, setDueFor] = useState(null);
+  const [cancelling, setCancelling] = useState(null);
   const [view, setView] = useState('ledger');
   const canBill = canManageBills(role);
   const customerView = role === 'CUSTOMER';
@@ -112,12 +113,17 @@ export function Payments({ pays, receipts, project, search, filter, F, D, notify
                 `${r.project} · ${r.plot}`,
                 <b>₹{r.amount}</b>,
                 r.mode,
-                <Badge>{r.shared ? 'Shared' : 'Not shared'}</Badge>,
+                <span key={`s-${r.no}`}>{r.cancelled ? <Badge>CANCELLED</Badge> : <Badge>{r.shared ? 'Shared' : 'Not shared'}</Badge>}</span>,
                 <div className="row-actions" key={r.no}>
                   <button className="icon-action" onClick={() => onOpenBill(r)} title="View / print bill (office + customer copy)">
                     <Printer size={14} />
                   </button>
-                  {canBill && (
+                  {canBill && onCancelPayment && !r.cancelled && typeof r.paymentId === 'number' && (
+                    <button className="button button-white small-btn" onClick={() => setCancelling(r)} title="Cancel this payment (entered by mistake)">
+                      <X size={12} /> Cancel
+                    </button>
+                  )}
+                  {canBill && !r.cancelled && (
                     <button className="button whatsapp-btn small-btn" onClick={() => onShare(r)} title="Share bill with customer">
                       <MessageCircle size={12} /> Share
                     </button>
@@ -132,8 +138,43 @@ export function Payments({ pays, receipts, project, search, filter, F, D, notify
           </>
         )}
       </div>
+      {cancelling && <CancelPaymentModal receipt={cancelling} close={() => setCancelling(null)} save={onCancelPayment} />}
       {dueFor && <DueDateModal payment={dueFor} close={() => setDueFor(null)} save={onDueDate} />}
     </>
+  );
+}
+
+/** Reverse a payment: needs a reason, and the customer's balance and the agent's commission follow. */
+function CancelPaymentModal({ receipt, close, save }) {
+  const [reason, setReason] = useState('');
+  const [error, setError] = useState('');
+  const submit = async (e) => {
+    e.preventDefault();
+    if (reason.trim().length < 3) { setError('Say why the payment is being cancelled.'); return; }
+    const problem = await save(receipt, reason.trim());
+    if (problem) setError(problem); else close();
+  };
+  return (
+    <div className="modal-backdrop" onMouseDown={(e) => e.target === e.currentTarget && close()}>
+      <form className="modal view-modal" onSubmit={submit} noValidate>
+        <div className="modal-head">
+          <div>
+            <span className="modal-kicker">CANCEL PAYMENT</span>
+            <h2>{receipt.no} · ₹{receipt.amount}</h2>
+            <p>{receipt.customer} · {receipt.project} · Plot {receipt.plot}. The amount is added back to the balance and the agent's commission on it is cancelled.</p>
+          </div>
+          <button type="button" className="modal-close" onClick={close} aria-label="Close"><X size={16} /></button>
+        </div>
+        <div className="form-grid">
+          <label>Reason<input value={reason} onChange={(e) => setReason(e.target.value)} maxLength={255} autoFocus /></label>
+        </div>
+        {error && <p className="form-error" role="alert">{error}</p>}
+        <div className="modal-actions">
+          <button type="button" className="button button-white" onClick={close}>Keep payment</button>
+          <button type="submit" className="button button-primary">Cancel payment</button>
+        </div>
+      </form>
+    </div>
   );
 }
 

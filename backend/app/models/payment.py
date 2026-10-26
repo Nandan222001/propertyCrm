@@ -51,6 +51,8 @@ class Commission(Base, PkMixin, PublicIdMixin, TenantMixin, TimestampMixin, Soft
 
     agent_id: Mapped[int] = mapped_column(ForeignKey("agents.id", ondelete="CASCADE"), nullable=False, index=True)
     booking_id: Mapped[int | None] = mapped_column(ForeignKey("bookings.id", ondelete="SET NULL"), index=True)
+    #: The customer payment this commission was earned on (None for a manual or legacy whole-deal commission).
+    payment_id: Mapped[int | None] = mapped_column(ForeignKey("payments.id", ondelete="SET NULL"), index=True)
 
     deal_value: Mapped[Decimal] = mapped_column(Numeric(18, 2), nullable=False)
     rate: Mapped[Decimal] = mapped_column(Numeric(5, 4), nullable=False)
@@ -81,6 +83,8 @@ class Payment(Base, PkMixin, PublicIdMixin, TenantMixin, TimestampMixin, SoftDel
     amount: Mapped[Decimal] = mapped_column(Numeric(18, 2), nullable=False)
     mode: Mapped[str] = mapped_column(String(24), nullable=False, default="UPI")
     reference: Mapped[str | None] = mapped_column(String(80))
+    #: Who the money was handed to (shown as "In favour of" on the receipt).
+    paid_to: Mapped[str | None] = mapped_column(String(80))
     instrument_date: Mapped[date | None] = mapped_column(Date)
     received_on: Mapped[date] = mapped_column(Date, nullable=False, default=date.today, index=True)
     due_date: Mapped[date | None] = mapped_column(Date, index=True)
@@ -120,11 +124,16 @@ class Receipt(Base, PkMixin, PublicIdMixin, TenantMixin, TimestampMixin):
     balance: Mapped[Decimal] = mapped_column(Numeric(18, 2), nullable=False)
     mode: Mapped[str] = mapped_column(String(24), nullable=False)
     reference: Mapped[str | None] = mapped_column(String(80))
+    paid_to: Mapped[str | None] = mapped_column(String(80))
     is_shared_with_customer: Mapped[bool] = mapped_column(default=False, nullable=False)
     shared_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
     pdf_key: Mapped[str | None] = mapped_column(String(255))
 
     payment = relationship("Payment", back_populates="receipt")
+
+    @property
+    def payment_status(self) -> str | None:
+        return self.payment.status if self.payment is not None else None
 
     __table_args__ = (
         UniqueConstraint("tenant_id", "receipt_number", name="uq_receipts_tenant_receipt_number"),

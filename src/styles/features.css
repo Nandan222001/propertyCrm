@@ -182,7 +182,15 @@
 .rc .inv2-head h2{font-size:17px}
 .rc .inv2-title b{font-size:18px}
 .rc .inv2-boxes{margin-top:10px}
-.rc .inv2-sign{margin-top:22px;justify-content:flex-end}
+.rc .inv2-sign{margin-top:46px;justify-content:space-between}
+.rc-parties{display:grid;grid-template-columns:1fr 1.1fr;gap:18px;margin-top:14px;align-items:start}
+.rc-from h3{margin:0 0 4px;font:700 15px Manrope;color:#172033}
+.rc-from p{margin:2px 0;font-size:13px;color:#2a3140}
+.rc-details{display:grid;grid-template-columns:auto 1fr;gap:3px 12px;margin:0;font-size:12px;color:#2a3140}
+.rc-details dd{margin:0;text-align:right;font-weight:700;color:#172033}
+.rc-total{display:flex;justify-content:space-between;align-items:center;gap:18px;margin-top:12px}
+.rc-total p{margin:0;font-size:12px;max-width:50%}
+.rc-grand{display:flex;justify-content:space-between;gap:16px;width:46%;background:#eef0fb;border:1.5px solid #3548c9;padding:8px 10px;font:800 14px Manrope;color:#2b3a93}
 
 /* admin dashboard: donut legend + reminders (computed rows) */
 .donut-legend i{display:block;width:8px;height:8px;border-radius:50%}
@@ -461,3 +469,4 @@
 
 /* Page content: 25px left and right padding beside the sidebar (phones keep their tighter gutters) */
 @media(min-width:601px){.content{padding-left:25px;padding-right:25px}}
+.chart-range{display:flex;align-items:center;gap:6px;flex-wrap:wrap;justify-content:flex-end;color:#6b7385;font-size:12px}

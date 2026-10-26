@@ -27,7 +27,7 @@ export const roleConfigs = {
     title: 'Operations Command Center',
     subtitle: 'Overall project portfolio, customer bookings, collection reconciliations and operations.',
     permissions: ['PROJECTS_CRUD', 'BOOKINGS_CRUD', 'PAYMENTS_CRUD', 'AGENTS_CRUD', 'REPORTS_VIEW', 'USER_MANAGEMENT'],
-    workspaceNav: ['Overview', 'Approvals', 'Projects & plots', 'Bookings', 'Payments', 'Billing', 'Customers', 'Agents', 'Commissions', 'Expenses'],
+    workspaceNav: ['Overview', 'Projects & plots', 'Agents', 'Customers', 'Approvals', 'Bookings', 'Payments', 'Billing', 'Commissions', 'Expenses'],
     insightsNav: ['Reports', 'Documents', 'Notifications', 'User & role management', 'Administration']
   },
   'SALES MANAGER': {

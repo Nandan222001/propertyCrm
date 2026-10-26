@@ -186,28 +186,90 @@ def test_payment_flow_creates_receipt_and_blocks_over_collection(
     assert shared.status_code == 200
 
 
-def test_commission_accrues_with_tds_split(client, admin_headers, agent_headers,
-                                           agent_approved_customer, available_plot):
-    """A commission only exists when a booking belongs to an agent."""
+def test_commission_accrues_on_each_payment_with_tds_split(client, admin_headers, agent_headers,
+                                                           agent_approved_customer, available_plot):
+    """The agent earns their rate on every payment the customer makes, not on the whole deal up front."""
+    booking = client.post(
+        "/api/v1/bookings",
+        json={"customer_id": agent_approved_customer["id"], "plot_id": available_plot["id"],
+              "final_price": available_plot["price"], "token_amount": "100000"},
+        headers=agent_headers,
+    ).json()["data"]
+    assert booking["status"] == "PENDING_APPROVAL"
+
+    def mine():
+        rows = client.get("/api/v1/commissions", headers=admin_headers, params={"page_size": 200}).json()["data"]
+        return sorted((c for c in rows if c["booking_id"] == booking["id"]), key=lambda c: c["id"])
+
+    assert not mine(), "nothing is earned before any money has been received"
+    approved = client.post(f"/api/v1/bookings/{booking['id']}/approve", json={"reason": "Commission test"},
+                           headers=admin_headers)
+    assert approved.status_code == 200
+    first = mine()
+    assert len(first) == 1 and float(first[0]["deal_value"]) == 100000
+
+    paid = client.post("/api/v1/payments", headers=admin_headers,
+                       json={"booking_id": booking["id"], "amount": "50000", "mode": "UPI"})
+    assert paid.status_code == 201, paid.text
+    entries = mine()
+    assert [float(c["deal_value"]) for c in entries] == [100000, 50000]
+    for entry in entries:
+        assert float(entry["gross_amount"]) == pytest.approx(float(entry["deal_value"]) * float(entry["rate"]))
+        assert float(entry["net_amount"]) == pytest.approx(float(entry["gross_amount"]) - float(entry["tds_amount"]))
+
+
+def test_cancelled_payment_stops_counting_and_cancels_its_commission(client, admin_headers, agent_headers,
+                                                                     agent_approved_customer, available_plot):
+    booking = client.post(
+        "/api/v1/bookings",
+        json={"customer_id": agent_approved_customer["id"], "plot_id": available_plot["id"],
+              "final_price": available_plot["price"], "token_amount": "100000"},
+        headers=agent_headers,
+    ).json()["data"]
+    assert client.post(f"/api/v1/bookings/{booking['id']}/approve", json={"reason": "ok"}, headers=admin_headers).status_code == 200
+    paid = client.post("/api/v1/payments", headers=admin_headers,
+                       json={"booking_id": booking["id"], "amount": "50000", "mode": "UPI"}).json()["data"]
+
+    def commissions():
+        rows = client.get("/api/v1/commissions", headers=admin_headers, params={"page_size": 200}).json()["data"]
+        return [c for c in rows if c["booking_id"] == booking["id"]]
+
+    assert client.post(f"/api/v1/payments/{paid['id']}/cancel", headers=admin_headers, json={"reason": "x"}).status_code == 422
+    cancelled = client.post(f"/api/v1/payments/{paid['id']}/cancel", headers=admin_headers, json={"reason": "Entered by mistake"})
+    assert cancelled.status_code == 200, cancelled.text
+    assert cancelled.json()["data"]["status"] == "CANCELLED"
+    assert [(c["payment_id"] == paid["id"], c["status"]) for c in commissions() if c["payment_id"] == paid["id"]] == [(True, "CANCELLED")]
+    assert [c["status"] for c in commissions() if c["payment_id"] != paid["id"]] != ["CANCELLED"]
+    after = client.get(f"/api/v1/bookings/{booking['id']}", headers=admin_headers).json()["data"]
+    assert float(after["paid_amount"]) == 100000
+    again = client.post(f"/api/v1/payments/{paid['id']}/cancel", headers=admin_headers, json={"reason": "twice"})
+    assert again.status_code == 422 or again.status_code == 400 or again.status_code == 409
+
+
+def test_each_customer_payment_records_its_own_dated_commission_at_the_agents_rate(
+        client, admin_headers, agent_headers, agent_approved_customer, available_plot):
+    """A 14% agent: ₹1,00,000 on the 4th and ₹50,000 on the 17th give two entries, 14,000 and 7,000."""
+    agents = client.get("/api/v1/agents", headers=admin_headers, params={"page_size": 100}).json()["data"]
+    me = next(a for a in agents if a["name"] == "S. Patel")
+    assert client.patch(f"/api/v1/agents/{me['id']}", headers=admin_headers,
+                        json={"commission_rate": "0.14"}).status_code == 200
     booking = client.post(
         "/api/v1/bookings",
         json={"customer_id": agent_approved_customer["id"], "plot_id": available_plot["id"],
               "final_price": available_plot["price"]},
         headers=agent_headers,
     ).json()["data"]
-    assert booking["status"] == "PENDING_APPROVAL"
-    approved = client.post(
-        f"/api/v1/bookings/{booking['id']}/approve",
-        json={"reason": "Commission test"},
-        headers=admin_headers,
-    )
-    assert approved.status_code == 200
+    assert client.post(f"/api/v1/bookings/{booking['id']}/approve", json={"reason": "ok"}, headers=admin_headers).status_code == 200
+    for amount, day in (("100000", "2026-10-04"), ("50000", "2026-10-17")):
+        paid = client.post("/api/v1/payments", headers=admin_headers,
+                           json={"booking_id": booking["id"], "amount": amount, "mode": "UPI", "received_on": day})
+        assert paid.status_code == 201, paid.text
 
-    commissions = client.get("/api/v1/commissions", headers=admin_headers).json()["data"]
-    mine = [c for c in commissions if c["booking_id"] == booking["id"]]
-    assert mine, "a confirmed booking must accrue an agent commission"
-    entry = mine[0]
-    assert float(entry["net_amount"]) == pytest.approx(float(entry["gross_amount"]) - float(entry["tds_amount"]))
+    rows = client.get("/api/v1/commissions", headers=admin_headers, params={"page_size": 200}).json()["data"]
+    mine = sorted((c for c in rows if c["booking_id"] == booking["id"]), key=lambda c: c["received_on"])
+    assert [(c["received_on"], float(c["deal_value"]), float(c["rate"]), float(c["gross_amount"])) for c in mine] == [
+        ("2026-10-04", 100000.0, 0.14, 14000.0), ("2026-10-17", 50000.0, 0.14, 7000.0)]
+    assert all(c["status"] == "PAYABLE" for c in mine)
 
 
 def test_agent_scoping_hides_other_agents_bookings(client, agent_headers):

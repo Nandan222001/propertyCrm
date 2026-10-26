@@ -68,7 +68,7 @@ class PlotRepository(BaseRepository[Plot]):
 
     def delete(self, entity: Plot, *, actor: str | None = None, hard: bool = False) -> None:
         if not hard:
-            entity.plot_number = _tombstone(entity.plot_number, entity.id, 24)   # frees the number for reuse
+            entity.plot_number = _tombstone(entity.plot_number, entity.id, 40)   # frees the number for reuse
         super().delete(entity, actor=actor, hard=hard)
 
     def release_deleted(self, project_id: int, numbers: list[str]) -> None:
@@ -76,7 +76,7 @@ class PlotRepository(BaseRepository[Plot]):
         stmt = select(Plot).where(Plot.project_id == project_id, Plot.is_deleted.is_(True),
                                   Plot.plot_number.in_(numbers))
         for old in self.db.execute(stmt).scalars():
-            old.plot_number = _tombstone(old.plot_number, old.id, 24)
+            old.plot_number = _tombstone(old.plot_number, old.id, 40)
         self.db.flush()
 
     def available_in_project(self, project_id: int) -> list[Plot]:

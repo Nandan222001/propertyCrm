@@ -33,13 +33,15 @@ export function SalesAgentDashboard({ go, D, notify, agentName = '', bookings = 
   const pct = sales ? Math.min(100, Math.round((collected / sales) * 100)) : 0;
   const pending = mine.filter((b) => b[7] === 'Pending Approval');
 
-  const commissionByBooking = new Map(commissions.map((c) => [c.booking_id, c]));
+  // A commission is earned on each payment, so a booking's commission is the sum of its rows.
+  const commissionByBooking = new Map();
+  commissions.forEach((c) => commissionByBooking.set(c.booking_id, (commissionByBooking.get(c.booking_id) || 0) + Number(c.gross_amount || 0)));
   const total = commissions.reduce((t, c) => t + Number(c.gross_amount || 0), 0);
   const paid = commissions.filter((c) => c.status === 'PAID').reduce((t, c) => t + Number(c.gross_amount || 0), 0);
   const approved = commissions.filter((c) => c.status === 'APPROVED').reduce((t, c) => t + Number(c.gross_amount || 0), 0);
   const commissionFor = (b) => {
     const c = commissionByBooking.get(b[10]);
-    return c ? `₹${fmtINR(c.gross_amount)}` : '—';
+    return c ? `₹${fmtINR(c)}` : '—';
   };
 
   const dues = confirmed.filter((b) => parseAmt(b[5]) - parseAmt(b[6]) > 0);
