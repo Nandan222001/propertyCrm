@@ -306,7 +306,7 @@ export function CustomerModal({ agentName, byAdmin = false, customers, projects 
   const [agents, setAgents] = useState([]);                 // the admin may tag the customer to an agent
   useEffect(() => {
     if (!byAdmin || !hasSession()) return;
-    api.agents.list({ page_size: 200 }).then((r) => setAgents((r.data || []).filter((a) => a.is_active !== false))).catch(() => {});
+    api.agents.list({ page_size: 200 }).then((r) => setAgents((r.data || []).filter((a) => a.is_active !== false && a.is_active !== 'INACTIVE'))).catch(() => {});
   }, [byAdmin]);
   function submit(e) {
     e.preventDefault();

@@ -602,7 +602,6 @@ export function App() {
         <BookingModal
           role={role}
           agentName={scoped.agentName}
-          byAdmin={Boolean(auth.isAdmin)}
           customers={domain.customers}
           plots={domain.plots}
           projects={domain.projects}
@@ -639,6 +638,7 @@ export function App() {
       {ui.modal === 'customer' && (
         <CustomerModal
           agentName={scoped.agentName}
+          byAdmin={Boolean(auth.isAdmin)}
           customers={domain.customers}
           projects={domain.projects}
           defaultProject={ui.project === 'All projects' ? '' : ui.project}
