@@ -118,7 +118,7 @@ jobs:
           pip install pip-audit
           pip-audit -r backend/requirements.txt
           pip-audit -r backend/requirements-dev.txt
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: '22'
       - name: npm audit (full report)
