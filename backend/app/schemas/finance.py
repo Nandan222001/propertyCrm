@@ -114,6 +114,8 @@ class PaymentCreate(SafeText):
     mode: str = Field(default="UPI", max_length=24)
     reference: str | None = Field(default=None, max_length=80)
     paid_to: str | None = Field(default=None, max_length=80, description="Who the money was paid to")
+    bank_name: str | None = Field(default=None, max_length=80, description="Cheque: issuing bank")
+    instrument_date: date | None = Field(default=None, description="Cheque: date the cheque was received")
     received_on: date | None = None
     due_date: date | None = None
     final_price: Money | None = Field(default=None, description="Reconfirm the price at collection time")
@@ -124,13 +126,18 @@ class PaymentCreate(SafeText):
     def _mode(cls, value: str) -> str:
         return normalise_enum(value, PAYMENT_MODES, field="mode")
 
-    @field_validator("received_on", "due_date", mode="before")
+    @field_validator("received_on", "due_date", "instrument_date", mode="before")
     @classmethod
     def _dates(cls, value, info):
         return to_date(value, field=info.field_name.replace("_", " ")) if value else None
 
     @model_validator(mode="after")
     def _amount_rules(self) -> PaymentCreate:
+        if self.mode == "CHEQUE":
+            if not (self.bank_name or "").strip():
+                raise ValueError("bank name is required for a cheque payment")
+            if self.instrument_date is None:
+                raise ValueError("cheque receiving date is required for a cheque payment")
         if self.amount <= 0:
             raise ValueError("payment amount must be greater than zero")
         if self.amount > Decimal("1000000000"):
@@ -147,6 +154,8 @@ class PaymentResponse(TimestampedResponse):
     amount: Decimal
     mode: str
     reference: str | None = None
+    bank_name: str | None = None
+    instrument_date: date | None = None
     received_on: date
     due_date: date | None = None
     status: str

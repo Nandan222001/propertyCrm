@@ -399,7 +399,7 @@ export const setFollowUp = (id, value) => (dispatch) => dispatch(followUpSet({ i
 
 // --------------------------------------------------------------- payments
 /** Live payment: the server updates the booking, ledger, plot and issues the numbered receipt. */
-const recordPaymentLive = ({ booking, finalPrice, amount, mode, reference, paidTo, due }) => async (dispatch) => {
+const recordPaymentLive = ({ booking, finalPrice, amount, mode, reference, paidTo, due, bankName, chequeDate }) => async (dispatch) => {
   if (typeof booking[10] !== 'number') {
     dispatch(toastPushed('Could not record the payment: this booking is not synced yet. Refresh and try again.'));
     return;
@@ -407,6 +407,7 @@ const recordPaymentLive = ({ booking, finalPrice, amount, mode, reference, paidT
   try {
     const response = await api.payments.create({
       booking_id: booking[10], amount, mode: String(mode).toUpperCase(), reference: reference || undefined, paid_to: paidTo || undefined,
+      ...(String(mode).toUpperCase() === 'CHEQUE' ? { bank_name: bankName, instrument_date: chequeDate } : {}),
       final_price: finalPrice, ...(due ? { due_date: due } : {}),
     });
     dispatch(modalClosed());
@@ -417,8 +418,8 @@ const recordPaymentLive = ({ booking, finalPrice, amount, mode, reference, paidT
   }
 };
 
-export const recordPayment = ({ booking, finalPrice, amount, mode, reference, paidTo, due }) => (dispatch, getState) => {
-  if (getState().auth.mode === 'live') return dispatch(recordPaymentLive({ booking, finalPrice, amount, mode, reference, paidTo, due }));
+export const recordPayment = ({ booking, finalPrice, amount, mode, reference, paidTo, due, bankName, chequeDate }) => (dispatch, getState) => {
+  if (getState().auth.mode === 'live') return dispatch(recordPaymentLive({ booking, finalPrice, amount, mode, reference, paidTo, due, bankName, chequeDate }));
   const { receipts, payments } = getState().domain;
   const paid = parseAmt(booking[6]) + amount;
   const balance = finalPrice - paid;

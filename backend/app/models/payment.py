@@ -85,6 +85,8 @@ class Payment(Base, PkMixin, PublicIdMixin, TenantMixin, TimestampMixin, SoftDel
     reference: Mapped[str | None] = mapped_column(String(80))
     #: Who the money was handed to (shown as "In favour of" on the receipt).
     paid_to: Mapped[str | None] = mapped_column(String(80))
+    #: Cheque payments: the issuing bank and the date the cheque was received.
+    bank_name: Mapped[str | None] = mapped_column(String(80))
     instrument_date: Mapped[date | None] = mapped_column(Date)
     received_on: Mapped[date] = mapped_column(Date, nullable=False, default=date.today, index=True)
     due_date: Mapped[date | None] = mapped_column(Date, index=True)

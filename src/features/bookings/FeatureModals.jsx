@@ -240,6 +240,8 @@ export function PaymentModal({ bookings, pays, close, save }) {
   const [price, setPrice] = useState('');
   const [amount, setAmount] = useState('');
   const [error, setError] = useState('');
+  const [payMode, setPayMode] = useState('UPI');
+  const isCheque = payMode === 'Cheque';
 
   const finalPrice = parseAmt(price || b?.[5]);
   const paidBefore = b ? parseAmt(b[6]) : 0;
@@ -254,9 +256,11 @@ export function PaymentModal({ bookings, pays, close, save }) {
     if (!b) return setError('Select a plot.');
     if (finalPrice <= 0) return setError('Enter the final price.');
     if (finalPrice < paidBefore) return setError('Final price cannot be below the amount already paid.');
+    if (isCheque && !(d.bankName || '').trim()) return setError('Enter the bank name for the cheque.');
+    if (isCheque && !d.chequeDate) return setError('Enter the cheque receiving date.');
     if (parseAmt(amount) <= 0) return setError('Enter the amount received.');
     if (parseAmt(amount) > balanceBefore) return setError(`Amount exceeds the balance of ₹${fmtINR(balanceBefore)}.`);
-    save({ booking: b, finalPrice, amount: parseAmt(amount), mode: d.mode, reference: d.reference, paidTo: (d.paidTo || '').trim(), due: d.due });
+    save({ booking: b, finalPrice, amount: parseAmt(amount), mode: d.mode, reference: d.reference, paidTo: (d.paidTo || '').trim(), due: d.due, bankName: (d.bankName || '').trim(), chequeDate: d.chequeDate });
   }
 
   return (
@@ -280,9 +284,13 @@ export function PaymentModal({ bookings, pays, close, save }) {
           </Field>
           <Field label="Balance after this payment (₹)"><input value={fmtINR(Math.max(balanceAfter, 0))} readOnly /></Field>
           <Field label="Payment mode">
-            <select name="mode" defaultValue="UPI">{['UPI', 'NEFT', 'Cheque', 'Cash', 'Card'].map(x => <option key={x}>{x}</option>)}</select>
+            <select name="mode" value={payMode} onChange={e => setPayMode(e.target.value)}>{['UPI', 'NEFT', 'Cheque', 'Cash', 'Card'].map(x => <option key={x}>{x}</option>)}</select>
           </Field>
-          <Field label="Transaction details" hint="UPI / bank transaction id or cheque number — shown on the receipt"><input name="reference" maxLength={80} placeholder="e.g. TXN123456" /></Field>
+          <Field label={isCheque ? 'Cheque number' : 'Transaction details'} hint="UPI / bank transaction id or cheque number — shown on the receipt"><input name="reference" maxLength={80} placeholder={isCheque ? 'e.g. 000123' : 'e.g. TXN123456'} /></Field>
+          {isCheque && <>
+            <Field label="Bank name"><input name="bankName" maxLength={80} placeholder="e.g. HDFC Bank" /></Field>
+            <Field label="Cheque receiving date"><input name="chequeDate" type="date" /></Field>
+          </>}
           <Field label="Paid to" hint="Who received the money — shown as 'In favour of' on the receipt"><input name="paidTo" maxLength={80} list="paid-to-options" placeholder="e.g. Company bank account" /><datalist id="paid-to-options"><option value="Company bank account" /><option value="Office cash" /><option value="Director" /><option value="Agent" /></datalist></Field>
           <Field label="Next due date"><input name="due" type="date" /></Field>
         </div>
