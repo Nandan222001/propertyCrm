@@ -120,6 +120,8 @@ export function BookingModal({ role, agentName, customers, plots, projects = [],
 
   const finalPrice = price || (plan ? (quote ? fmtINR(Number(quote.total_payable)) : '') : (selected?.[10] ?? selected?.[4])) || '';
   const tokenValue = tokenEdit ?? '';
+  const [payMode, setPayMode] = useState('UPI');
+  const isCheque = payMode === 'Cheque';
 
   function submit(e) {
     e.preventDefault();
@@ -130,9 +132,11 @@ export function BookingModal({ role, agentName, customers, plots, projects = [],
     if (plan && (!quote || quote.forAllotment !== allotment)) return setError(quoteError || 'Wait for the payment scheme to be calculated.');
     if (parseAmt(finalPrice) <= 0) return setError('Enter the final price.');
     if (parseAmt(tokenValue) > parseAmt(finalPrice)) return setError('The amount paid at booking cannot exceed the final price.');
+    if (isCheque && parseAmt(tokenValue) > 0 && !(d.bankName || '').trim()) return setError('Enter the bank name for the cheque.');
+    if (isCheque && parseAmt(tokenValue) > 0 && !d.chequeDate) return setError('Enter the cheque receiving date.');
     save({
       customer, customerId: typeof chosen?.id === 'number' ? chosen.id : undefined, project, plot: selected[0], amount: fmtINR(parseAmt(finalPrice)), paid: fmtINR(parseAmt(tokenValue)),
-      mode: d.mode || 'UPI', txn: (d.txn || '').trim(), paidTo: (d.paidTo || '').trim(), plan: plan?.name || 'Standard', planId: plan ? plan.id : undefined, agent: agentMode ? agentName : d.agent,
+      mode: d.mode || 'UPI', txn: (d.txn || '').trim(), paidTo: (d.paidTo || '').trim(), bankName: isCheque ? (d.bankName || '').trim() : '', chequeDate: isCheque ? d.chequeDate : '', plan: plan?.name || 'Standard', planId: plan ? plan.id : undefined, agent: agentMode ? agentName : d.agent,
       applicationId: applicationId ? Number(applicationId) : undefined,
     });
   }
@@ -191,11 +195,15 @@ export function BookingModal({ role, agentName, customers, plots, projects = [],
             <input name="paid" value={tokenValue} onChange={e => setTokenEdit(e.target.value)} inputMode="numeric" placeholder="0" />
           </Field>
           <Field label="Payment mode" hint="Shown on the payment receipt">
-            <select name="mode" defaultValue="UPI">{['UPI', 'NEFT', 'RTGS', 'Cheque', 'Cash', 'Card'].map(x => <option key={x}>{x}</option>)}</select>
+            <select name="mode" value={payMode} onChange={e => setPayMode(e.target.value)}>{['UPI', 'NEFT', 'RTGS', 'Cheque', 'Cash', 'Card'].map(x => <option key={x}>{x}</option>)}</select>
           </Field>
-          <Field label="Transaction details" hint="UPI / bank transaction id or cheque number — shown on the receipt">
-            <input name="txn" maxLength={80} placeholder="e.g. TXN123456" />
+          <Field label={isCheque ? 'Cheque number' : 'Transaction details'} hint="UPI / bank transaction id or cheque number — shown on the receipt">
+            <input name="txn" maxLength={80} placeholder={isCheque ? 'e.g. 000123' : 'e.g. TXN123456'} />
           </Field>
+          {isCheque && <>
+            <Field label="Bank name"><input name="bankName" maxLength={80} placeholder="e.g. HDFC Bank" /></Field>
+            <Field label="Cheque receiving date"><input name="chequeDate" type="date" /></Field>
+          </>}
           <Field label="Paid to" hint="Who received the money — shown as 'In favour of' on the receipt"><input name="paidTo" maxLength={80} list="paid-to-options" placeholder="e.g. Company bank account" /><datalist id="paid-to-options"><option value="Company bank account" /><option value="Office cash" /><option value="Director" /><option value="Agent" /></datalist></Field>
           
           {hasPlans ? (

@@ -19,6 +19,8 @@ class BookingCreate(SafeText):
     token_amount: Money = Decimal("0")
     payment_mode: str | None = Field(default=None, max_length=24, description="How the amount paid at booking was received")
     payment_paid_to: str | None = Field(default=None, max_length=80, description="Who the amount paid at booking was paid to")
+    payment_bank_name: str | None = Field(default=None, max_length=80, description="Cheque: issuing bank")
+    payment_instrument_date: date | None = Field(default=None, description="Cheque: date the cheque was received")
     application_id: int | None = Field(default=None, gt=0, description="The customer's open application this allotment closes")
     payment_reference: str | None = Field(default=None, max_length=80, description="Transaction id / cheque no. of that payment")
     discount_amount: Money = Decimal("0")
@@ -32,6 +34,11 @@ class BookingCreate(SafeText):
     @classmethod
     def _date(cls, value):
         return to_date(value, field="booking date") if value else None
+
+    @field_validator("payment_instrument_date", mode="before")
+    @classmethod
+    def _cheque_date(cls, value):
+        return to_date(value, field="cheque date") if value else None
 
     @field_validator("payment_mode", mode="before")
     @classmethod

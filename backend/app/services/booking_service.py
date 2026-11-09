@@ -218,6 +218,8 @@ class BookingService(BaseService[Booking]):
             token_payment_mode=payload.payment_mode,
             token_payment_reference=(payload.payment_reference or None),
             token_payment_paid_to=(payload.payment_paid_to or "").strip() or None,
+            token_payment_bank_name=(payload.payment_bank_name or "").strip() or None,
+            token_payment_instrument_date=payload.payment_instrument_date,
             discount_amount=payload.discount_amount,
             paid_amount=Decimal("0.00"),
             payment_plan=plan.name if plan is not None else payload.payment_plan,
@@ -268,6 +270,8 @@ class BookingService(BaseService[Booking]):
                     mode=payload.payment_mode or "TOKEN_ADVANCE",
                     reference=(payload.payment_reference or None) if payload.payment_mode else "Token advance at booking",
                     paid_to=booking.token_payment_paid_to,
+                    bank_name=booking.token_payment_bank_name,
+                    instrument_date=booking.token_payment_instrument_date,
                     notes="Auto-generated token receipt",
                 )
             )
@@ -392,7 +396,9 @@ class BookingService(BaseService[Booking]):
                 PaymentCreate(booking_id=booking.id, amount=booking.token_amount,
                               mode=booking.token_payment_mode or "TOKEN_ADVANCE",
                               reference=booking.token_payment_reference if booking.token_payment_mode else "Token advance on approval",
-                              paid_to=booking.token_payment_paid_to, notes="Token receipt on approval")
+                              paid_to=booking.token_payment_paid_to,
+                              bank_name=booking.token_payment_bank_name,
+                              instrument_date=booking.token_payment_instrument_date, notes="Token receipt on approval")
             )
         return booking
 

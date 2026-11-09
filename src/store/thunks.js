@@ -226,7 +226,7 @@ const createBookingLive = (form) => async (dispatch, getState) => {
     const response = await api.bookings.create({
       customer_id: customer.id, plot_id: plot[9], final_price: parseAmt(form.amount),
       token_amount: parseAmt(form.paid || 0), payment_plan: form.plan,
-      ...(parseAmt(form.paid || 0) > 0 && form.mode ? { payment_mode: form.mode, ...(form.txn ? { payment_reference: form.txn } : {}), ...(form.paidTo ? { payment_paid_to: form.paidTo } : {}) } : {}),
+      ...(parseAmt(form.paid || 0) > 0 && form.mode ? { payment_mode: form.mode, ...(form.txn ? { payment_reference: form.txn } : {}), ...(form.paidTo ? { payment_paid_to: form.paidTo } : {}), ...(form.bankName ? { payment_bank_name: form.bankName } : {}), ...(form.chequeDate ? { payment_instrument_date: form.chequeDate } : {}) } : {}),
       ...(form.planId ? { plan_id: form.planId } : {}),
       ...(form.applicationId ? { application_id: form.applicationId } : {}),
     });
