@@ -7,6 +7,7 @@ from typing import Annotated
 from fastapi import Depends
 
 from app.core.constants import Permission
+from app.core.exceptions import ValidationError
 from app.core.dependencies import ActorDep, DbDep, PaginationDep, require
 from app.core.responses import success
 from app.schemas.finance import PaymentCreate
@@ -26,6 +27,11 @@ def list_payments(page: PaginationDep, service: PaymentServiceDep) -> dict:
 
 
 def record_payment(payload: PaymentCreate, service: PaymentServiceDep) -> dict:
+    if payload.mode == "CHEQUE":
+        if not (payload.bank_name or "").strip():
+            raise ValidationError("Bank name is required for a cheque payment")
+        if payload.instrument_date is None:
+            raise ValidationError("Cheque receiving date is required for a cheque payment")
     payment = service.record_payment(payload)
     receipt = payment.receipt.receipt_number if payment.receipt else "-"
     return success(

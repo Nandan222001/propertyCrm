@@ -133,11 +133,6 @@ class PaymentCreate(SafeText):
 
     @model_validator(mode="after")
     def _amount_rules(self) -> PaymentCreate:
-        if self.mode == "CHEQUE":
-            if not (self.bank_name or "").strip():
-                raise ValueError("bank name is required for a cheque payment")
-            if self.instrument_date is None:
-                raise ValueError("cheque receiving date is required for a cheque payment")
         if self.amount <= 0:
             raise ValueError("payment amount must be greater than zero")
         if self.amount > Decimal("1000000000"):
