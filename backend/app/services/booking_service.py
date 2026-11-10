@@ -283,6 +283,11 @@ class BookingService(BaseService[Booking]):
                     notes="Auto-generated token receipt",
                 )
             )
+        if approved and payload.application_id is not None:
+            # The application fee and enrollment fee already paid count towards this plot's price.
+            from app.services.payment_service import PaymentService
+
+            PaymentService(self.db, self.actor).credit_application_fees(booking)
         return booking
 
     # --------------------------------------------------------------- update
@@ -405,6 +410,8 @@ class BookingService(BaseService[Booking]):
                     after={"status": booking.status}, summary=f"Booking {booking.booking_number} approved")
         self._tell_agent(booking, "approved", "info")
 
+        from app.services.payment_service import PaymentService as _PaymentService
+
         if booking.token_amount > 0 and not self.payments.list(filters={"booking_id": booking.id}, limit=1):
             from app.schemas.finance import PaymentCreate
             from app.services.payment_service import PaymentService
@@ -417,6 +424,8 @@ class BookingService(BaseService[Booking]):
                               bank_name=booking.token_payment_bank_name,
                               instrument_date=booking.token_payment_instrument_date, notes="Token receipt on approval")
             )
+        # The application fee and enrollment fee already paid count towards this plot's price.
+        _PaymentService(self.db, self.actor).credit_application_fees(booking)
         return booking
 
     def _tell_agent(self, booking: Booking, outcome: str, severity: str) -> None:

@@ -12,7 +12,7 @@ from app.db.base import Base, PkMixin, PublicIdMixin, SoftDeleteMixin, TenantMix
 
 
 class Application(Base, PkMixin, PublicIdMixin, TenantMixin, TimestampMixin, SoftDeleteMixin):
-    """The fees are the company's own and are never adjusted against a plot's price."""
+    """Once a plot is allotted, both fees are credited against its price; commission is earned on the enrollment fee only."""
 
     __tablename__ = "applications"
 

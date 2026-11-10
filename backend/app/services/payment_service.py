@@ -257,6 +257,60 @@ class PaymentService(BaseService[Payment]):
         self._maybe_create_commission(booking, payment)
         return payment
 
+    def credit_application_fees(self, booking) -> list[Payment]:
+        """Credit the fees the customer paid in step 1 against the plot price of the booking they were allotted.
+
+        The application fee and the enrollment fee each become a ledger entry (no new receipt: the application's own
+        receipt already covers them). Commission is earned on the enrollment fee only, never on the application fee.
+        Idempotent per application and fee; never credits more than the booking's outstanding balance."""
+        from app.models.application import Application
+
+        applications = list(self.db.execute(select(Application).where(
+            Application.booking_id == booking.id, Application.is_deleted.is_(False))).scalars())
+        created: list[Payment] = []
+        for application in applications:
+            for tag, label, amount, earns_commission in (
+                ("APP", "Application fee", Decimal(application.application_fee), False),
+                ("ENR", "Enrollment fee", Decimal(application.enrollment_fee), True),
+            ):
+                reference = f"{application.receipt_number}/{tag}"
+                already = self.db.execute(select(Payment.id).where(
+                    Payment.booking_id == booking.id, Payment.reference == reference)).first()
+                credit = min(amount, booking.balance)
+                if already or credit <= 0:
+                    continue
+                new_paid = booking.paid_amount + credit
+                balance_after = booking.final_price - new_paid
+                fully_paid = balance_after <= 0
+                schedule_due = None
+                if booking.plan_id is not None:
+                    plans = PlanService(self.db, self.actor)
+                    plans.allocate_payment(booking.id, credit)
+                    schedule_due = plans.next_due(booking.id)
+                payment = Payment(
+                    booking_id=booking.id, customer_id=booking.customer_id, amount=credit,
+                    mode=(application.payment_mode or "UPI").upper()[:24], reference=reference,
+                    paid_to=application.paid_to, received_on=application.received_on,
+                    due_date=schedule_due or (None if fully_paid else application.received_on + timedelta(
+                        days=setting_int(self.db, "tax", "installmentDays"))),
+                    status=PAYMENT_STATUS_FOR[fully_paid], balance_after=max(balance_after, Decimal("0")),
+                    notes=f"{label} credited from application {application.receipt_number}",
+                    recorded_by_id=self.actor.user_id,
+                    approved_by_id=self.actor.user_id if self.actor.can(Permission.PAYMENT_APPROVE) else None,
+                )
+                self.payments.create(payment)
+                booking.paid_amount = new_paid
+                self.db.flush()
+                if fully_paid and booking.plot is not None:
+                    booking.plot.status = "SOLD"
+                    self.db.flush()
+                self._audit(AuditAction.CREATE, payment, after={"amount": str(credit), "booking": booking.booking_number},
+                            summary=f"₹{credit} {label.lower()} credited to {booking.booking_number}")
+                if earns_commission:
+                    self._maybe_create_commission(booking, payment)
+                created.append(payment)
+        return created
+
     def cancel_payment(self, payment_id: int, reason: str) -> Payment:
         """Reverse a payment entered by mistake: the booking's balance and schedule are restored and the agent's
         commission on it is cancelled (it no longer counts)."""

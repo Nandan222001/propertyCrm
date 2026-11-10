@@ -10,7 +10,7 @@ instalment schedule a booking is made on. The shape follows a developer's brochu
 
     total payable = allotment + (balance - discount)
 
-The application fee and enrollment fee are taken in an earlier step (an Application) and are separate from the price.
+The application fee and enrollment fee are taken in an earlier step (an Application); once the plot is allotted they are credited against the price as payments (see PaymentService.credit_application_fees).
 
 Rounding is to the paisa and the *last* instalment absorbs the remainder, so the schedule always adds up to
 the total payable exactly.
@@ -103,7 +103,7 @@ def build_quote(terms: PlanTerms, price, booking_date: date, *, allotment=0, tot
 
     ``allotment`` is the amount paid when the plot is allotted (the booking itself): it counts towards the price and
     the discount applies to what is left. The application fee and enrollment fee are taken earlier, in their own
-    step, and are never part of a plot's price.
+    step; they are credited against the price as payments after allotment, not part of this quote.
 
     ``total_override`` (an admin's negotiated total) adjusts only the balance / EMI amounts (never the upfront ones)."""
     validate_terms(terms)

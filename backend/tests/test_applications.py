@@ -50,3 +50,18 @@ def test_a_rejected_booking_reopens_the_application(client, agent_headers, admin
     rows = client.get("/api/v1/applications", headers=admin_headers, params={"page_size": 200}).json()["data"]
     reopened = next(a for a in rows if a["id"] == application["id"])
     assert reopened["status"] == "OPEN" and reopened["booking_id"] is None
+
+
+def test_fees_are_credited_to_the_plot_and_commission_skips_the_application_fee(
+        client, agent_headers, admin_headers, agent_approved_customer, available_plot):
+    application = apply(client, agent_headers, agent_approved_customer, available_plot).json()["data"]   # ₹500 + ₹5,000
+    booking = client.post("/api/v1/bookings", headers=admin_headers, json={
+        "customer_id": agent_approved_customer["id"], "plot_id": available_plot["id"], "final_price": available_plot["price"],
+        "application_id": application["id"]})
+    assert booking.status_code == 201, booking.text
+    data = booking.json()["data"]
+    assert float(data["paid_amount"]) == 5500                      # both fees reduce what is left to pay
+    assert float(data["balance"]) == float(data["final_price"]) - 5500
+    commissions = client.get("/api/v1/commissions", headers=admin_headers, params={"page_size": 200}).json()["data"]
+    mine = [c for c in commissions if c["booking_id"] == data["id"]]
+    assert [float(c["deal_value"]) for c in mine] == [5000.0]     # enrollment only, no commission on the application fee
