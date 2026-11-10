@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import { api, hasSession } from '../../api';
 import { Eye, Printer, MessageCircle, Download, FileText, Check, X as XIcon, Plus, Edit2, Trash2 } from 'lucide-react';
 import { ConfirmDialog } from '../../components/common/ConfirmDialog';
 import { EditCustomerModal } from './EditCustomerModal';
@@ -107,9 +108,23 @@ export function CustomersPage({ customers, bookings, role, search, project, onOp
 // ------------------------------------------------- profile (staff + portal)
 export function CustomerProfile({
   customer, bookings, pays, receipts, registry, portal, role,
-  onRegistry, onOpenBill, onPrintBooking, notify
+  onRegistry, onOpenBill, onPrintBooking, onPrintApplication, notify
 }) {
   const [schedule, setSchedule] = useState(null);
+  // Application fee + enrollment fee are paid in step 1, before any plot is booked, so they are not in the
+  // booking receipts: show them here from the customer's applications.
+  const [applications, setApplications] = useState([]);
+  useEffect(() => {
+    if (!hasSession() || typeof customer.id !== 'number') { setApplications([]); return undefined; }
+    let live = true;
+    const load = () => api.applications.list({ page_size: 200 })
+      .then((r) => live && setApplications((r.data || []).filter((a) => a.customer_id === customer.id)))
+      .catch(() => live && setApplications([]));
+    load();
+    window.addEventListener('erp:applications-changed', load);
+    return () => { live = false; window.removeEventListener('erp:applications-changed', load); };
+  }, [customer.id]);
+  const feesPaid = applications.reduce((s, a) => s + Number(a.total || 0), 0);
   // Two customers can share a name: match on the customer id whenever the live data carries it.
   const byId = typeof customer.id === 'number';
   const mine = bookings.filter(b => (byId && typeof b[11] === 'number' ? b[11] === customer.id : b[1] === customer.name) && b[7] !== 'Rejected');
@@ -137,11 +152,12 @@ export function CustomerProfile({
         )}
       </div>
 
-      <div className="mini-stats four" style={{ marginTop: 14 }}>
+      <div className={`mini-stats ${applications.length ? 'five' : 'four'}`} style={{ marginTop: 14 }}>
         <div className="mini-stat"><small>PLOTS OWNED / BOOKED</small><b>{mine.length}</b></div>
         <div className="mini-stat"><small>TOTAL VALUE</small><b>₹{fmtINR(total)}</b></div>
         <div className="mini-stat"><small>PAID</small><b className="green-text">₹{fmtINR(paid)}</b></div>
         <div className="mini-stat"><small>PENDING</small><b className="amber-text">₹{fmtINR(total - paid)}</b></div>
+        {applications.length > 0 && <div className="mini-stat"><small>APPLICATION + ENROLLMENT PAID</small><b className="green-text">₹{fmtINR(feesPaid)}</b></div>}
       </div>
 
       <h3 className="sheet-h">{portal ? 'My plots & registry status' : 'Plots & registry status'}</h3>
@@ -196,7 +212,22 @@ export function CustomerProfile({
 
         <div className="panel">
           <div className="panel-head"><div><h2>Bills &amp; receipts</h2><p>{portal ? 'Receipts shared with you' : 'All receipts issued'}</p></div></div>
-          {bills.length === 0 && <p className="empty-note">No bills yet.</p>}
+          {bills.length === 0 && applications.length === 0 && <p className="empty-note">No bills yet.</p>}
+          {applications.map((a) => (
+            <div className="due-row" key={`app-${a.id}`}>
+              <div>
+                <b>{a.receipt_number}</b> <small>· Application &amp; enrollment</small><br />
+                <small>
+                  {new Date(a.received_on).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })} · {a.project_name} · {a.payment_mode}
+                  {' '}· Application ₹{fmtINR(Number(a.application_fee))} + Enrollment ₹{fmtINR(Number(a.enrollment_fee))}
+                </small>
+              </div>
+              <div><b>₹{fmtINR(Number(a.total))}</b></div>
+              {onPrintApplication
+                ? <button className="icon-action" title="View / print receipt" onClick={() => onPrintApplication(a)}><Eye size={14} /></button>
+                : <span />}
+            </div>
+          ))}
           {bills.map(r => (
             <div className="due-row" key={r.no}>
               <div><b>{r.no}</b><br /><small>{r.date} · Plot {r.plot} · {r.mode}</small></div>
