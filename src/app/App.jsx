@@ -362,6 +362,7 @@ export function App() {
                   role={role}
                   onOpenBill={(receipt) => dispatch(billOpened(receipt.no))}
                   onPrintBooking={(booking) => dispatch(bookingPrintSet(booking[0]))}
+                  onPrintApplication={setPrintedApplication}
                   notify={notify}
                 />
               )}
@@ -593,6 +594,7 @@ export function App() {
               onRegistry={(id, value) => dispatch(setRegistryStatus(id, value))}
               onOpenBill={(receipt) => dispatch(billOpened(receipt.no))}
               onPrintBooking={(booking) => dispatch(bookingPrintSet(booking[0]))}
+              onPrintApplication={setPrintedApplication}
               notify={notify}
             />
           )}
