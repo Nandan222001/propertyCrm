@@ -21,6 +21,16 @@ class AgentRepository(BaseRepository[Agent]):
     def get_by_code(self, code: str) -> Agent | None:
         return self.get_by(code=(code or "").strip().upper())
 
+    def next_code(self, prefix: str = "LRI") -> str:
+        """Next sequential agent code (LRI001, LRI002 …) for the tenant — soft-deleted agents still hold their code."""
+        import re
+
+        codes = self.db.execute(
+            select(Agent.code).where(Agent.code.like(f"{prefix}%"))
+        ).scalars().all()
+        highest = max((int(m.group(1)) for c in codes if (m := re.fullmatch(rf"{prefix}(\d+)", c or ""))), default=0)
+        return f"{prefix}{highest + 1:03d}"
+
     def get_by_user(self, user_id: int) -> Agent | None:
         return self.get_by(user_id=user_id)
 

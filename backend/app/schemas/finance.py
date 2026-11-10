@@ -16,7 +16,8 @@ PAYMENT_MODES = ("CASH", "UPI", "NEFT", "RTGS", "CHEQUE", "CARD", "TOKEN_ADVANCE
 
 class AgentCreate(SafeText):
     name: str = Field(min_length=2, max_length=120)
-    code: str = Field(min_length=2, max_length=16, pattern=r"^[A-Za-z0-9\-]+$")
+    code: str | None = Field(default=None, min_length=2, max_length=16, pattern=r"^[A-Za-z0-9\-]+$",
+                             description="Leave blank — the next code (LRI001, LRI002 …) is generated")
     email: str | None = Field(default=None, max_length=190)
     phone: str | None = Field(default=None, max_length=20)
     commission_rate: Decimal = Field(default=Decimal("0.0200"), ge=0, le=Decimal("0.25"))

@@ -78,8 +78,8 @@ function EditAgentModal({ agent, close, save }) {
 }
 
 /** Onboard a sales agent (admin only). The code is what customers/bookings are tagged with. */
-function AddAgentModal({ suggestedCode, close, save }) {
-  const [form, setForm] = useState({ name: '', code: suggestedCode, phone: '', email: '', rate: '2' });
+function AddAgentModal({ close, save }) {
+  const [form, setForm] = useState({ name: '', phone: '', email: '', rate: '2' });
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const set = (key, fn = (v) => v) => (e) => setForm({ ...form, [key]: fn(e.target.value) });
@@ -87,14 +87,13 @@ function AddAgentModal({ suggestedCode, close, save }) {
     e.preventDefault();
     const rate = Number(form.rate);
     if (form.name.trim().length < 2) return setError('Enter the agent\'s full name.');
-    if (!/^[A-Za-z0-9-]{2,16}$/.test(form.code.trim())) return setError('Code: 2-16 letters, digits or dashes (e.g. LRI01).');
     if (form.name.replace(/[^A-Za-z]/g, '').length < 4) return setError('Enter a name with at least 4 letters.');
     if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(form.email.trim())) return setError('Enter the agent\'s e-mail — it is their sign-in.');
     if (!isValidMobile(form.phone)) return setError(MOBILE_HINT);
     if (!Number.isFinite(rate) || rate <= 0 || rate > 25) return setError('Commission rate must be between 0.1% and 25%.');
     setBusy(true);
     const problem = await save({
-      name: form.name.trim(), code: form.code.trim().toUpperCase(),
+      name: form.name.trim(),
       ...(form.phone ? { phone: normaliseMobile(form.phone) } : {}),
       ...(form.email ? { email: form.email.trim() } : {}),
       commission_rate: rate / 100,
@@ -115,7 +114,7 @@ function AddAgentModal({ suggestedCode, close, save }) {
         </div>
         <div className="form-grid">
           <label>Full name<input value={form.name} onChange={set('name')} autoFocus placeholder="Full name" /></label>
-          <label>Agent code<input value={form.code} onChange={set('code')} placeholder="Agent code" /></label>
+          <label>Agent code<input value="Auto-generated (e.g. LRI001)" readOnly disabled /></label>
           <label>Mobile<input value={form.phone} onChange={set('phone', limitMobile)} {...MOBILE_INPUT} placeholder="10-digit mobile number" /></label>
           <label>Email<input value={form.email} onChange={set('email')} type="email" placeholder="E-mail address" /></label>
           <label>Commission rate (%)<input value={form.rate} onChange={set('rate')} inputMode="decimal" /></label>
@@ -178,7 +177,7 @@ export function Agents({ search, notify, role, onView, bookings = [], project = 
     try {
       const response = await api.agents.create(body);
       const login = response.data?.login || '';
-      notify(`Agent ${body.name} (${body.code}) added. ${login.startsWith('login created')
+      notify(`Agent ${body.name} (${response.data?.code || ''}) added. ${login.startsWith('login created')
         ? 'They can sign in with their e-mail and a starting password (first 4 letters of the name + last 5 digits of the mobile — not displayed); they must change it at first sign-in.'
         : login}`);
       await load();
@@ -186,10 +185,6 @@ export function Agents({ search, notify, role, onView, bookings = [], project = 
     } catch (error) {
       return error.message || 'Could not add the agent.';
     }
-  };
-  const nextCode = () => {
-    const nums = (rows || []).map((r) => Number(String(r.code).replace(/\D/g, '')) || 0);
-    return `LRI${String(Math.max(0, ...nums) + 1).padStart(2, '0')}`;
   };
 
   // Offline preview keeps the sample table; a live tenant only ever sees its own agents.
@@ -269,7 +264,7 @@ export function Agents({ search, notify, role, onView, bookings = [], project = 
           />
         )}
       </div>
-      {adding && <AddAgentModal suggestedCode={nextCode()} close={() => setAdding(false)} save={addAgent} />}
+      {adding && <AddAgentModal close={() => setAdding(false)} save={addAgent} />}
       {granting && (
         <ConfirmDialog
           title="Create login"

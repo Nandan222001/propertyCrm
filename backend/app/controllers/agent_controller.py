@@ -103,13 +103,14 @@ class AgentService(BaseService):
         self._authorise("create")
         from app.core.exceptions import ConflictError
 
-        if self.agents.get_by_code(payload.code):
-            raise ConflictError(f"Agent code {payload.code.upper()} already exists")
+        code = (payload.code or "").strip().upper() or self.agents.next_code()
+        if self.agents.get_by_code(code):
+            raise ConflictError(f"Agent code {code} already exists")
         wants_login = bool(payload.email and payload.phone)
         if wants_login:
             self._check_login_can_be_created(payload.name, payload.email, payload.phone)
         agent = self.agents.create(
-            self.agents.model(**{**payload.model_dump(), "code": payload.code.upper()})
+            self.agents.model(**{**payload.model_dump(), "code": code})
         )
         self._audit(AuditAction.CREATE, agent, summary=f"Agent {agent.code} onboarded")
         login = ""
