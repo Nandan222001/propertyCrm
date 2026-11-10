@@ -136,6 +136,14 @@ class BookingService(BaseService[Booking]):
             status=booking.status,
             payment_plan=booking.payment_plan,
             plan_id=booking.plan_id,
+            notes=booking.notes,
+            discount_amount=booking.discount_amount,
+            token_payment_mode=booking.token_payment_mode,
+            token_payment_paid_to=booking.token_payment_paid_to,
+            token_payment_reference=booking.token_payment_reference,
+            token_payment_bank_name=booking.token_payment_bank_name,
+            token_payment_instrument_date=booking.token_payment_instrument_date,
+            agent_code=booking.agent.code if booking.agent else None,
             approved_at=booking.approved_at,
             rejection_reason=booking.rejection_reason,
             registry_stage=booking.registry_stage or "NOT_STARTED",
@@ -286,6 +294,15 @@ class BookingService(BaseService[Booking]):
         price_changed = payload.final_price is not None and payload.final_price != booking.final_price
         if price_changed and not self.actor.can(Permission.BOOKING_APPROVE):
             raise PermissionDeniedError("Only an approver can revise the final price")
+        if payload.discount_amount is not None and payload.discount_amount != booking.discount_amount:
+            if not self.actor.can(Permission.BOOKING_APPROVE):
+                raise PermissionDeniedError("Only an approver can change the discount")
+        effective_price = payload.final_price if payload.final_price is not None else booking.final_price
+        effective_discount = payload.discount_amount if payload.discount_amount is not None else booking.discount_amount
+        if effective_discount > effective_price:
+            raise BusinessRuleError("Discount cannot exceed the final price")
+        if payload.final_price is not None and payload.final_price < booking.paid_amount:
+            raise BusinessRuleError("The final price cannot be less than the amount already paid")
         values = payload.model_dump(exclude_unset=True, exclude_none=True)
         if payload.agent_code:
             agent = self.agents.get_by_code(payload.agent_code)
