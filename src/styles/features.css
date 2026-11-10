@@ -418,7 +418,7 @@
   .global-search input,.global-search kbd{display:none}
   .top-divider{display:none}
   .stat-value{font-size:20px}
-  .mini-stats.four,.mini-stats.five{grid-template-columns:1fr 1fr}
+  .mini-stats.four,.mini-stats.five,.mini-stats.six{grid-template-columns:1fr 1fr}
   .plan-schedule-scroll{max-height:320px}
 }
 .reminder-item{gap:10px}

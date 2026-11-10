@@ -60,9 +60,22 @@ class BookingCreate(SafeText):
 
 class BookingUpdate(SafeText):
     final_price: Money | None = None
+    discount_amount: Money | None = None
+    booking_date: date | None = None
     payment_plan: str | None = Field(default=None, max_length=80)
     notes: str | None = Field(default=None, max_length=2000)
     agent_code: str | None = Field(default=None, max_length=16)
+    # Details of the amount paid at booking (the amount itself is a ledger entry and is changed by payments).
+    token_payment_mode: str | None = Field(default=None, max_length=24)
+    token_payment_paid_to: str | None = Field(default=None, max_length=80)
+    token_payment_reference: str | None = Field(default=None, max_length=80)
+    token_payment_bank_name: str | None = Field(default=None, max_length=80)
+    token_payment_instrument_date: date | None = None
+
+    @field_validator("booking_date", "token_payment_instrument_date", mode="before")
+    @classmethod
+    def _dates(cls, value):
+        return to_date(value, field="date") if value else None
 
 
 class BookingDeleteRequest(SafeText):
@@ -129,6 +142,14 @@ class BookingResponse(TimestampedResponse):
     status: str
     payment_plan: str | None = None
     plan_id: int | None = None
+    notes: str | None = None
+    discount_amount: Decimal = Decimal("0")
+    token_payment_mode: str | None = None
+    token_payment_paid_to: str | None = None
+    token_payment_reference: str | None = None
+    token_payment_bank_name: str | None = None
+    token_payment_instrument_date: date | None = None
+    agent_code: str | None = None
     approved_at: datetime | None = None
     rejection_reason: str | None = None
     registry_stage: str = "NOT_STARTED"

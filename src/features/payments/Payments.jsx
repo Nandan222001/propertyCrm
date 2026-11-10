@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { parseAmt, fmtINR, amountInWords, agentKey, todayLabel, openWhatsApp, waLink, isAdmin, canCreateBooking, canApprove, canCreateCustomer, canRecordPayment, canManageBills, isCustomer, isPendingStatus } from '../../utils';
 
+import { api, hasSession } from '../../api';
 import { Table } from '../../components/common/DataTable';
 import { Badge } from '../../components/common/Badge';
 import { Mini } from '../../components/common/StatTile';
@@ -30,6 +31,22 @@ export function Payments({ pays, receipts, project, search, filter, F, D, notify
   });
   const bills = receipts.filter(r => r.customer.toLowerCase().includes(search.toLowerCase()) || r.no.toLowerCase().includes(search.toLowerCase()) || r.plot.toLowerCase().includes(search.toLowerCase()));
 
+  // Application fee + enrollment fee are received in step 1 (before any plot is allotted), so they are not in
+  // the booking ledger: they get their own cards, following the project filter.
+  const [applications, setApplications] = useState([]);
+  useEffect(() => {
+    if (!hasSession() || customerView) return undefined;
+    let live = true;
+    const load = () => api.applications.list({ page_size: 200 })
+      .then((r) => live && setApplications(r.data || [])).catch(() => {});
+    load();
+    window.addEventListener('erp:applications-changed', load);
+    return () => { live = false; window.removeEventListener('erp:applications-changed', load); };
+  }, [customerView]);
+  const feeRows = applications.filter((a) => project === 'All projects' || a.project_name === project);
+  const applicationFees = feeRows.reduce((s, a) => s + Number(a.application_fee || 0), 0);
+  const enrollmentFees = feeRows.reduce((s, a) => s + Number(a.enrollment_fee || 0), 0);
+
   const total = pays.reduce((s, p) => s + parseAmt(p[3]), 0);
   const paid = pays.reduce((s, p) => s + parseAmt(p[4]), 0);
   const overdue = pays.filter(p => p[7] === 'OVERDUE').reduce((s, p) => s + parseAmt(p[5]), 0);
@@ -38,11 +55,13 @@ export function Payments({ pays, receipts, project, search, filter, F, D, notify
     <>
       <RoleContextBanner role={role} page="Payments" />
 
-      <div className="mini-stats four">
+      <div className={`mini-stats ${customerView ? 'four' : 'six'}`}>
         <Mini title="TOTAL BOOKING VALUE" value={`₹${fmtINR(total)}`} />
         <Mini title="COLLECTED TO DATE" value={`₹${fmtINR(paid)}`} color="green-text" />
         <Mini title="PENDING" value={`₹${fmtINR(total - paid)}`} color="indigo-text" />
         <Mini title="OVERDUE" value={`₹${fmtINR(overdue)}`} color="amber-text" />
+        {!customerView && <Mini title="APPLICATION FEES" value={`₹${fmtINR(applicationFees)}`} color="green-text" />}
+        {!customerView && <Mini title="ENROLLMENT FEES" value={`₹${fmtINR(enrollmentFees)}`} color="green-text" />}
       </div>
 
       <div className="panel section-panel">
