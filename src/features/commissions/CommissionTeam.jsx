@@ -7,6 +7,9 @@ import { Table } from '../../components/common/DataTable';
 import { limitMobile, MOBILE_INPUT } from '../../utils/phone';
 import { pageCache } from '../../utils/pageCache';
 
+/** Every agent keeps at least this much (%) of their own rate — the chain stops here. */
+const MIN_KEPT = 1;
+
 /** A rate as the server stores it (0.1) -> "10%". */
 export const pct = (rate) => `${Number((Number(rate) * 100).toFixed(2))}%`;
 
@@ -29,7 +32,7 @@ function AddTeamAgentModal({ parent, parents, close, save }) {
     if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(form.email.trim())) return setError('Enter the agent\'s e-mail — it is their sign-in.');
     if (!isValidMobile(form.phone)) return setError(MOBILE_HINT);
     if (!Number.isFinite(share) || share <= 0) return setError('Enter the percentage you are giving this agent.');
-    if (share >= have) return setError(`${giver.name} has ${pct(giver.commission_rate)} — give less than that so they keep a share.`);
+    if (have - share < MIN_KEPT) return setError(have - MIN_KEPT > 0 ? `${giver.name} has ${pct(giver.commission_rate)} and must keep at least ${MIN_KEPT}%, so can give at most ${Number((have - MIN_KEPT).toFixed(2))}%.` : `${giver.name} is down to ${pct(giver.commission_rate)} — there is nothing left to give.`);
     setBusy(true);
     const problem = await save({
       name: form.name.trim(), email: form.email.trim(), phone: normaliseMobile(form.phone),
@@ -63,7 +66,7 @@ function AddTeamAgentModal({ parent, parents, close, save }) {
           <label>Email<input value={form.email} onChange={set('email')} type="email" placeholder="E-mail address" /></label>
           <label>Commission given (%)<input value={form.share} onChange={set('share')} inputMode="decimal" placeholder="e.g. 10" /></label>
         </div>
-        {giver && Number.isFinite(share) && share > 0 && share < have && (
+        {giver && Number.isFinite(share) && share > 0 && have - share >= MIN_KEPT && (
           <p className="bill-words">
             {giver.name}: {pct(giver.commission_rate)} → <b>{Number((have - share).toFixed(2))}%</b> · New agent: <b>{Number(share.toFixed(2))}%</b>
           </p>

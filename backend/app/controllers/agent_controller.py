@@ -20,6 +20,9 @@ from app.schemas.finance import AgentCreate, AgentPerformance, AgentUpdate, SubA
 from app.services.base_service import BaseService
 from app.services.notification_service import agent_user_id
 
+#: An agent can keep handing commission down until they are left with this much.
+MIN_RETAINED_RATE = Decimal("0.01")
+
 
 class AgentService(BaseService):
     resource = "agent"
@@ -210,9 +213,11 @@ class AgentService(BaseService):
 
         share = Decimal(payload.share)
         available = Decimal(parent.commission_rate)
-        if share >= available:
+        if available - share < MIN_RETAINED_RATE:
+            room = max(available - MIN_RETAINED_RATE, Decimal("0"))
             raise BusinessRuleError(
-                f"{parent.name} has {self._pct(available)} to give — hand down less than that so they keep a share"
+                f"{parent.name} has {self._pct(available)} and must keep at least {self._pct(MIN_RETAINED_RATE)}"
+                + (f", so can give at most {self._pct(room)}" if room > 0 else " — there is nothing left to give")
             )
         self._check_login_can_be_created(payload.name, payload.email, payload.phone)
 

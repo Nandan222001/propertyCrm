@@ -114,3 +114,18 @@ def test_only_the_owner_or_admin_can_add_agents_to_a_team(client, admin_headers,
     ok = _add(client, admin_headers, "Admin Placed Agent", unique_phone, "0.001", parent_agent_id=other["id"])
     assert ok.status_code == 201, ok.text
     assert ok.json()["data"]["parent_agent_id"] == other["id"]
+
+
+def test_commission_can_be_handed_down_until_the_parent_is_left_with_one_percent(
+        client, admin_headers, unique_phone):
+    top = client.post("/api/v1/agents", headers=admin_headers, json={"name": "Floor Test Agent", "commission_rate": "0.03"})
+    assert top.status_code == 201, top.text
+    top_id = top.json()["data"]["id"]
+    # 3% -> give 2%, parent keeps exactly 1% (allowed) ...
+    assert _add(client, admin_headers, "Floor Child One", unique_phone, "0.02", parent_agent_id=top_id).status_code == 201
+    assert PCT(client.get("/api/v1/agents", headers=admin_headers, params={"page_size": 200}).json()["data"]
+               and next(a for a in client.get("/api/v1/agents", headers=admin_headers, params={"page_size": 200}).json()["data"]
+                        if a["id"] == top_id)["commission_rate"]) == 1
+    # ... but nothing further: the parent is now at the 1% floor.
+    blocked = _add(client, admin_headers, "Floor Child Two", unique_phone, "0.001", parent_agent_id=top_id)
+    assert blocked.status_code == 409 and "at least 1%" in blocked.text
