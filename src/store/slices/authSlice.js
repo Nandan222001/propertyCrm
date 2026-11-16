@@ -84,6 +84,7 @@ const authSlice = createSlice({
           tenantId: user.tenant_id ?? null,
           tenantName: user.tenant_name || '',
           tenantSlug: user.tenant_slug || '',
+          plotMap: user.plot_map || '',
           mustChangePassword: Boolean(user.must_change_password),
         };
         state.permissions = permissions.length ? permissions : user.permissions || [];

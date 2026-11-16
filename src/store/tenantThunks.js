@@ -54,6 +54,7 @@ const apiBody = (form) => ({
   contact_email: form.contact_email.trim() || null,
   contact_phone: form.contact_phone.trim() || null,
   notes: form.notes.trim() || null,
+  plot_map: form.plot_map || null,
 });
 
 const adminBody = (admin) => ({

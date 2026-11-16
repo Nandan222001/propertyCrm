@@ -58,9 +58,10 @@ export const blankTenantForm = (tenant) => (tenant ? {
   contact_email: tenant.contact_email || '',
   contact_phone: tenant.contact_phone || '',
   notes: tenant.notes || '',
+  plot_map: tenant.plot_map || '',
 } : {
   name: '', slug: '', plan: 'STANDARD', max_users: '25',
-  contact_name: '', contact_email: '', contact_phone: '', notes: '',
+  contact_name: '', contact_email: '', contact_phone: '', notes: '', plot_map: '',
   admin: { name: '', email: '', phone: '' },
 });
 

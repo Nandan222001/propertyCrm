@@ -338,3 +338,19 @@ def test_invoice_letterhead_is_the_tenants_own(client, platform_headers):
         other = company_profile(db, sky.id)
         assert other["name"] == sky.name and "Lalita" not in other["name"]
         assert other["gstin"] == ""   # nothing is borrowed from the sample letterhead
+
+
+def test_super_admin_links_a_plot_map_to_a_tenant_and_staff_see_it(client, platform_headers):
+    admin = {"name": "Map Admin", "email": f"map-{uuid.uuid4().hex[:6]}@org.demo", "phone": "9876543210"}
+    bad = client.post("/api/v1/tenants", headers=platform_headers,
+                      json={"name": "Map Realty", "plot_map": "nope", "admin": admin})
+    assert bad.status_code == 422
+    created = client.post("/api/v1/tenants", headers=platform_headers,
+                          json={"name": "Map Realty", "plot_map": "the-index", "admin": admin})
+    assert created.status_code == 201, created.text
+    tenant = created.json()["data"]["tenant"]
+    assert tenant["plot_map"] == "the-index"
+    me = client.get("/api/v1/auth/me", headers=_login(client, admin["email"], "mapa43210")).json()["data"]["user"]
+    assert me["plot_map"] == "the-index"
+    cleared = client.patch(f"/api/v1/tenants/{tenant['id']}", headers=platform_headers, json={"plot_map": None})
+    assert cleared.status_code == 200 and cleared.json()["data"]["plot_map"] is None

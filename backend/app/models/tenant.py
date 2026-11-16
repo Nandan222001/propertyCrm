@@ -28,6 +28,9 @@ class Tenant(Base, PkMixin, PublicIdMixin, TimestampMixin):
     plan: Mapped[str] = mapped_column(String(16), nullable=False, default=TenantPlan.STANDARD.value)
     max_users: Mapped[int] = mapped_column(Integer, nullable=False, default=25)
 
+    #: Interactive plot map shown to this tenant's staff (a key of ``PLOT_MAPS``); set by the super admin.
+    plot_map: Mapped[str | None] = mapped_column(String(40))
+
     contact_name: Mapped[str | None] = mapped_column(String(120))
     contact_email: Mapped[str | None] = mapped_column(String(190))
     contact_phone: Mapped[str | None] = mapped_column(String(20))

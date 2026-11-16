@@ -292,3 +292,7 @@ GST_RATE = 0.18
 #: Billing: invoice numbers start at 0001 each year; GST splits into CGST + SGST halves (intra-state).
 INVOICE_SEQUENCE_START = 0
 INVOICE_GST_RATES = (Decimal("0"), Decimal("0.05"), Decimal("0.12"), Decimal("0.18"))
+
+
+#: Interactive plot maps a super admin can link to a tenant (key -> label). The artwork lives in the SPA.
+PLOT_MAPS: dict[str, str] = {"the-index": "THE INDEX — Bhojpur, Bihar"}

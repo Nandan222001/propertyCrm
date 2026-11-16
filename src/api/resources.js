@@ -84,6 +84,11 @@ api.agents.provisionLogin = (id) => authedRequest(`${ENDPOINTS.agents.item(id)}/
 /** Per-agent sales totals (deals, gross sales, collected) for the Agents page. */
 actions.agentLeaderboard = () => authedRequest(`${ENDPOINTS.agents.list}/leaderboard`);
 
+/** The agent hierarchy: the caller's own rate, who they report to and everyone below them. */
+actions.agentTeam = () => authedRequest(`${ENDPOINTS.agents.list}/team`);
+/** Add an agent under yourself, handing them `share` (a fraction, e.g. 0.1) of your own commission rate. */
+actions.addSubAgent = (body) => authedRequest(`${ENDPOINTS.agents.list}/team`, { method: 'POST', body });
+
 /** The caller's own notification queue (the server scopes it by role / person). */
 actions.notificationQueue = () => authedRequest(ENDPOINTS.notifications.list);
 actions.notificationAction = (id) => authedRequest(`${ENDPOINTS.notifications.item(id)}/action`, { method: 'POST', body: {} });

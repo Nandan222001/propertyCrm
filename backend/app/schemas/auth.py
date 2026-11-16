@@ -101,6 +101,8 @@ class SessionUser(ORMModel):
     tenant_id: int | None = None
     tenant_name: str | None = None
     tenant_slug: str | None = None
+    #: Interactive plot map the super admin linked to this organisation (``None`` = none).
+    plot_map: str | None = None
     is_platform: bool = False
 
 

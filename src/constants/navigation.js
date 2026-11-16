@@ -1,7 +1,7 @@
 /** Route table, headings and icon map — one definition for sidebar + routes. */
 import {
   LayoutDashboard, Map, ClipboardList, Wallet, Users, Handshake, Percent,
-  ChartNoAxesCombined, FolderOpen, Bell, Settings, Shield, FileText, ReceiptIndianRupee, Building2, Banknote,
+  ChartNoAxesCombined, FolderOpen, Bell, Settings, Shield, FileText, ReceiptIndianRupee, Building2, Banknote, MapPinned,
 } from 'lucide-react';
 
 const PAGE = {
@@ -16,6 +16,7 @@ const PAGE = {
   AGENTS: 'Agents',
   COMMISSIONS: 'Commissions',
   EXPENSES: 'Expenses',
+  PLOT_MAP: 'Plot map',
   REPORTS: 'Reports',
   DOCUMENTS: 'Documents',
   NOTIFICATIONS: 'Notifications',
@@ -39,6 +40,7 @@ export const PATH_FOR = {
   [PAGE.AGENTS]: '/agents',
   [PAGE.COMMISSIONS]: '/commissions',
   [PAGE.EXPENSES]: '/expenses',
+  [PAGE.PLOT_MAP]: '/plot-map',
   [PAGE.REPORTS]: '/reports',
   [PAGE.DOCUMENTS]: '/documents',
   [PAGE.NOTIFICATIONS]: '/notifications',
@@ -62,6 +64,7 @@ export const PAGE_ICON = {
   [PAGE.AGENTS]: Handshake,
   [PAGE.COMMISSIONS]: Percent,
   [PAGE.EXPENSES]: Banknote,
+  [PAGE.PLOT_MAP]: MapPinned,
   [PAGE.REPORTS]: ChartNoAxesCombined,
   [PAGE.DOCUMENTS]: FolderOpen,
   [PAGE.NOTIFICATIONS]: Bell,
@@ -81,6 +84,7 @@ export const PAGE_META = {
   [PAGE.AGENTS]: ['Sales Force & Agency Roster', 'Agent productivity, active bookings, commission tiering, and performance metrics.'],
   [PAGE.COMMISSIONS]: ['Agent Commissions & Payouts', 'Eligibility rules, manager approvals, TDS tax compliance, and bank disbursements.'],
   [PAGE.EXPENSES]: ['Expenses & Company Profit', 'Record what the company spends. Profit = money collected, minus agent commission, minus expenses.'],
+  [PAGE.PLOT_MAP]: ['Plot Map', 'Green plots are available; red plots are booked.'],
   [PAGE.REPORTS]: ['Reports & Business Intelligence', 'Real-time financial, operational, sales funnel and portfolio BI.'],
   [PAGE.DOCUMENTS]: ['Document Vault & Contracts', 'Booking forms, allotment letters, agreement copies, and tax invoices.'],
   [PAGE.NOTIFICATIONS]: ['Operational Follow-ups & Alerts', 'Payment overdue warnings, customer reminders, and system notifications.'],

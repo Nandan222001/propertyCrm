@@ -74,9 +74,10 @@ class CommissionService(BaseService[Commission]):
         )
 
     def serialise(self, commission: Commission) -> CommissionResponse:
-        from app.models.payment import Payment
+        from app.models.payment import Agent, Payment
 
         payment = self.db.get(Payment, commission.payment_id) if commission.payment_id else None
+        source = self.db.get(Agent, commission.source_agent_id) if commission.source_agent_id else None
         return CommissionResponse(
             received_on=payment.received_on if payment is not None else None,
             id=commission.id,
@@ -85,6 +86,9 @@ class CommissionService(BaseService[Commission]):
             agent_name=commission.agent.name if commission.agent else None,
             booking_id=commission.booking_id,
             payment_id=commission.payment_id,
+            source_agent_id=commission.source_agent_id,
+            source_agent_name=source.name if source is not None else None,
+            is_override=commission.source_agent_id is not None and commission.source_agent_id != commission.agent_id,
             deal_value=commission.deal_value,
             rate=commission.rate,
             gross_amount=commission.gross_amount,
@@ -105,13 +109,20 @@ class CommissionService(BaseService[Commission]):
     def accrue_for_payment(self, booking, payment) -> Commission | None:
         """The agent earns their rate on every payment the customer makes, until the booking is paid up.
 
+        Agents form a hierarchy: whoever onboarded the booking agent keeps the slice of rate they did not hand
+        down, and earns it (a team override) on every deal the sub-agent closes. The chain therefore never pays
+        out more than the top agent's original rate.
+
         Idempotent per payment. A booking that still carries an older whole-deal commission is left alone so the
-        same money is never commissioned twice."""
+        same money is never commissioned twice. Returns the booking agent's own commission."""
         if booking.agent_id is None:
             return None
         existing = self.commissions.list(filters={"booking_id": booking.id}, limit=1000)
-        if any(c.payment_id is None or c.payment_id == payment.id for c in existing):
-            return next((c for c in existing if c.payment_id == payment.id), None)
+        if any(c.payment_id is None for c in existing):
+            return None
+        already = [c for c in existing if c.payment_id == payment.id]
+        if already:
+            return next((c for c in already if c.agent_id == booking.agent_id), already[0])
 
         agent = self.agents.get(booking.agent_id)
         if agent is None:
@@ -119,27 +130,38 @@ class CommissionService(BaseService[Commission]):
         from app.services.org_settings import setting_text
 
         default_rate = Decimal(setting_text(self.db, "tax", "defaultCommission")) / 100
-        rate = commission_rate_for(Decimal(agent.commission_rate), default_rate)
         received = Decimal(payment.amount)
-        gross, tds, net = split_commission(received, rate, self._tds_rate())
+        tds_rate = self._tds_rate()
 
-        commission = Commission(
-            agent_id=agent.id,
-            booking_id=booking.id,
-            payment_id=payment.id,
-            deal_value=received,
-            rate=rate,
-            gross_amount=gross,
-            tds_amount=tds,
-            net_amount=net,
-            status="PAYABLE",
-        )
-        self.commissions.create(commission)
-        self.audit.log(
-            action=AuditAction.CREATE, resource=self.resource, resource_id=commission.public_id,
-            summary=f"Commission ₹{net} accrued on a ₹{received} payment at {rate}", actor=self.actor,
-        )
-        return commission
+        earners: list[tuple[object, Decimal]] = [(agent, commission_rate_for(Decimal(agent.commission_rate), default_rate))]
+        for upline_agent in self.agents.upline(agent):
+            if Decimal(upline_agent.commission_rate) > 0:
+                earners.append((upline_agent, Decimal(upline_agent.commission_rate)))
+
+        own: Commission | None = None
+        for earner, rate in earners:
+            gross, tds, net = split_commission(received, rate, tds_rate)
+            commission = Commission(
+                agent_id=earner.id,
+                source_agent_id=agent.id,
+                booking_id=booking.id,
+                payment_id=payment.id,
+                deal_value=received,
+                rate=rate,
+                gross_amount=gross,
+                tds_amount=tds,
+                net_amount=net,
+                status="PAYABLE",
+            )
+            self.commissions.create(commission)
+            if own is None:
+                own = commission
+            what = "accrued" if earner is agent else f"team override accrued (deal by {agent.name})"
+            self.audit.log(
+                action=AuditAction.CREATE, resource=self.resource, resource_id=commission.public_id,
+                summary=f"Commission ₹{net} {what} on a ₹{received} payment at {rate}", actor=self.actor,
+            )
+        return own
 
     def create_manual(self, payload: CommissionCreate) -> Commission:
         self._authorise("create")
