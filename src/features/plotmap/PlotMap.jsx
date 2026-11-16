@@ -9,7 +9,7 @@ const FREE_GREEN = '#23ae65';
  * soon as it is booked (booked, on hold or sold — anything that is no longer free). Colours follow the
  * tenant's live plot inventory, matched by plot number.
  *
- * `plots` are the inventory rows ([number, …, status, …, project]).
+ * `plots` are `{ number, status, project }` objects.
  */
 export function PlotMap({ mapKey, plots = [], project = 'All projects' }) {
   const map = PLOT_MAPS[mapKey];
@@ -21,16 +21,16 @@ export function PlotMap({ mapKey, plots = [], project = 'All projects' }) {
 
   const numbers = useMemo(() => new Set((map?.points || []).map((p) => String(p[0]))), [map]);
   // Which project this drawing describes: the one picked in the header, else the one holding most of its plot numbers.
-  const projects = useMemo(() => [...new Set(plots.map((p) => p[8]).filter(Boolean))], [plots]);
+  const projects = useMemo(() => [...new Set(plots.map((p) => p.project).filter(Boolean))], [plots]);
   const best = useMemo(() => {
-    const score = (name) => plots.filter((p) => p[8] === name && numbers.has(String(p[0]))).length;
+    const score = (name) => plots.filter((p) => p.project === name && numbers.has(String(p.number))).length;
     return [...projects].sort((a, b) => score(b) - score(a))[0] || '';
   }, [plots, projects, numbers]);
   const active = chosen || (project !== 'All projects' && projects.includes(project) ? project : best);
 
   const statusOf = useMemo(() => {
     const lookup = new Map();
-    plots.filter((p) => p[8] === active).forEach((p) => lookup.set(String(p[0]), p[5]));
+    plots.filter((p) => p.project === active).forEach((p) => lookup.set(String(p.number), p.status));
     return lookup;
   }, [plots, active]);
 

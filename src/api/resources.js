@@ -84,6 +84,9 @@ api.agents.provisionLogin = (id) => authedRequest(`${ENDPOINTS.agents.item(id)}/
 /** Per-agent sales totals (deals, gross sales, collected) for the Agents page. */
 actions.agentLeaderboard = () => authedRequest(`${ENDPOINTS.agents.list}/leaderboard`);
 
+/** Public (no sign-in): plot availability for an organisation's plot map. */
+actions.publicPlotMap = (slug) => request(`/public/plot-map/${encodeURIComponent(slug)}`, { auth: false });
+
 /** The agent hierarchy: the caller's own rate, who they report to and everyone below them. */
 actions.agentTeam = () => authedRequest(`${ENDPOINTS.agents.list}/team`);
 /** Add an agent under yourself, handing them `share` (a fraction, e.g. 0.1) of your own commission rate. */

@@ -23,6 +23,7 @@ from app.routes.notification_routes import router as notification_router
 from app.routes.payment_routes import router as payment_router
 from app.routes.plan_routes import router as plan_router
 from app.routes.property_routes import router as property_router
+from app.routes.public_routes import router as public_router
 from app.routes.report_routes import router as report_router
 from app.routes.tenant_routes import router as tenant_router
 from app.routes.user_routes import router as user_router
@@ -33,6 +34,7 @@ PUBLIC_PATHS = (
     "/ready",
     "/metrics",
     "/branding",
+    "/public/",
 )
 
 api_router = APIRouter()
@@ -42,6 +44,9 @@ api_router.include_router(health_router)
 
 # Authentication: public, but strictly rate limited.
 api_router.include_router(auth_router)
+
+# Anonymous, read-only: the public plot map (plot number + free/booked only).
+api_router.include_router(public_router)
 
 # Everything below requires a valid access token (route-level dependencies).
 for router in (
