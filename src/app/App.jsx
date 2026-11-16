@@ -531,7 +531,7 @@ export function App() {
 
           {page === PAGES.AGENTS && <Agents search={ui.search} notify={notify} role={role} bookings={scoped.bookings} project={ui.project} onView={(agent) => dispatch(agentInfoSet(agent))} />}
           {page === PAGES.COMMISSIONS && <Commissions search={ui.search} notify={notify} role={role} bookings={scoped.bookings} project={ui.project} />}
-          {page === PAGES.PLOT_MAP && <PlotMap mapKey={auth.user?.plotMap} plots={domain.plots} project={ui.project} />}
+          {page === PAGES.PLOT_MAP && <PlotMap mapKey={auth.user?.plotMap} plots={domain.plots.map((p) => ({ number: p[0], status: p[5], project: p[8] }))} project={ui.project} />}
           {page === PAGES.EXPENSES && <Expenses search={ui.search} notify={notify} role={role} />}
           {page === PAGES.REPORTS && (
             <Reports
