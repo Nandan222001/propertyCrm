@@ -354,3 +354,25 @@ def test_super_admin_links_a_plot_map_to_a_tenant_and_staff_see_it(client, platf
     assert me["plot_map"] == "the-index"
     cleared = client.patch(f"/api/v1/tenants/{tenant['id']}", headers=platform_headers, json={"plot_map": None})
     assert cleared.status_code == 200 and cleared.json()["data"]["plot_map"] is None
+
+
+def test_public_plot_map_exposes_only_free_or_booked_and_only_for_linked_tenants(client, platform_headers, admin_headers):
+    # Not linked: the seeded organisation has no plot map, so the anonymous endpoint says 404.
+    assert client.get("/api/v1/public/plot-map/lalita").status_code == 404
+    assert client.get("/api/v1/public/plot-map/does-not-exist").status_code == 404
+    tenant = next(t for t in client.get("/api/v1/tenants", headers=platform_headers, params={"page_size": 100}).json()["data"]
+                  if t["slug"] == "lalita")
+    assert client.patch(f"/api/v1/tenants/{tenant['id']}", headers=platform_headers,
+                        json={"plot_map": "the-index"}).status_code == 200
+    try:
+        response = client.get("/api/v1/public/plot-map/lalita")  # no Authorization header
+        assert response.status_code == 200, response.text
+        data = response.json()["data"]
+        assert data["map"] == "the-index" and data["plots"]
+        assert {p["status"] for p in data["plots"]} <= {"AVAILABLE", "BOOKED"}
+        assert all(set(p) == {"number", "status", "project"} for p in data["plots"])
+        mine = client.get("/api/v1/plots", headers=admin_headers, params={"page_size": 200}).json()["data"]
+        assert len(data["plots"]) == len(mine)  # only that organisation's plots
+    finally:
+        client.patch(f"/api/v1/tenants/{tenant['id']}", headers=platform_headers, json={"plot_map": None})
+    assert client.get("/api/v1/public/plot-map/lalita").status_code == 404
