@@ -290,6 +290,7 @@ class AuthService:
             tenant_id=user.tenant_id,
             tenant_name=tenant.name if tenant else None,
             tenant_slug=tenant.slug if tenant else None,
+            plot_map=tenant.plot_map if tenant else None,
             is_platform=user.tenant_id is None and user.role == Role.SUPER_ADMIN.value,
             id=user.id,
             public_id=user.public_id,

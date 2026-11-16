@@ -46,7 +46,7 @@ await build({
   outfile,
   platform: 'browser',
   jsx: 'automatic',
-  loader: { '.js': 'jsx', '.jsx': 'jsx' },
+  loader: { '.js': 'jsx', '.jsx': 'jsx', '.png': 'dataurl' },
   external: ['react', 'react-dom', 'react-dom/server', 'react-redux', 'react-router-dom', '@reduxjs/toolkit', 'lucide-react'],
   define: { 'import.meta.env': '{}' },
   logLevel: 'error',

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Check, X } from 'lucide-react';
 import { PLAN_LABEL, TENANT_PLANS, blankTenantForm, slugify, validateTenant } from '../../utils/tenants';
+import { PLOT_MAP_OPTIONS } from '../../data/plotMaps';
 import { limitMobile, MOBILE_INPUT } from '../../utils/phone';
 
 /** Create (editing = null) or edit an organisation. Creating also provisions its first administrator. */
@@ -81,6 +82,14 @@ export function TenantModal({ editing, tenants, close, save }) {
           <label>
             Contact phone
             <input value={form.contact_phone} onChange={set('contact_phone', limitMobile)} {...MOBILE_INPUT} placeholder="10-digit mobile number" />
+          </label>
+          <label className="span-2">
+            Plot map
+            <select value={form.plot_map} onChange={set('plot_map')}>
+              <option value="">None</option>
+              {PLOT_MAP_OPTIONS.map((m) => <option key={m.key} value={m.key}>{m.label}</option>)}
+            </select>
+            <small className="field-hint">Adds a view-only Plot map page for this organisation: booked plots show red, available plots green.</small>
           </label>
           <label className="span-2">
             Notes

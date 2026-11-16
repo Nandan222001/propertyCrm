@@ -477,3 +477,7 @@
 /* application detail: label / value rows */
 .kv-row{display:flex;justify-content:space-between;gap:12px;padding:6px 0;border-bottom:1px solid #eceff5;font-size:13px}
 .kv-row span{color:#6b7385}
+
+/* Plot map (view-only) */
+.plotmap-bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:4px 0 12px;border-bottom:1px solid #eff0f3}.plotmap-bar input{width:140px}.plotmap-legend{margin-left:auto;display:flex;align-items:center;gap:6px;font-size:12px}.plotmap-legend i{width:11px;height:11px;border-radius:3px;display:inline-block;margin-left:8px}
+.plotmap-scroll{height:calc(100vh - 250px);min-height:420px;overflow:auto;background:#e8edf4;margin-top:12px;border-radius:8px}.plotmap-stage{position:relative;margin:12px auto}.plotmap-stage img{display:block;width:100%;height:100%;user-select:none;pointer-events:none}.plotmap-stage svg{position:absolute;inset:0;width:100%;height:100%}

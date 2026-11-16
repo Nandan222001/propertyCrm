@@ -24,6 +24,16 @@ def _slug(value: str) -> str:
     return slug
 
 
+def _plot_map(value: str | None) -> str | None:
+    from app.core.constants import PLOT_MAPS
+
+    if not value:
+        return None
+    if value not in PLOT_MAPS:
+        raise ValueError(f"Unknown plot map (choose one of: {', '.join(PLOT_MAPS)})")
+    return value
+
+
 class TenantAdminIn(RequestModel):
     """The organisation's first administrator."""
 
@@ -52,7 +62,13 @@ class TenantCreate(SafeText):
     contact_email: str | None = Field(default=None, max_length=190)
     contact_phone: str | None = Field(default=None, max_length=20)
     notes: str | None = Field(default=None, max_length=2000)
+    plot_map: str | None = Field(default=None, max_length=40)
     admin: TenantAdminIn
+
+    @field_validator("plot_map")
+    @classmethod
+    def _plot_map(cls, value: str | None) -> str | None:
+        return _plot_map(value)
 
     @field_validator("slug")
     @classmethod
@@ -78,6 +94,12 @@ class TenantUpdate(SafeText):
     contact_email: str | None = Field(default=None, max_length=190)
     contact_phone: str | None = Field(default=None, max_length=20)
     notes: str | None = Field(default=None, max_length=2000)
+    plot_map: str | None = Field(default=None, max_length=40)
+
+    @field_validator("plot_map")
+    @classmethod
+    def _plot_map(cls, value: str | None) -> str | None:
+        return _plot_map(value)
 
     @field_validator("contact_email")
     @classmethod
@@ -114,6 +136,7 @@ class TenantResponse(ORMModel):
     contact_email: str | None = None
     contact_phone: str | None = None
     notes: str | None = None
+    plot_map: str | None = None
     suspended_at: datetime | None = None
     suspended_reason: str | None = None
     created_at: datetime

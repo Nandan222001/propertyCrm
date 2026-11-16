@@ -32,10 +32,15 @@ export const selectToast = (state) => state.ui.toast;
 export const selectRoleConfig = createSelector([selectRole], (role) => roleConfigs[role] || roleConfigs[ROLES.ADMIN]);
 
 /** Nav sections for the active role, intersected with the pages that exist. */
-export const selectNavigation = createSelector([selectRoleConfig], (config) => ({
-  workspace: config.workspaceNav || [],
-  insights: config.insightsNav || [],
-}));
+export const selectNavigation = createSelector([selectRoleConfig, selectRole, selectCurrentUser], (config, role, user) => {
+  const workspace = config.workspaceNav || [];
+  // A tenant the super admin linked to a plot map gets a view-only "Plot map" page (staff roles only).
+  const hasMap = Boolean(user?.plotMap) && ![ROLES.CUSTOMER, ROLES.SUPER_ADMIN].includes(role);
+  return {
+    workspace: hasMap && !workspace.includes(PAGES.PLOT_MAP) ? [...workspace, PAGES.PLOT_MAP] : workspace,
+    insights: config.insightsNav || [],
+  };
+});
 
 export const selectHeading = createSelector([selectRoleConfig, selectPage], (config, page) =>
   PAGE_META[page] || [config.title, config.subtitle]);

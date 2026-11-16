@@ -192,7 +192,7 @@ class TenantService:
             name=payload.name, slug=self._unique_slug(payload.slug, payload.name),
             plan=payload.plan.value, max_users=payload.max_users,
             contact_name=payload.contact_name, contact_email=payload.contact_email,
-            contact_phone=payload.contact_phone, notes=payload.notes,
+            contact_phone=payload.contact_phone, notes=payload.notes, plot_map=payload.plot_map,
             status=TenantStatus.ACTIVE.value,
         )
         self.db.add(tenant)
@@ -214,7 +214,7 @@ class TenantService:
                 raise BusinessRuleError(f"Seat limit cannot be below the {used} users already in this tenant")
         before = {k: getattr(tenant, k) for k in values}
         for key, value in values.items():
-            if value is not None or key in {"contact_name", "contact_email", "contact_phone", "notes"}:
+            if value is not None or key in {"contact_name", "contact_email", "contact_phone", "notes", "plot_map"}:
                 setattr(tenant, key, value)
         self.db.flush()
         self._audit(AuditAction.TENANT_UPDATED, tenant, f"Updated tenant {tenant.name}", before=before, after=values)
