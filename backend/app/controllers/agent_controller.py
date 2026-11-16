@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+from decimal import Decimal
 from typing import Annotated
 
 from fastapi import Depends, Query
+from sqlalchemy import func
 
 from app.core.constants import AuditAction, Permission
 from app.core.dependencies import ActorDep, DbDep, PaginationDep, require
@@ -14,7 +16,7 @@ from app.repositories.booking_repository import BookingRepository
 from app.repositories.customer_repository import CustomerRepository
 from app.repositories.finance_repository import AgentRepository, CommissionRepository, PaymentRepository
 from app.repositories.property_repository import PlotRepository
-from app.schemas.finance import AgentCreate, AgentPerformance, AgentUpdate
+from app.schemas.finance import AgentCreate, AgentPerformance, AgentUpdate, SubAgentCreate
 from app.services.base_service import BaseService
 from app.services.notification_service import agent_user_id
 
@@ -49,6 +51,12 @@ class AgentService(BaseService):
             return set()  # unused
         return {self.actor.agent_id} if self.actor.agent_id else set()
 
+    def _team_agent_ids(self) -> set[int]:
+        """Who the team page may show: an agent's own branch (themself and everyone below them)."""
+        if not self.actor.agent_id:
+            return set()
+        return {self.actor.agent_id} | self.agents.descendant_ids(self.actor.agent_id)
+
     def scope_clause(self):
         from sqlalchemy import false
 
@@ -73,6 +81,8 @@ class AgentService(BaseService):
             "commission_rate": str(agent.commission_rate),
             "is_active": agent.is_active,
             "has_login": agent_user_id(self.db, agent) is not None,
+            "parent_agent_id": agent.parent_agent_id,
+            "assigned_rate": str(agent.assigned_rate) if agent.assigned_rate is not None else None,
             "created_at": agent.created_at,
         }
 
@@ -122,8 +132,125 @@ class AgentService(BaseService):
         self.db.commit()  # the UI reloads the list right away; don't wait for the request-end commit
         return {**self.serialise(agent), "login": login}
 
+    # --------------------------------------------------------- hierarchy
+    def _my_agent(self):
+        agent = self.agents.get(self.actor.agent_id) if self.actor.agent_id else None
+        return agent
+
+    def team(self) -> dict:
+        """The caller's place in the hierarchy: their own rate, who they report to, and everyone below them.
+
+        An agent sees their own branch; an admin (or other oversight role) sees every agent and the links
+        between them."""
+        from sqlalchemy import select
+
+        from app.models.payment import Commission
+
+        me = self._my_agent()
+        if self._sees_all_agents:
+            members = list(self.agents.list(limit=1000))
+        else:
+            ids = self._team_agent_ids()
+            members = [a for a in self.agents.list(limit=1000) if a.id in ids]
+        by_id = {a.id: a for a in members}
+
+        def depth(agent) -> int:
+            level, seen, cursor = 0, {agent.id}, agent
+            while cursor.parent_agent_id in by_id and cursor.parent_agent_id not in seen:
+                cursor = by_id[cursor.parent_agent_id]
+                seen.add(cursor.id)
+                level += 1
+            return level
+
+        earned = {
+            agent_id: Decimal(str(total or 0))
+            for agent_id, total in self.db.execute(
+                select(Commission.agent_id, func.sum(Commission.gross_amount))
+                .where(Commission.agent_id.in_(by_id or {0}), Commission.is_deleted == 0,
+                       Commission.status != "CANCELLED")
+                .group_by(Commission.agent_id)
+            ).all()
+        }
+        rows = []
+        for agent in sorted(members, key=lambda a: (depth(a), a.name)):
+            rows.append({
+                **self.serialise(agent),
+                "level": depth(agent),
+                "parent_name": by_id[agent.parent_agent_id].name if agent.parent_agent_id in by_id else (
+                    me.name if me is not None and agent.parent_agent_id == me.id else None),
+                "commission_earned": str(earned.get(agent.id, Decimal("0"))),
+            })
+        return {
+            "me": self.serialise(me) if me is not None else None,
+            "can_add": me is not None or self.actor.can(Permission.USER_MANAGE),
+            "members": rows,
+        }
+
+    def create_sub_agent(self, payload: SubAgentCreate) -> dict:
+        """Add an agent under ``parent`` and move ``share`` of the parent's commission rate to them.
+
+        The parent's rate drops by exactly what the new agent receives, so the total paid along the chain
+        never grows: 20% with 10% handed down leaves the parent on 10% and the new agent on 10%."""
+        from app.core.exceptions import ConflictError
+
+        if self.actor.agent_id:
+            parent = self._my_agent()
+            if payload.parent_agent_id and payload.parent_agent_id != self.actor.agent_id:
+                raise PermissionDeniedError("You can only add agents under yourself")
+        elif self.actor.can(Permission.USER_MANAGE):
+            if not payload.parent_agent_id:
+                raise BusinessRuleError("Choose the agent this new agent reports to")
+            parent = self.agents.get_or_404(payload.parent_agent_id)
+        else:
+            raise PermissionDeniedError("Only an agent (or an admin on their behalf) can add agents to a team")
+        if parent is None:
+            raise BusinessRuleError("Your agent profile was not found")
+        if parent.is_active == "INACTIVE":
+            raise BusinessRuleError(f"{parent.name} is inactive and cannot add agents")
+
+        share = Decimal(payload.share)
+        available = Decimal(parent.commission_rate)
+        if share >= available:
+            raise BusinessRuleError(
+                f"{parent.name} has {self._pct(available)} to give — hand down less than that so they keep a share"
+            )
+        self._check_login_can_be_created(payload.name, payload.email, payload.phone)
+
+        code = self.agents.next_code()
+        agent = self.agents.create(self.agents.model(
+            name=payload.name, email=payload.email, phone=payload.phone, code=code,
+            commission_rate=share, assigned_rate=share, parent_agent_id=parent.id,
+        ))
+        before = parent.commission_rate
+        parent.commission_rate = available - share
+        self.db.flush()
+        self._audit(
+            AuditAction.CREATE, agent,
+            summary=f"Agent {agent.code} added under {parent.code} with {self._pct(share)} of the parent's rate "
+                    f"({parent.code}: {self._pct(before)} -> {self._pct(parent.commission_rate)})",
+        )
+        self._create_login(agent, as_admin=True)
+        self.db.commit()
+        return {**self.serialise(agent), "parent_commission_rate": str(parent.commission_rate),
+                "login": "login created: e-mail + starting password (first 4 letters of the name + last 5 digits of the mobile)"}
+
+    @staticmethod
+    def _pct(rate: Decimal) -> str:
+        return f"{(Decimal(rate) * 100).normalize():f}%"
+
     # ------------------------------------------------------------ sign-in
-    def _users(self):
+    def _users(self, *, as_admin: bool = False):
+        from dataclasses import replace
+
+        from app.core.constants import Role
+        from app.services.user_service import UserService
+
+        # An agent onboarding their own sub-agent may mint exactly one kind of account (a sales-agent login),
+        # which UserService only lets an admin do, so the call is made with the admin role for this one step.
+        actor = replace(self.actor, role=Role.ADMIN.value) if as_admin else self.actor
+        return UserService(self.db, actor)
+
+    def _check_login_can_be_created(self, name: str, email: str, phone: str) -> None:
         from app.services.user_service import UserService
 
         return UserService(self.db, self.actor)
@@ -139,11 +266,11 @@ class AgentService(BaseService):
             raise ConflictError("An account with this e-mail already exists")
         self._users()._assert_seat_available()
 
-    def _create_login(self, agent) -> None:
+    def _create_login(self, agent, *, as_admin: bool = False) -> None:
         from app.core.constants import Role
         from app.schemas.governance import UserCreate
 
-        self._users().create_user(UserCreate(
+        self._users(as_admin=as_admin).create_user(UserCreate(
             name=agent.name, email=agent.email, phone=agent.phone, role=Role.SALES_AGENT,
             title="Sales agent", agent_code=agent.code,
         ))
@@ -228,6 +355,14 @@ def agent_performance(
     agent_id: int = Query(gt=0),
 ) -> dict:
     return success(service.performance(agent_id).model_dump(), "Agent performance")
+
+
+def my_team(service: AgentServiceDep) -> dict:
+    return success(service.team(), "Agent team")
+
+
+def add_sub_agent(payload: SubAgentCreate, service: AgentServiceDep) -> dict:
+    return success(service.create_sub_agent(payload), "Agent added to your team")
 
 
 def create_agent(payload: AgentCreate, service: AgentServiceDep) -> dict:

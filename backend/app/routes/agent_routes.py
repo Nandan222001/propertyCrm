@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends, Query, status
 from app.controllers import agent_controller as controller
 from app.core.constants import Permission
 from app.core.dependencies import PaginationDep, require
-from app.schemas.finance import AgentCreate, AgentUpdate
+from app.schemas.finance import AgentCreate, AgentUpdate, SubAgentCreate
 
 router = APIRouter(prefix="/agents", tags=["Agents"])
 
@@ -37,6 +37,20 @@ def agent_performance(service: controller.AgentServiceDep, agent_id: int = Query
 def lookup_agent(service: controller.AgentServiceDep, q: str = Query(min_length=2, max_length=40),
                  _: PERF = None):
     return controller.lookup_agent(service, q, None)
+
+
+TEAM = Annotated[None, Depends(require(Permission.COMMISSION_VIEW))]
+
+
+@router.get("/team", summary="Your place in the agent hierarchy and everyone below you")
+def my_team(service: controller.AgentServiceDep, _: TEAM = None):
+    return controller.my_team(service)
+
+
+@router.post("/team", status_code=status.HTTP_201_CREATED,
+             summary="Add an agent under you, handing them part of your commission rate")
+def add_sub_agent(payload: SubAgentCreate, service: controller.AgentServiceDep, _: TEAM = None):
+    return controller.add_sub_agent(payload, service)
 
 
 @router.post("", status_code=status.HTTP_201_CREATED, summary="Onboard an agent")

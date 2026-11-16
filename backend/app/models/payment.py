@@ -37,6 +37,11 @@ class Agent(Base, PkMixin, PublicIdMixin, TenantMixin, TimestampMixin, SoftDelet
     user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
     commission_rate: Mapped[Decimal] = mapped_column(Numeric(5, 4), default=Decimal("0.0200"), nullable=False)
     is_active: Mapped[str] = mapped_column(String(16), default="ACTIVE", nullable=False)
+    #: Agent hierarchy: the agent who onboarded this one and gave them a slice of their own commission.
+    parent_agent_id: Mapped[int | None] = mapped_column(ForeignKey("agents.id", ondelete="SET NULL"), index=True)
+    #: The slice of the parent's rate this agent was originally given (informational; ``commission_rate`` is what
+    #: they currently keep after handing any slice on to their own sub-agents).
+    assigned_rate: Mapped[Decimal | None] = mapped_column(Numeric(5, 4))
 
     __table_args__ = (
         UniqueConstraint("tenant_id", "code", name="uq_agents_tenant_code"),
@@ -53,6 +58,9 @@ class Commission(Base, PkMixin, PublicIdMixin, TenantMixin, TimestampMixin, Soft
     booking_id: Mapped[int | None] = mapped_column(ForeignKey("bookings.id", ondelete="SET NULL"), index=True)
     #: The customer payment this commission was earned on (None for a manual or legacy whole-deal commission).
     payment_id: Mapped[int | None] = mapped_column(ForeignKey("payments.id", ondelete="SET NULL"), index=True)
+    #: The agent whose booking generated this commission. Differs from ``agent_id`` on a team override: an upline
+    #: agent earns their retained rate on every deal their sub-agents close.
+    source_agent_id: Mapped[int | None] = mapped_column(ForeignKey("agents.id", ondelete="SET NULL"), index=True)
 
     deal_value: Mapped[Decimal] = mapped_column(Numeric(18, 2), nullable=False)
     rate: Mapped[Decimal] = mapped_column(Numeric(5, 4), nullable=False)
@@ -66,7 +74,7 @@ class Commission(Base, PkMixin, PublicIdMixin, TenantMixin, TimestampMixin, Soft
     payout_reference: Mapped[str | None] = mapped_column(String(80))
     paid_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
 
-    agent = relationship("Agent", lazy="joined")
+    agent = relationship("Agent", lazy="joined", foreign_keys=[agent_id])
 
 
 class Payment(Base, PkMixin, PublicIdMixin, TenantMixin, TimestampMixin, SoftDeleteMixin):

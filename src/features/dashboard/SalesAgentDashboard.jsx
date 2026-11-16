@@ -1,9 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { Target, Plus, Phone, MapPin, Award, AlertCircle } from 'lucide-react';
-import { api, hasSession } from '../../api';
+import { api, actions, hasSession } from '../../api';
 import { parseAmt, fmtINR } from '../../utils';
 import { usePageLoading } from '../../hooks';
 import { pageCache } from '../../utils/pageCache';
+
+const pctOf = (rate) => `${Number((Number(rate) * 100).toFixed(2))}%`;
 
 const crLakh = (n) => (n >= 10000000 ? `₹${(n / 10000000).toFixed(2)} Cr` : n >= 100000 ? `₹${(n / 100000).toFixed(2)} L` : `₹${fmtINR(n)}`);
 const OPEN = (b) => b[7] !== 'Rejected' && b[7] !== 'Cancelled';
@@ -16,6 +18,7 @@ const OPEN = (b) => b[7] !== 'Rejected' && b[7] !== 'Cancelled';
 export function SalesAgentDashboard({ go, D, notify, agentName = '', bookings = [], plots: allPlots = [], project = 'All projects' }) {
   const live = hasSession();
   const [commissions, setCommissions] = useState(() => pageCache.get('agent-dash') ?? []);
+  const [myRate, setMyRate] = useState(() => pageCache.get('agent-rate') ?? null);
   const [loaded, setLoaded] = useState(!live || pageCache.has('agent-dash'));
   usePageLoading('agent-dash', !loaded);
 
@@ -25,6 +28,11 @@ export function SalesAgentDashboard({ go, D, notify, agentName = '', bookings = 
       .then((response) => { setCommissions(pageCache.set('agent-dash', response.data || [])); setLoaded(true); })
       .catch(() => { setCommissions([]); setLoaded(true); });
   }, [live, bookings.length]);
+
+  useEffect(() => {
+    if (!live) return;
+    actions.agentTeam().then((r) => setMyRate(pageCache.set('agent-rate', r.data?.me ? { rate: r.data.me.commission_rate, team: Math.max((r.data.members || []).length - 1, 0) } : null))).catch(() => {});
+  }, [live]);
 
   const mine = bookings.filter(OPEN);
   const confirmed = mine.filter((b) => b[7] !== 'Pending Approval');
@@ -95,6 +103,7 @@ export function SalesAgentDashboard({ go, D, notify, agentName = '', bookings = 
           <div className="commission-meta-pills">
             <div className="meta-pill"><small>Disbursed to bank</small><b>{live ? `₹${fmtINR(paid)}` : '—'}</b></div>
             <div className="meta-pill highlight"><small>Approved / due</small><b>{live ? `₹${fmtINR(approved)}` : '—'}</b></div>
+            <div className="meta-pill"><small>My commission rate</small><b>{live && myRate ? `${pctOf(myRate.rate)}${myRate.team ? ` · ${myRate.team} in team` : ''}` : '—'}</b></div>
           </div>
         </div>
       </div>

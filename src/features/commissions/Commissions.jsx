@@ -8,6 +8,7 @@ import { Mini } from '../../components/common/StatTile';
 import { RoleContextBanner } from '../../components/layout/RoleContextBanner';
 import { usePageLoading } from '../../hooks';
 import { pageCache } from '../../utils/pageCache';
+import { CommissionTeam } from './CommissionTeam';
 
 /** One deal: the commission rows (one per customer payment) are rolled up into a single line. */
 export function groupDeals(rows, bookingByNo) {
@@ -28,7 +29,7 @@ export function groupDeals(rows, bookingByNo) {
     const statuses = [...new Set(active.map((r) => r[6]))];
     const status = !active.length ? 'CANCELLED' : statuses.length === 1 ? statuses[0] : (statuses.includes('PAID') ? 'PARTLY PAID' : 'PARTLY APPROVED');
     return {
-      key: first[8] ?? `manual-${first[7]}`, agent: first[0], project: first[1], plot: first[2], rate: first[10],
+      key: first[8] ?? `manual-${first[7]}`, agent: first[0], project: first[1], plot: first[2], rate: first[10], via: first[13] || '',
       dealValue, received, earned, remaining: Math.max(dealValue - received, 0), status, list,
       ids: (statusName) => list.filter((r) => r[6] === statusName).map((r) => r[7]),
     };
@@ -36,7 +37,7 @@ export function groupDeals(rows, bookingByNo) {
 }
 
 function CommissionSlip({ deal, close }) {
-  const { agent, project, plot, rate, dealValue, received, earned, remaining, status, list } = deal;
+  const { agent, via, project, plot, rate, dealValue, received, earned, remaining, status, list } = deal;
   const pct = `${Number((rate * 100).toFixed(2))}%`;
   const upcoming = Math.round(remaining * rate);
   return (
@@ -46,7 +47,7 @@ function CommissionSlip({ deal, close }) {
           <div>
             <span className="modal-kicker">COMMISSION · {project} · Plot {plot}</span>
             <h2>{agent}</h2>
-            <p>{status === 'CANCELLED' ? 'All payments on this deal were cancelled' : `${list.filter((r) => r[6] !== 'CANCELLED').length} payment(s) recorded`}</p>
+            <p>{via ? `Team commission — earned on ${via}'s deal. ` : ''}{status === 'CANCELLED' ? 'All payments on this deal were cancelled' : `${list.filter((r) => r[6] !== 'CANCELLED').length} payment(s) recorded`}</p>
           </div>
           <button className="modal-close" onClick={close} aria-label="Close"><X size={17} /></button>
         </div>
@@ -92,6 +93,7 @@ export const toRow = (c, bookingById) => {
     c.agent_name || '—', booking?.[2] || '—', booking?.[3] || '—', fmtINR(c.deal_value),
     `${Number((Number(c.rate) * 100).toFixed(2))}%`, fmtINR(c.gross_amount), STATUS_LABEL(c.status), c.id,
     c.booking_id ?? null, c.received_on || c.created_at || '', Number(c.rate), Number(c.deal_value), Number(c.gross_amount),
+    c.is_override ? (c.source_agent_name || 'a sub-agent') : '',
   ];
 };
 
@@ -134,6 +136,8 @@ export function Commissions({ search, notify, role, bookings = [], project = 'Al
     <>
       <RoleContextBanner role={role} page="Commissions" />
 
+      {live && <CommissionTeam role={role} notify={notify} />}
+
       <div className="mini-stats four">
         {stats.map(([title, value, color]) => <Mini key={title} title={title} value={value} color={color || undefined} />)}
       </div>
@@ -149,7 +153,7 @@ export function Commissions({ search, notify, role, bookings = [], project = 'Al
               .map((d) => {
                 const last = d.list.filter((r) => r[6] !== 'CANCELLED').map((r) => r[9]).sort().pop();
                 return [
-                  <b>{d.agent}</b>,
+                  <span><b>{d.agent}</b>{d.via && <small style={{ display: 'block', opacity: 0.7 }}>team share · {d.via}'s deal</small>}</span>,
                   d.project,
                   d.plot,
                   `₹${fmtINR(d.dealValue)}`,

@@ -52,6 +52,26 @@ class AgentUpdate(SafeText):
         return normalise_mobile(value) if value else None
 
 
+class SubAgentCreate(SafeText):
+    """Onboard an agent under yourself, handing them ``share`` of your own commission rate."""
+
+    name: str = Field(min_length=2, max_length=120)
+    email: str = Field(max_length=190)
+    phone: str = Field(max_length=20)
+    share: Decimal = Field(gt=0, le=Decimal("0.25"), description="Slice of the parent's rate given to the new agent")
+    parent_agent_id: int | None = Field(default=None, gt=0, description="Admin only: the agent to add this one under")
+
+    @field_validator("email")
+    @classmethod
+    def _email(cls, value: str) -> str:
+        return validate_email(value)
+
+    @field_validator("phone")
+    @classmethod
+    def _phone(cls, value: str) -> str:
+        return normalise_mobile(value)
+
+
 class AgentPerformance(ORMModel):
     agent_id: int
     code: str
@@ -94,6 +114,10 @@ class CommissionResponse(TimestampedResponse):
     agent_name: str | None = None
     booking_id: int | None = None
     payment_id: int | None = None
+    #: Set when this is a team override: the sub-agent whose deal earned it.
+    source_agent_id: int | None = None
+    source_agent_name: str | None = None
+    is_override: bool = False
     received_on: date | None = None
     deal_value: Decimal
     rate: Decimal

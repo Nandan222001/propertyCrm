@@ -31,6 +31,32 @@ class AgentRepository(BaseRepository[Agent]):
         highest = max((int(m.group(1)) for c in codes if (m := re.fullmatch(rf"{prefix}(\d+)", c or ""))), default=0)
         return f"{prefix}{highest + 1:03d}"
 
+    def descendant_ids(self, agent_id: int) -> set[int]:
+        """Every agent below ``agent_id`` in the hierarchy (children, grandchildren …)."""
+        found: set[int] = set()
+        frontier = {agent_id}
+        while frontier:
+            rows = self.db.execute(
+                select(Agent.id).where(Agent.parent_agent_id.in_(frontier), Agent.is_deleted == 0)
+            ).scalars().all()
+            frontier = {r for r in rows if r not in found and r != agent_id}
+            found |= frontier
+        return found
+
+    def upline(self, agent: Agent) -> list[Agent]:
+        """Ancestors from the direct parent up to the top of the chain (cycle-safe)."""
+        chain: list[Agent] = []
+        seen = {agent.id}
+        parent_id = agent.parent_agent_id
+        while parent_id is not None and parent_id not in seen:
+            parent = self.get(parent_id)
+            if parent is None:
+                break
+            chain.append(parent)
+            seen.add(parent.id)
+            parent_id = parent.parent_agent_id
+        return chain
+
     def get_by_user(self, user_id: int) -> Agent | None:
         return self.get_by(user_id=user_id)
 
