@@ -31,7 +31,7 @@ import {
   computeTotals, itemsPayload, nextInvoiceNumber,
 } from '../utils/billing';
 import { buildInvoicePdf, downloadPdfBytes } from '../utils/pdf';
-import { modalClosed, toastPushed } from './slices/uiSlice';
+import { billOpened, modalClosed, toastPushed } from './slices/uiSlice';
 import { pageCache } from '../utils/pageCache';
 
 /** Toast helper — every page calls `notify(...)` through this one action. */
@@ -234,6 +234,11 @@ const createBookingLive = (form) => async (dispatch, getState) => {
     window.dispatchEvent(new Event('erp:applications-changed'));
     dispatch(modalClosed());
     await dispatch(hydrateWorkspace({ silent: true }));
+    // The allotment receipt is issued with the booking (admin-confirmed, amount paid) — open it ready to print.
+    const allotmentReceipt = booking.status === 'CONFIRMED' && parseAmt(form.paid || 0) > 0
+      ? getState().domain.receipts.find((r) => r.bookingNo === booking.booking_number)
+      : null;
+    if (allotmentReceipt) dispatch(billOpened(allotmentReceipt.no));
     dispatch(toastPushed(booking.status === 'CONFIRMED'
       ? `Booking ${booking.booking_number} confirmed · Plot ${form.plot} booked`
       : `Booking ${booking.booking_number} sent to admin for approval · Plot ${form.plot} on hold`));
