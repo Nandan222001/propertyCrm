@@ -145,6 +145,7 @@ class PaymentCreate(SafeText):
     due_date: date | None = None
     final_price: Money | None = Field(default=None, description="Reconfirm the price at collection time")
     notes: str | None = Field(default=None, max_length=2000)
+    payment_type: str | None = Field(default=None, max_length=40, description="e.g. Allotment; blank for an instalment")
 
     @field_validator("mode")
     @classmethod
@@ -219,6 +220,7 @@ class ReceiptResponse(TimestampedResponse):
     reference: str | None = None
     paid_to: str | None = None
     payment_status: str | None = None
+    payment_type: str | None = None
     is_shared_with_customer: bool = False
 
 

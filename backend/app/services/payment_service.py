@@ -222,6 +222,7 @@ class PaymentService(BaseService[Payment]):
             status=PAYMENT_STATUS_FOR[fully_paid],
             balance_after=max(balance_after, Decimal("0")),
             notes=payload.notes,
+            payment_type=payload.payment_type,
             recorded_by_id=self.actor.user_id,
             approved_by_id=self.actor.user_id if self.actor.can(Permission.PAYMENT_APPROVE) else None,
         )

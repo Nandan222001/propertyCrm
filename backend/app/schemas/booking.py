@@ -19,6 +19,7 @@ class BookingCreate(SafeText):
     token_amount: Money = Decimal("0")
     payment_mode: str | None = Field(default=None, max_length=24, description="How the amount paid at booking was received")
     payment_paid_to: str | None = Field(default=None, max_length=80, description="Who the amount paid at booking was paid to")
+    payment_received_on: date | None = Field(default=None, description="Receipt date of the amount paid at booking")
     payment_bank_name: str | None = Field(default=None, max_length=80, description="Cheque: issuing bank")
     payment_instrument_date: date | None = Field(default=None, description="Cheque: date the cheque was received")
     application_id: int | None = Field(default=None, gt=0, description="The customer's open application this allotment closes")
@@ -34,6 +35,14 @@ class BookingCreate(SafeText):
     @classmethod
     def _date(cls, value):
         return to_date(value, field="booking date") if value else None
+
+    @field_validator("payment_received_on", mode="before")
+    @classmethod
+    def _receipt_date(cls, value):
+        parsed = to_date(value, field="receipt date") if value else None
+        if parsed and parsed > date.today():
+            raise ValueError("receipt date cannot be in the future")
+        return parsed
 
     @field_validator("payment_instrument_date", mode="before")
     @classmethod

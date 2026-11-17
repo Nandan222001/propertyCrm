@@ -103,6 +103,8 @@ class Payment(Base, PkMixin, PublicIdMixin, TenantMixin, TimestampMixin, SoftDel
     )
     balance_after: Mapped[Decimal] = mapped_column(Numeric(18, 2), default=Decimal("0"), nullable=False)
     notes: Mapped[str | None] = mapped_column(Text)
+    #: What the money was for, when it is not a plain instalment (e.g. "Allotment") — printed on the receipt.
+    payment_type: Mapped[str | None] = mapped_column(String(40))
 
     recorded_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
     approved_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
@@ -140,6 +142,10 @@ class Receipt(Base, PkMixin, PublicIdMixin, TenantMixin, TimestampMixin):
     pdf_key: Mapped[str | None] = mapped_column(String(255))
 
     payment = relationship("Payment", back_populates="receipt")
+
+    @property
+    def payment_type(self) -> str | None:
+        return self.payment.payment_type if self.payment is not None else None
 
     @property
     def payment_status(self) -> str | None:

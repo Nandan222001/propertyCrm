@@ -104,6 +104,8 @@ export function adaptWorkspace({
         mode: r.mode,
         reference: r.reference || '',
         paidTo: r.paid_to || '',
+        // Allotment receipts show the receipt date the admin picked, and say what the money was for.
+        ...(r.payment_type ? { paymentType: r.payment_type, dateLabel: 'Receipt Date', dateTime: dateLabel(r.issued_on) } : {}),
         paymentId: r.payment_id ?? null,
         cancelled: r.payment_status === 'CANCELLED',
         agent: booking?.agent_name || '',

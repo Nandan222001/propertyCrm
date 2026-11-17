@@ -52,6 +52,7 @@ class Booking(Base, PkMixin, PublicIdMixin, TenantMixin, TimestampMixin, SoftDel
     token_payment_reference: Mapped[str | None] = mapped_column(String(80))   # its transaction id / cheque number
     token_payment_bank_name: Mapped[str | None] = mapped_column(String(80))   # cheque: issuing bank
     token_payment_instrument_date: Mapped[date | None] = mapped_column(Date)   # cheque: date received
+    token_payment_received_on: Mapped[date | None] = mapped_column(Date)   # receipt date chosen at allotment
     paid_amount: Mapped[Decimal] = mapped_column(Numeric(18, 2), default=Decimal("0"), nullable=False)
     discount_amount: Mapped[Decimal] = mapped_column(Numeric(18, 2), default=Decimal("0"), nullable=False)
     gst_amount: Mapped[Decimal] = mapped_column(Numeric(18, 2), default=Decimal("0"), nullable=False)

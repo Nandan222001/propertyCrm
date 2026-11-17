@@ -132,11 +132,13 @@ export function BookingModal({ role, agentName, customers, plots, projects = [],
     if (plan && (!quote || quote.forAllotment !== allotment)) return setError(quoteError || 'Wait for the payment scheme to be calculated.');
     if (parseAmt(finalPrice) <= 0) return setError('Enter the final price.');
     if (parseAmt(tokenValue) > parseAmt(finalPrice)) return setError('The amount paid at booking cannot exceed the final price.');
+    if (parseAmt(tokenValue) > 0 && !d.receiptDate) return setError('Select the receipt date.');
+    if (d.receiptDate && d.receiptDate > new Date().toISOString().slice(0, 10)) return setError('The receipt date cannot be in the future.');
     if (isCheque && parseAmt(tokenValue) > 0 && !(d.bankName || '').trim()) return setError('Enter the bank name for the cheque.');
     if (isCheque && parseAmt(tokenValue) > 0 && !d.chequeDate) return setError('Enter the cheque receiving date.');
     save({
       customer, customerId: typeof chosen?.id === 'number' ? chosen.id : undefined, project, plot: selected[0], amount: fmtINR(parseAmt(finalPrice)), paid: fmtINR(parseAmt(tokenValue)),
-      mode: d.mode || 'UPI', txn: (d.txn || '').trim(), paidTo: (d.paidTo || '').trim(), bankName: isCheque ? (d.bankName || '').trim() : '', chequeDate: isCheque ? d.chequeDate : '', plan: plan?.name || 'Standard', planId: plan ? plan.id : undefined, agent: agentMode ? agentName : d.agent,
+      mode: d.mode || 'UPI', txn: (d.txn || '').trim(), paidTo: (d.paidTo || '').trim(), receiptDate: d.receiptDate || '', bankName: isCheque ? (d.bankName || '').trim() : '', chequeDate: isCheque ? d.chequeDate : '', plan: plan?.name || 'Standard', planId: plan ? plan.id : undefined, agent: agentMode ? agentName : d.agent,
       applicationId: applicationId ? Number(applicationId) : undefined,
     });
   }
@@ -204,6 +206,7 @@ export function BookingModal({ role, agentName, customers, plots, projects = [],
             <Field label="Bank name"><input name="bankName" maxLength={80} placeholder="e.g. HDFC Bank" /></Field>
             <Field label="Cheque receiving date"><input name="chequeDate" type="date" /></Field>
           </>}
+          <Field label="Receipt date" hint="Date of the amount paid at booking — shown on the receipt"><input name="receiptDate" type="date" defaultValue={new Date().toISOString().slice(0, 10)} max={new Date().toISOString().slice(0, 10)} /></Field>
           <Field label="Paid to" hint="Who received the money — shown as 'In favour of' on the receipt"><input name="paidTo" maxLength={80} list="paid-to-options" placeholder="e.g. Company bank account" /><datalist id="paid-to-options"><option value="Company bank account" /><option value="Office cash" /><option value="Director" /><option value="Agent" /></datalist></Field>
           
           {hasPlans ? (
