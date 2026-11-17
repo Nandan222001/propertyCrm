@@ -11,13 +11,14 @@ export function AddPlotsModal({ projects, defaultProject = '', close, save }) {
   const real = projects.filter((p) => typeof p[6] === 'number');
   const [form, setForm] = useState({
     project: real.find((p) => p[0] === defaultProject)?.[0] || real[0]?.[0] || '',
-    prefix: 'A-', start: '1', count: '', layout: '', facing: 'East', area: '', price: '',
+    prefix: 'A-', start: '1', count: '', layout: '', facing: 'East', length: '', width: '', price: '',
   });
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const set = (key) => (e) => setForm({ ...form, [key]: e.target.value });
   const picked = real.find((p) => p[0] === form.project);
   const count = Number(form.count);
+  const area = Math.round(Number(form.length) * Number(form.width) * 100) / 100;   // plot area = length × width
   const first = `${form.prefix.trim().toUpperCase()}${Number(form.start)}`;
   const last = `${form.prefix.trim().toUpperCase()}${Number(form.start) + Math.max(count - 1, 0)}`;
 
@@ -26,13 +27,14 @@ export function AddPlotsModal({ projects, defaultProject = '', close, save }) {
     if (!picked) return setError('Choose the project.');
     if (!Number.isInteger(count) || count < 1 || count > 500) return setError('How many plots: a whole number from 1 to 500.');
     if (!Number.isInteger(Number(form.start)) || Number(form.start) < 0) return setError('Starting number must be 0 or more.');
-    if (!(Number(form.area) > 0)) return setError('Enter the plot area in sq.ft.');
+    if (!(Number(form.length) > 0) || !(Number(form.width) > 0)) return setError('Enter the plot length and width (in feet).');
+    if (area > 1000000) return setError('Plot area is too large — check the length and width.');
     if (!(Number(String(form.price).replace(/,/g, '')) > 0)) return setError('Enter the price for each plot.');
     setBusy(true);
     const problem = await save({
       project_id: picked[6], prefix: form.prefix.trim(), start: Number(form.start), count,
       layout: form.layout.trim() || undefined, facing: form.facing || undefined,
-      area_sqft: Number(form.area), price: Number(String(form.price).replace(/,/g, '')),
+      area_sqft: area, price: Number(String(form.price).replace(/,/g, '')),
     }, count);
     setBusy(false);
     if (problem) setError(problem); else close();
@@ -51,7 +53,9 @@ export function AddPlotsModal({ projects, defaultProject = '', close, save }) {
           <label>Starting number<input value={form.start} onChange={set('start')} inputMode="numeric" /></label>
           <label>How many plots<input value={form.count} onChange={set('count')} inputMode="numeric" placeholder="e.g. 20" autoFocus /></label>
           <label>Layout<input value={form.layout} onChange={set('layout')} placeholder="Layout name" /></label>
-          <label>Area of each (sq.ft)<input value={form.area} onChange={set('area')} inputMode="decimal" /></label>
+          <label>Length (ft)<input value={form.length} onChange={set('length')} inputMode="decimal" placeholder="e.g. 50" /></label>
+          <label>Width (ft)<input value={form.width} onChange={set('width')} inputMode="decimal" placeholder="e.g. 30" /></label>
+          <label>Plot area (length × width)<input value={area > 0 ? `${area} sq.ft` : ''} readOnly placeholder="Calculated automatically" /></label>
           <label>Facing
             <select value={form.facing} onChange={set('facing')}>{FACINGS.map((f) => <option key={f}>{f}</option>)}</select>
           </label>
