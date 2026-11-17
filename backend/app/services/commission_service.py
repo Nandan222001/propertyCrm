@@ -19,8 +19,11 @@ MONEY = Decimal("0.01")
 
 
 def commission_rate_for(override: Decimal | None, default: Decimal) -> Decimal:
-    """The agent's own rate; the organisation's default rate when the agent has none."""
-    if override is not None and override > 0:
+    """The agent's own rate; the organisation's default rate only for an agent that was never given one.
+
+    A rate of ``0`` means the organisation deliberately put this agent at zero (they earn nothing), while a
+    missing rate falls back to the default."""
+    if override is not None:
         return Decimal(override)
     return default
 
