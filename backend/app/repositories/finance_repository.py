@@ -57,6 +57,16 @@ class AgentRepository(BaseRepository[Agent]):
             parent_id = parent.parent_agent_id
         return chain
 
+    def purge_deleted_code(self, code: str) -> None:
+        """Hard-delete a previously removed agent that still holds this code, so the code can be issued again."""
+        stale = self.db.execute(
+            select(Agent).where(Agent.code == (code or "").strip().upper(), Agent.is_deleted.is_(True))
+        ).scalars().all()
+        for agent in stale:
+            self.db.delete(agent)
+        if stale:
+            self.db.flush()
+
     def get_by_user(self, user_id: int) -> Agent | None:
         return self.get_by(user_id=user_id)
 

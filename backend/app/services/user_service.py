@@ -76,6 +76,7 @@ class UserService(BaseService[User]):
         email = payload.email.lower().strip()
         if self.users.get_by_email(email):
             raise ConflictError("A user with this e-mail already exists")
+        self.users.purge_deleted_email(email)
         self._assert_escalation_allowed(payload.role)
         self._assert_seat_available()
 

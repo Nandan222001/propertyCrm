@@ -53,7 +53,7 @@ def test_unscoped_bulk_delete_is_blocked(session):
         session.execute(Customer.__table__.delete())
 
 
-def test_soft_delete_keeps_rows_for_retention(client, session, admin_headers, unique_email, unique_phone):
+def test_deleting_a_customer_removes_the_row_so_they_can_be_added_again(client, session, admin_headers, unique_email, unique_phone):
     created = client.post(
         "/api/v1/customers",
         json={"name": "Retention Probe", "email": unique_email, "phone": unique_phone,
@@ -66,11 +66,8 @@ def test_soft_delete_keeps_rows_for_retention(client, session, admin_headers, un
     from app.models.customer import Customer
 
     session.rollback()  # end the read txn to see committed rows
-    stored = session.query(Customer).filter(Customer.id == customer_id).one()
-    assert stored.is_deleted is True and stored.deleted_at is not None
-    # Standard queries hide it; audit queries can still see it.
-    assert session.query(Customer).filter(Customer.id == customer_id,
-                                          Customer.is_deleted.is_(False)).first() is None
+    # A customer with no paperwork is really deleted (one with bookings/receipts stays hidden instead).
+    assert session.query(Customer).filter(Customer.id == customer_id).first() is None
 
 
 def test_every_model_carries_security_columns_and_constraints():

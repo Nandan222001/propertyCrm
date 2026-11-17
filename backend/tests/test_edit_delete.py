@@ -350,3 +350,22 @@ def test_agent_leaderboard_ignores_deleted_bookings(client, agent_headers, admin
     with_booking = deals()
     assert delete_booking(client, booking["id"], admin_headers) == 200
     assert deals() == with_booking - 1
+
+
+def test_deleted_agent_and_customer_can_be_added_again(client, admin_headers, unique_email, unique_phone):
+    """Deleting really removes them (and their sign-in), so re-adding the same person is not a duplicate."""
+    body = {"name": "Readd Probe Agent", "email": unique_email, "phone": unique_phone, "commission_rate": 0.02}
+    first = client.post("/api/v1/agents", headers=admin_headers, json=body)
+    assert first.status_code in (200, 201), first.text
+    agent = first.json()["data"]
+    assert client.delete(f"/api/v1/agents/{agent['id']}", headers=admin_headers).status_code == 200
+    again = client.post("/api/v1/agents", headers=admin_headers, json=body)
+    assert again.status_code in (200, 201), again.text
+    assert "login created" in again.json()["data"]["login"]
+    assert client.delete(f"/api/v1/agents/{again.json()['data']['id']}", headers=admin_headers).status_code == 200
+
+    cust_email, cust_phone = "r" + unique_email, "8" + unique_phone[1:][::-1]
+    c1 = _new_customer(client, admin_headers, cust_email, cust_phone, "Readd Probe Customer")
+    assert client.delete(f"/api/v1/customers/{c1['id']}", headers=admin_headers).status_code == 200
+    c2 = _new_customer(client, admin_headers, cust_email, cust_phone, "Readd Probe Customer")
+    assert client.delete(f"/api/v1/customers/{c2['id']}", headers=admin_headers).status_code == 200

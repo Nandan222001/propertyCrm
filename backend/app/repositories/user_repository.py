@@ -39,6 +39,18 @@ class UserRepository(BaseRepository[User]):
         )
         return self.db.execute(stmt).scalars().first()
 
+    def purge_deleted_email(self, email: str) -> None:
+        """Hard-delete a previously removed account that still holds this e-mail, so the person can be added again."""
+        stale = self.db.execute(
+            select(User)
+            .where(User.email == (email or "").strip().lower(), User.is_deleted.is_(True))
+            .execution_options(all_tenants=True)
+        ).scalars().all()
+        for user in stale:
+            self.db.delete(user)
+        if stale:
+            self.db.flush()
+
     def active(self) -> list[User]:
         return self.list(filters={"status": UserStatus.ACTIVE.value})
 

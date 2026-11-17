@@ -119,6 +119,7 @@ class AgentService(BaseService):
         code = (payload.code or "").strip().upper() or self.agents.next_code()
         if self.agents.get_by_code(code):
             raise ConflictError(f"Agent code {code} already exists")
+        self.agents.purge_deleted_code(code)
         wants_login = bool(payload.email and payload.phone)
         if wants_login:
             self._check_login_can_be_created(payload.name, payload.email, payload.phone)
@@ -333,8 +334,17 @@ class AgentService(BaseService):
             Booking.agent_id == agent.id, Booking.is_deleted.is_(False))).scalar_one()
         if deals:
             raise BusinessRuleError(f"{agent.name} has {deals} booking(s) — set the agent to inactive instead of deleting")
-        self.agents.delete(agent, actor=self.actor.name)
         self._audit(AuditAction.DELETE, agent, summary="Agent deleted")
+        # Really remove the agent and their sign-in so the same person / code can be added again.
+        from app.models.user import User
+        from app.services.notification_service import agent_user_id
+
+        login_id = agent_user_id(self.db, agent)
+        login = self.db.get(User, login_id) if login_id else None
+        self.db.delete(agent)
+        self.db.flush()
+        if login is not None:
+            self.db.delete(login)
         self.db.commit()
 
 

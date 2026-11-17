@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from sqlalchemy import func, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.constants import ApprovalStatus, AuditAction, BookingStatus, Permission, Role, UserStatus
@@ -195,6 +196,7 @@ class CustomerService(BaseService[Customer]):
         email = email.lower().strip()
         if UserRepository(self.db).get_by_email(email):
             return "no login created: this e-mail already belongs to another account"
+        UserRepository(self.db).purge_deleted_email(email)
         try:
             password = initial_password(customer.name, phone)
         except ValidationError as problem:
@@ -207,13 +209,15 @@ class CustomerService(BaseService[Customer]):
         self.db.flush()
         return "login created: e-mail + starting password (first 4 letters of the name + last 5 digits of the mobile)"
 
-    def _drop_portal_login(self, customer: Customer, *, suspend_only: bool = False) -> None:
+    def _drop_portal_login(self, customer: Customer, *, suspend_only: bool = False, hard: bool = False) -> None:
         user = self._portal_user(customer)
         if user is None:
             return
         AuthTokenRepository(self.db).revoke_all_for_user(user.id)
         if suspend_only:
             user.status = UserStatus.SUSPENDED.value
+        elif hard:
+            self.db.delete(user)        # frees the e-mail for the next time this person is added
         else:
             user.soft_delete(self.actor.name)
         self.db.flush()
@@ -232,9 +236,15 @@ class CustomerService(BaseService[Customer]):
         ).scalar_one()
         if live:
             raise BusinessRuleError("This customer still has active bookings — cancel or remove those first")
-        self.customers.delete(customer, actor=self.actor.name)
-        self._drop_portal_login(customer)
         self._audit(AuditAction.DELETE, customer, before=self._snapshot(customer), summary="Customer removed")
+        self._drop_portal_login(customer, hard=True)
+        # Really remove the row so the same person can be added again. A customer who has paperwork
+        # (cancelled bookings, applications, receipts …) cannot be erased without breaking it — that one stays hidden.
+        try:
+            with self.db.begin_nested():
+                self.customers.delete(customer, hard=True)
+        except IntegrityError:
+            self.customers.delete(customer, actor=self.actor.name)
         return customer
 
     def update_customer(self, customer_id: int, payload: CustomerUpdate) -> Customer:
