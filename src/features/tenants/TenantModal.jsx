@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Check, X } from 'lucide-react';
 import { PLAN_LABEL, TENANT_PLANS, blankTenantForm, slugify, validateTenant } from '../../utils/tenants';
-import { PLOT_MAP_OPTIONS } from '../../data/plotMaps';
+import { PLOT_MAP_OPTIONS } from '../../data/plotMapOptions';
 import { limitMobile, MOBILE_INPUT } from '../../utils/phone';
 
 /** Create (editing = null) or edit an organisation. Creating also provisions its first administrator. */

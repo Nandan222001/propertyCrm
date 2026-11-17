@@ -96,6 +96,17 @@ The platform hosts many organisations ("tenants"); each one is fully isolated.
   (`GET /invoices/{id}/pdf`) — the SPA also renders the same PDF offline in
   demo mode, so "download bill" works without a backend.
 * **Commissions** — accrual on confirmation, TDS split, approval and payout.
+* **Agent hierarchy** — one commission pool. A 20% agent can put four agents
+  under them on 10%, 12%, 14% and 16% (each a slice of that same pool) and keep
+  the rest of their 20% on each branch's deals. A deal pays only the agent who
+  brought it and the uplines above them — never the parallel agents — and the
+  path never pays out more than the pool. Overrides accrue on every payment.
+* **3D plot map** — the colony layout drawn as an interactive 3D map (rotate / pan / zoom, click a plot).
+  Every plot is coloured from the live inventory (green available, amber on hold, red booked/sold) and is matched
+  on the digits of its plot number alone, so a plot entered as `COMM-01` maps to plot 1 of the drawing. The same
+  map is served publicly at `/plot-map/<organisation>` with numbers and free/booked only.
+* **Sales-agent hierarchy** — the Agents page toggles between the ranked list and a tree of who onboarded whom,
+  showing the pool share each agent holds, what they were given and how many agents sit below them.
 * **Customers** — master data, per-customer 360° profile, portal access, consent,
   data-subject requests.
 * **Governance** — audit trail, security events, notification follow-ups,

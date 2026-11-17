@@ -109,9 +109,14 @@ class CommissionService(BaseService[Commission]):
     def accrue_for_payment(self, booking, payment) -> Commission | None:
         """The agent earns their rate on every payment the customer makes, until the booking is paid up.
 
-        Agents form a hierarchy: whoever onboarded the booking agent keeps the slice of rate they did not hand
-        down, and earns it (a team override) on every deal the sub-agent closes. The chain therefore never pays
-        out more than the top agent's original rate.
+        A hierarchy is one commission pool, and a deal pays only the one path that brought it: the selling
+        agent earns the slice they hold, and each upline earns what is left of their own rate on that deal.
+        Parallel agents (the other branches of the same pool holder) earn nothing, and the path never pays out
+        more than the pool.
+
+        Example: the pool holder holds 20% and gives one agent 14%, who gives their own agent 8%. The 14% agent
+        keeps 6% on that branch, so the bottom agent's deal pays 8% + 6% + 6% = 20%; a deal by the 14% agent
+        pays 14% + 6% = 20%; and if another agent under the pool holder holds 4%, their deals pay 4% + 16%.
 
         Idempotent per payment. A booking that still carries an older whole-deal commission is left alone so the
         same money is never commissioned twice. Returns the booking agent's own commission."""
@@ -133,10 +138,16 @@ class CommissionService(BaseService[Commission]):
         received = Decimal(payment.amount)
         tds_rate = self._tds_rate()
 
+        # The seller earns their slice; each upline earns what is left of their own rate on this one path.
         earners: list[tuple[object, Decimal]] = [(agent, commission_rate_for(Decimal(agent.commission_rate), default_rate))]
+        child = agent
         for upline_agent in self.agents.upline(agent):
-            if Decimal(upline_agent.commission_rate) > 0:
-                earners.append((upline_agent, Decimal(upline_agent.commission_rate)))
+            held = Decimal(upline_agent.commission_rate)
+            promised = Decimal(child.assigned_rate if child.assigned_rate is not None else child.commission_rate)
+            kept = held - promised
+            if kept > 0:
+                earners.append((upline_agent, kept.quantize(Decimal("0.0001"))))
+            child = upline_agent
 
         own: Commission | None = None
         for earner, rate in earners:

@@ -1,4 +1,9 @@
-"""Agent hierarchy: an agent hands part of their own commission rate to the agents they add."""
+"""Agent hierarchy: one commission pool per branch, and a deal pays only the selling agent's own chain.
+
+The top agent holds the pool (say 20%). Each agent under them is promised a slice of that pool: 14% to one agent
+who keeps 6% of it on that branch and hands 8% to their own agent. A deal by the bottom agent therefore pays
+8% + 6% + 6% = 20% — never more than the pool — and the parallel agents of the same upline earn nothing.
+"""
 
 from __future__ import annotations
 
@@ -26,41 +31,43 @@ def _add(client, headers, name, phone, share, **extra):
         "name": name, "email": f"{uuid.uuid4().hex[:8]}@example.demo", "phone": phone, "share": share, **extra})
 
 
-def test_rate_moves_from_parent_to_new_agent_and_chain_shares_every_deal(
+def test_a_deal_pays_only_the_sellers_chain_and_never_more_than_the_pool(
         client, admin_headers, agent_headers, unique_phone, available_plot):
     first = _agent_named(client, admin_headers, "S. Patel")
     assert client.patch(f"/api/v1/agents/{first['id']}", headers=admin_headers,
                         json={"commission_rate": "0.20"}).status_code == 200
 
-    # First agent (20%) adds a second agent with 10% of it.
+    # The pool holder promises 14% of their 20% to one agent; they hold 20% and keep 6% on that branch.
     email_b = f"{uuid.uuid4().hex[:8]}@example.demo"
     created = client.post("/api/v1/agents/team", headers=agent_headers, json={
-        "name": "Second Agent", "email": email_b, "phone": unique_phone, "share": "0.10"})
+        "name": "Second Agent", "email": email_b, "phone": unique_phone, "share": "0.14"})
     assert created.status_code == 201, created.text
     second = created.json()["data"]
-    assert PCT(second["commission_rate"]) == 10 and second["parent_agent_id"] == first["id"]
-    assert PCT(created.json()["data"]["parent_commission_rate"]) == 10
-    assert PCT(_agent_named(client, admin_headers, "S. Patel")["commission_rate"]) == 10
+    assert PCT(second["commission_rate"]) == 14 and second["parent_agent_id"] == first["id"]
+    assert PCT(created.json()["data"]["parent_commission_rate"]) == 20
+    assert PCT(_agent_named(client, admin_headers, "S. Patel")["commission_rate"]) == 20
 
-    # The second agent signs in and sees 10% on their own team page; the first still sees theirs.
     b_headers = _sign_in(client, email_b, "Second Agent", unique_phone)
     team_b = client.get("/api/v1/agents/team", headers=b_headers).json()["data"]
-    assert PCT(team_b["me"]["commission_rate"]) == 10
+    assert PCT(team_b["me"]["commission_rate"]) == 14
     assert [m["name"] for m in team_b["members"]] == ["Second Agent"]
-    team_a = client.get("/api/v1/agents/team", headers=agent_headers).json()["data"]
-    assert PCT(team_a["me"]["commission_rate"]) == 10
-    assert {m["name"] for m in team_a["members"]} >= {"S. Patel", "Second Agent"}
 
-    # The second agent adds a third with 4% of their 10%.
+    # A parallel agent under the same pool holder — it must not earn on the other branch's deal.
+    phone_d = "7" + unique_phone[1:][::-1]
+    assert _add(client, admin_headers, "Parallel Agent", phone_d, "0.04",
+                parent_agent_id=first["id"]).status_code == 201
+
+    # The second agent hands 8% of their 14% to a third agent: on that branch they keep 6%.
     phone_c = "9" + unique_phone[1:][::-1]
     email_c = f"{uuid.uuid4().hex[:8]}@example.demo"
     third = client.post("/api/v1/agents/team", headers=b_headers, json={
-        "name": "Third Agent", "email": email_c, "phone": phone_c, "share": "0.04"})
+        "name": "Third Agent", "email": email_c, "phone": phone_c, "share": "0.08"})
     assert third.status_code == 201, third.text
-    assert PCT(third.json()["data"]["commission_rate"]) == 4
-    assert PCT(_agent_named(client, admin_headers, "Second Agent")["commission_rate"]) == 6
+    assert PCT(third.json()["data"]["commission_rate"]) == 8
+    # The second agent still holds 14%; on this branch they keep 6% (14 - 8), as the payout below shows.
+    assert PCT(_agent_named(client, admin_headers, "Second Agent")["commission_rate"]) == 14
 
-    # The third agent's deal: everyone on the chain earns their own rate; the total is the original 20%.
+    # The third agent's deal: 8% + 6% + 6% = the 20% pool. The parallel agent is paid nothing.
     c_headers = _sign_in(client, email_c, "Third Agent", phone_c)
     customer = client.post("/api/v1/customers", headers=c_headers, json={
         "name": "Chain Customer", "email": f"{uuid.uuid4().hex[:8]}@example.demo", "phone": "9" + unique_phone[1:],
@@ -78,11 +85,13 @@ def test_rate_moves_from_parent_to_new_agent_and_chain_shares_every_deal(
     rows = client.get("/api/v1/commissions", headers=admin_headers, params={"page_size": 200}).json()["data"]
     mine = {c["agent_name"]: c for c in rows if c["booking_id"] == booking["id"]}
     assert {k: float(v["gross_amount"]) for k, v in mine.items()} == {
-        "Third Agent": 4000.0, "Second Agent": 6000.0, "S. Patel": 10000.0}
-    assert [k for k, v in mine.items() if v["is_override"]] == ["Second Agent", "S. Patel"] or \
-        {k for k, v in mine.items() if v["is_override"]} == {"Second Agent", "S. Patel"}
+        "Third Agent": 8000.0, "Second Agent": 6000.0, "S. Patel": 6000.0}
+    assert "Parallel Agent" not in mine
+    assert {k for k, v in mine.items() if v["is_override"]} == {"Second Agent", "S. Patel"}
     assert all(v["source_agent_name"] == "Third Agent" for v in mine.values())
-    # Paying again accrues once per person, never twice.
+    assert sum(float(v["rate"]) for v in mine.values()) <= 0.20 + 1e-9
+
+    # Paying again accrues once per person on the selling chain, never twice.
     assert client.post("/api/v1/payments", headers=admin_headers, json={
         "booking_id": booking["id"], "amount": "50000", "mode": "UPI"}).status_code == 201
     rows = client.get("/api/v1/commissions", headers=admin_headers, params={"page_size": 200}).json()["data"]
@@ -94,12 +103,27 @@ def test_rate_moves_from_parent_to_new_agent_and_chain_shares_every_deal(
         assert {c["agent_name"] for c in seen} == expected
 
 
-def test_new_agent_cannot_be_given_more_than_the_parent_has(client, admin_headers, agent_headers, unique_phone):
-    me = _agent_named(client, admin_headers, "S. Patel")
-    have = float(me["commission_rate"])
-    too_much = _add(client, agent_headers, "Greedy Agent", unique_phone, str(min(have, 0.25)))
+def test_one_twenty_percent_pool_can_carry_four_parallel_agents(client, admin_headers, agent_headers, unique_phone):
+    """20% pool with four agents on 10%, 12%, 14% and 16%: each is a slice of the one pool, not an addition."""
+    assert client.patch(f"/api/v1/agents/{_agent_named(client, admin_headers, 'S. Patel')['id']}",
+                        headers=admin_headers, json={"commission_rate": "0.20"}).status_code == 200
+    for index, share in enumerate(("0.10", "0.12", "0.14", "0.16")):
+        added = _add(client, agent_headers, f"Pool Agent {index}", unique_phone, share)
+        assert added.status_code == 201, added.text
+        assert PCT(added.json()["data"]["parent_commission_rate"]) == 20
+    # The pool holder keeps their 20%: on each branch it keeps whatever it did not promise that branch.
+    assert PCT(_agent_named(client, admin_headers, "S. Patel")["commission_rate"]) == 20
+    team = client.get("/api/v1/agents/team", headers=agent_headers).json()["data"]
+    assert sorted(PCT(m["commission_rate"]) for m in team["members"] if m["name"].startswith("Pool Agent")) == [
+        10.0, 12.0, 14.0, 16.0]
+    # But no single promise can swallow the pool: 20% down to one agent leaves the holder nothing.
+    blocked = _add(client, agent_headers, "Pool Agent 5", unique_phone, "0.20")
+    assert blocked.status_code in (409, 422) and "at least 1%" in blocked.text
+
+
+def test_a_share_cannot_be_more_than_the_parent_holds(client, admin_headers, agent_headers, unique_phone):
+    too_much = _add(client, agent_headers, "Greedy Agent", unique_phone, "0.25")
     assert too_much.status_code in (409, 422), too_much.text
-    assert PCT(_agent_named(client, admin_headers, "S. Patel")["commission_rate"]) == PCT(have)
     assert _add(client, agent_headers, "Zero Agent", unique_phone, "0").status_code == 422
 
 
@@ -114,18 +138,3 @@ def test_only_the_owner_or_admin_can_add_agents_to_a_team(client, admin_headers,
     ok = _add(client, admin_headers, "Admin Placed Agent", unique_phone, "0.001", parent_agent_id=other["id"])
     assert ok.status_code == 201, ok.text
     assert ok.json()["data"]["parent_agent_id"] == other["id"]
-
-
-def test_commission_can_be_handed_down_until_the_parent_is_left_with_one_percent(
-        client, admin_headers, unique_phone):
-    top = client.post("/api/v1/agents", headers=admin_headers, json={"name": "Floor Test Agent", "commission_rate": "0.03"})
-    assert top.status_code == 201, top.text
-    top_id = top.json()["data"]["id"]
-    # 3% -> give 2%, parent keeps exactly 1% (allowed) ...
-    assert _add(client, admin_headers, "Floor Child One", unique_phone, "0.02", parent_agent_id=top_id).status_code == 201
-    assert PCT(client.get("/api/v1/agents", headers=admin_headers, params={"page_size": 200}).json()["data"]
-               and next(a for a in client.get("/api/v1/agents", headers=admin_headers, params={"page_size": 200}).json()["data"]
-                        if a["id"] == top_id)["commission_rate"]) == 1
-    # ... but nothing further: the parent is now at the 1% floor.
-    blocked = _add(client, admin_headers, "Floor Child Two", unique_phone, "0.001", parent_agent_id=top_id)
-    assert blocked.status_code == 409 and "at least 1%" in blocked.text

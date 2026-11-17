@@ -20,7 +20,8 @@ from app.schemas.finance import AgentCreate, AgentPerformance, AgentUpdate, SubA
 from app.services.base_service import BaseService
 from app.services.notification_service import agent_user_id
 
-#: An agent can keep handing commission down until they are left with this much.
+#: An agent keeps at least this much of their own rate on every deal their agents bring, so never pays out more
+#: than they hold. A pool holder on 20% can therefore hand any one agent up to 19%.
 MIN_RETAINED_RATE = Decimal("0.01")
 
 
@@ -191,12 +192,12 @@ class AgentService(BaseService):
         }
 
     def create_sub_agent(self, payload: SubAgentCreate) -> dict:
-        """Add an agent under ``parent`` and move ``share`` of the parent's commission rate to them.
+        """Add an agent under ``parent`` and give them ``share`` of the parent's own rate.
 
-        The parent's rate drops by exactly what the new agent receives, so the total paid along the chain
-        never grows: 20% with 10% handed down leaves the parent on 10% and the new agent on 10%."""
-        from app.core.exceptions import ConflictError
-
+        A hierarchy is one pool. A 20% agent can put four agents under them on 10%, 12%, 14% and 16%: those are
+        four separate promises out of the same 20%, not four additions to it. Whichever branch sells is paid from
+        the pool, and the pool holder earns what is left of their 20% on that deal — never less than
+        ``MIN_RETAINED_RATE``, and the whole chain never pays more than the pool."""
         if self.actor.agent_id:
             parent = self._my_agent()
             if payload.parent_agent_id and payload.parent_agent_id != self.actor.agent_id:
@@ -217,7 +218,8 @@ class AgentService(BaseService):
         if available - share < MIN_RETAINED_RATE:
             room = max(available - MIN_RETAINED_RATE, Decimal("0"))
             raise BusinessRuleError(
-                f"{parent.name} has {self._pct(available)} and must keep at least {self._pct(MIN_RETAINED_RATE)}"
+                f"{parent.name} holds {self._pct(available)} and must keep at least "
+                f"{self._pct(MIN_RETAINED_RATE)} of it on the deals this agent brings"
                 + (f", so can give at most {self._pct(room)}" if room > 0 else " — there is nothing left to give")
             )
         self._check_login_can_be_created(payload.name, payload.email, payload.phone)
@@ -227,13 +229,11 @@ class AgentService(BaseService):
             name=payload.name, email=payload.email, phone=payload.phone, code=code,
             commission_rate=share, assigned_rate=share, parent_agent_id=parent.id,
         ))
-        before = parent.commission_rate
-        parent.commission_rate = available - share
-        self.db.flush()
         self._audit(
             AuditAction.CREATE, agent,
-            summary=f"Agent {agent.code} added under {parent.code} with {self._pct(share)} of the parent's rate "
-                    f"({parent.code}: {self._pct(before)} -> {self._pct(parent.commission_rate)})",
+            summary=f"Agent {agent.code} added under {parent.code} with {self._pct(share)} out of the "
+                    f"{self._pct(available)} {parent.code} holds; {parent.code} keeps "
+                    f"{self._pct(available - share)} on {agent.code}'s deals",
         )
         self._create_login(agent, as_admin=True)
         self.db.commit()

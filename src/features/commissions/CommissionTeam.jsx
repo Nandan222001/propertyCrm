@@ -7,15 +7,15 @@ import { Table } from '../../components/common/DataTable';
 import { limitMobile, MOBILE_INPUT } from '../../utils/phone';
 import { pageCache } from '../../utils/pageCache';
 
-/** Every agent keeps at least this much (%) of their own rate — the chain stops here. */
+/** Every agent keeps at least this much (%) of their own rate on a sub-agent's deals — the pool stops here. */
 const MIN_KEPT = 1;
 
 /** A rate as the server stores it (0.1) -> "10%". */
 export const pct = (rate) => `${Number((Number(rate) * 100).toFixed(2))}%`;
 
 /**
- * Hand part of your own commission to a new agent. The share comes out of your rate, so 20% with 10% handed
- * down leaves you on 10% and the new agent on 10%.
+ * Give a new agent a slice of the pool you hold. Every agent under you is a promise out of the same pool, so a
+ * 20% holder can put four agents on 10%, 12%, 14% and 16%: on each of their deals you keep the rest of your 20%.
  */
 function AddTeamAgentModal({ parent, parents, close, save }) {
   const [form, setForm] = useState({ name: '', phone: '', email: '', share: '', parent: parents ? '' : String(parent.id) });
@@ -48,7 +48,7 @@ function AddTeamAgentModal({ parent, parents, close, save }) {
           <div>
             <span className="modal-kicker">ADD AGENT TO TEAM</span>
             <h2>New agent under {giver ? giver.name : '…'}</h2>
-            <p>The percentage you give comes out of {giver ? `${giver.name}'s` : 'the parent\'s'} own rate{giver ? ` (${pct(giver.commission_rate)} now)` : ''}. The new agent sees it as their own commission.</p>
+            <p>The percentage comes out of {giver ? `${giver.name}'s` : 'the parent\'s'} own rate{giver ? ` (${pct(giver.commission_rate)})` : ''} — every agent under them is a slice of that same pool. On this agent's deals {giver ? giver.name : 'the parent'} keeps the rest, and a deal only ever pays the agent who brought it and the uplines above them.</p>
           </div>
           <button type="button" className="modal-close" onClick={close} aria-label="Close"><X size={16} /></button>
         </div>
@@ -68,7 +68,7 @@ function AddTeamAgentModal({ parent, parents, close, save }) {
         </div>
         {giver && Number.isFinite(share) && share > 0 && have - share >= MIN_KEPT && (
           <p className="bill-words">
-            {giver.name}: {pct(giver.commission_rate)} → <b>{Number((have - share).toFixed(2))}%</b> · New agent: <b>{Number(share.toFixed(2))}%</b>
+            {giver.name} keeps on this agent's deals: <b>{Number((have - share).toFixed(2))}%</b> · New agent gets: <b>{Number(share.toFixed(2))}%</b>
           </p>
         )}
         {error && <p className="form-error">{error}</p>}
@@ -123,7 +123,7 @@ export function CommissionTeam({ role, notify, onChanged }) {
           <h2><UsersRound size={14} style={{ verticalAlign: '-2px' }} /> {admin ? 'Agent hierarchy' : 'My commission team'}</h2>
           <p>
             {me
-              ? `You currently earn ${pct(me.commission_rate)} on your own deals${parentName ? ` (given to you by ${parentName})` : ''}. Add agents under you and give each a share of that — it comes out of your own rate.`
+              ? `You currently earn ${pct(me.commission_rate)} on your own deals${parentName ? ` (given to you by ${parentName})` : ''}. Add agents under you and give each a share of that — it comes out of your own rate. A deal only pays the agent who brought it and the uplines above them.`
               : 'Every agent, who they report to and the share of commission they keep.'}
           </p>
         </div>

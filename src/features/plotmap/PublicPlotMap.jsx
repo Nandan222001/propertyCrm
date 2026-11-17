@@ -1,11 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import { actions } from '../../api/resources';
-import { PlotMap } from './PlotMap';
-import { PLOT_MAPS } from '../../data/plotMaps';
+import { PlotMap3D } from './PlotMap3D';
 
 const REFRESH_MS = 60000;
 
-/** Public, view-only plot map at /plot-map/<organisation>. No sign-in; shows only free (green) and booked (red). */
+/**
+ * Public, view-only 3D plot map at /plot-map/<organisation>. No sign-in; the API sends only plot numbers,
+ * their project and whether the plot is free — never prices, customers or agents.
+ */
 export function PublicPlotMap({ slug }) {
   const [state, setState] = useState({ loading: true, data: null, error: '' });
 
@@ -25,12 +27,17 @@ export function PublicPlotMap({ slug }) {
   return (
     <div className="public-plotmap">
       <header>
-        <h1>{data ? (PLOT_MAPS[data.map]?.label || data.label) : 'Plot map'}</h1>
-        <p>{data ? `${PLOT_MAPS[data.map]?.subtitle || data.name} · Green = available · Red = booked` : ''}</p>
+        <h1>{data?.label || 'Plot map'}</h1>
+        <p>{data ? `${data.name} · Green = available · Amber = on hold · Red = booked` : ''}</p>
       </header>
       {state.loading && <p className="empty-note">Loading plot map…</p>}
       {state.error && <p className="empty-note" role="alert">{state.error}</p>}
-      {data && <PlotMap mapKey={data.map} plots={data.plots} />}
+      {data && (
+        <PlotMap3D
+          // The public feed marks a plot AVAILABLE or BOOKED; the map colour follows that.
+          plots={(data.plots || []).map((p) => ({ number: p.number, status: p.status, project: p.project }))}
+        />
+      )}
     </div>
   );
 }
