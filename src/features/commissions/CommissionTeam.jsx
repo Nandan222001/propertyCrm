@@ -7,15 +7,15 @@ import { Table } from '../../components/common/DataTable';
 import { limitMobile, MOBILE_INPUT } from '../../utils/phone';
 import { pageCache } from '../../utils/pageCache';
 
-/** The most any single agent can be given (%) — matches the server's cap on an agent's rate. */
-const MAX_RATE = 25;
+/** Every agent keeps at least this much (%) of their own rate on a sub-agent's deals — the pool stops here. */
+const MIN_KEPT = 1;
 
 /** A rate as the server stores it (0.1) -> "10%". */
 export const pct = (rate) => `${Number((Number(rate) * 100).toFixed(2))}%`;
 
 /**
- * Add an agent under an existing one, each on their own commission rate. The new agent's rate does not come out
- * of the parent's, so an agent on 20% can give 10%, 5%, 8% and 4% to four different agents and stay on 20%.
+ * Give a new agent a slice of the pool you hold. Every agent under you is a promise out of the same pool, so a
+ * 20% holder can put four agents on 10%, 12%, 14% and 16%: on each of their deals you keep the rest of your 20%.
  */
 function AddTeamAgentModal({ parent, parents, close, save }) {
   const [form, setForm] = useState({ name: '', phone: '', email: '', share: '', parent: parents ? '' : String(parent.id) });
@@ -31,8 +31,8 @@ function AddTeamAgentModal({ parent, parents, close, save }) {
     if (form.name.replace(/[^A-Za-z]/g, '').length < 4) return setError('Enter a name with at least 4 letters.');
     if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(form.email.trim())) return setError('Enter the agent\'s e-mail — it is their sign-in.');
     if (!isValidMobile(form.phone)) return setError(MOBILE_HINT);
-    if (!Number.isFinite(share) || share <= 0) return setError('Enter the commission percentage for this agent.');
-    if (share > MAX_RATE) return setError(`An agent can be given at most ${MAX_RATE}%.`);
+    if (!Number.isFinite(share) || share <= 0) return setError('Enter the percentage you are giving this agent.');
+    if (have - share < MIN_KEPT) return setError(have - MIN_KEPT > 0 ? `${giver.name} has ${pct(giver.commission_rate)} and must keep at least ${MIN_KEPT}%, so can give at most ${Number((have - MIN_KEPT).toFixed(2))}%.` : `${giver.name} is down to ${pct(giver.commission_rate)} — there is nothing left to give.`);
     setBusy(true);
     const problem = await save({
       name: form.name.trim(), email: form.email.trim(), phone: normaliseMobile(form.phone),
@@ -48,7 +48,7 @@ function AddTeamAgentModal({ parent, parents, close, save }) {
           <div>
             <span className="modal-kicker">ADD AGENT TO TEAM</span>
             <h2>New agent under {giver ? giver.name : '…'}</h2>
-            <p>The new agent gets their own commission rate, separate from {giver ? `${giver.name}'s` : 'the parent\'s'} rate{giver ? ` (${pct(giver.commission_rate)})` : ''} — {giver ? `${giver.name} keeps ${pct(giver.commission_rate)}` : 'the parent keeps their rate'} on every deal in the chain.</p>
+            <p>The percentage comes out of {giver ? `${giver.name}'s` : 'the parent\'s'} own rate{giver ? ` (${pct(giver.commission_rate)})` : ''} — every agent under them is a slice of that same pool. On this agent's deals {giver ? giver.name : 'the parent'} keeps the rest, and a deal only ever pays the agent who brought it and the uplines above them.</p>
           </div>
           <button type="button" className="modal-close" onClick={close} aria-label="Close"><X size={16} /></button>
         </div>
@@ -66,9 +66,9 @@ function AddTeamAgentModal({ parent, parents, close, save }) {
           <label>Email<input value={form.email} onChange={set('email')} type="email" placeholder="E-mail address" /></label>
           <label>Commission given (%)<input value={form.share} onChange={set('share')} inputMode="decimal" placeholder="e.g. 10" /></label>
         </div>
-        {giver && Number.isFinite(share) && share > 0 && share <= MAX_RATE && (
+        {giver && Number.isFinite(share) && share > 0 && have - share >= MIN_KEPT && (
           <p className="bill-words">
-            {giver.name} keeps <b>{pct(giver.commission_rate)}</b> · New agent: <b>{Number(share.toFixed(2))}%</b> · Deal on this chain pays <b>{Number((have + share).toFixed(2))}%</b>
+            {giver.name} keeps on this agent's deals: <b>{Number((have - share).toFixed(2))}%</b> · New agent gets: <b>{Number(share.toFixed(2))}%</b>
           </p>
         )}
         {error && <p className="form-error">{error}</p>}
@@ -107,7 +107,7 @@ export function CommissionTeam({ role, notify, onChanged }) {
     try {
       const response = await actions.addSubAgent(body);
       const parent = members.find((m) => m.id === response.data.parent_agent_id) || me;
-      notify(`${body.name} added on ${Number(share.toFixed(2))}%${parent ? ` under ${parent.name}, who keeps ${pct(response.data.parent_commission_rate)}` : ''}. They can sign in with their e-mail and a starting password.`);
+      notify(`${body.name} added with ${Number(share.toFixed(2))}% — ${parent ? `${parent.name} now keeps ${pct(response.data.parent_commission_rate)}` : ''}. They can sign in with their e-mail and a starting password.`);
       await load();
       if (onChanged) onChanged();
       return '';
@@ -123,7 +123,7 @@ export function CommissionTeam({ role, notify, onChanged }) {
           <h2><UsersRound size={14} style={{ verticalAlign: '-2px' }} /> {admin ? 'Agent hierarchy' : 'My commission team'}</h2>
           <p>
             {me
-              ? `You currently earn ${pct(me.commission_rate)} on your own deals${parentName ? ` (given to you by ${parentName})` : ''}. Add agents under you and give each their own rate — your rate stays as it is, and you earn yours on every deal anyone below you brings in.`
+              ? `You currently earn ${pct(me.commission_rate)} on your own deals${parentName ? ` (given to you by ${parentName})` : ''}. Add agents under you and give each a share of that — it comes out of your own rate. A deal only pays the agent who brought it and the uplines above them.`
               : 'Every agent, who they report to and the share of commission they keep.'}
           </p>
         </div>

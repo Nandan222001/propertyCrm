@@ -51,10 +51,8 @@ const MODULES = [
       ['holdDays', 'Plot hold while a booking awaits approval (days)', 'number', '7', range(1, 365, 'Hold period')],
       ['installmentDays', 'Default gap to the next instalment (days)', 'number', '30', range(1, 365, 'Instalment gap')],
       ['defaultCommission', 'Commission rate for agents without their own (%)', 'number', '2', range(0.1, 25, 'Commission rate')],
-      ['treePayoutCap', 'Cap the commission paid on an agent chain (1 = on, 0 = off)', 'number', '0', range(0, 1, 'Chain cap')],
-      ['maxTreeCommission', 'Most the whole chain may earn on one deal (%)', 'number', '25', range(0, 100, 'Chain payout')],
     ],
-    summary: (v) => `Prefix ${v.receiptPrefix} · GST ${Number(v.defaultGst) * 100}% · TDS ${v.tdsRate}% · ${v.dueDays} days · hold ${v.holdDays} days${Number(v.treePayoutCap) === 1 ? ` · chain capped at ${v.maxTreeCommission}%` : ' · each agent earns their own rate'}`,
+    summary: (v) => `Prefix ${v.receiptPrefix} · GST ${Number(v.defaultGst) * 100}% · TDS ${v.tdsRate}% · ${v.dueDays} days · hold ${v.holdDays} days`,
     note: 'Used by new receipts, invoices, due dates, plot holds, instalment reminders, commissions and the TDS report.',
   },
   {

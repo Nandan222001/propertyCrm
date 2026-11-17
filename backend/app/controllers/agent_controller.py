@@ -20,8 +20,9 @@ from app.schemas.finance import AgentCreate, AgentPerformance, AgentUpdate, SubA
 from app.services.base_service import BaseService
 from app.services.notification_service import agent_user_id
 
-#: The most any single agent can be given (matches the ``AgentCreate``/``AgentUpdate`` schema cap).
-MAX_AGENT_RATE = Decimal("0.25")
+#: An agent keeps at least this much of their own rate on every deal their agents bring, so never pays out more
+#: than they hold. A pool holder on 20% can therefore hand any one agent up to 19%.
+MIN_RETAINED_RATE = Decimal("0.01")
 
 
 class AgentService(BaseService):
@@ -191,13 +192,12 @@ class AgentService(BaseService):
         }
 
     def create_sub_agent(self, payload: SubAgentCreate) -> dict:
-        """Add an agent under ``parent``. Both keep their own rate.
+        """Add an agent under ``parent`` and give them ``share`` of the parent's own rate.
 
-        A hierarchy is not a shared pot: the parent keeps the rate they already earned the right to, and the new
-        agent is given their own rate on top of it.  An agent on 20% who adds four agents on 10%, 5%, 8% and 4%
-        stays on 20% and the chain is paid 47% whenever one of those agents brings a deal — the same as if each
-        of them had been onboarded directly.  Rates stay capped at ``MAX_AGENT_RATE`` and, with the
-        ``tax.treePayoutCap`` setting switched on, the whole chain is held to that cap."""
+        A hierarchy is one pool. A 20% agent can put four agents under them on 10%, 12%, 14% and 16%: those are
+        four separate promises out of the same 20%, not four additions to it. Whichever branch sells is paid from
+        the pool, and the pool holder earns what is left of their 20% on that deal — never less than
+        ``MIN_RETAINED_RATE``, and the whole chain never pays more than the pool."""
         if self.actor.agent_id:
             parent = self._my_agent()
             if payload.parent_agent_id and payload.parent_agent_id != self.actor.agent_id:
@@ -214,9 +214,13 @@ class AgentService(BaseService):
             raise BusinessRuleError(f"{parent.name} is inactive and cannot add agents")
 
         share = Decimal(payload.share)
-        if share > MAX_AGENT_RATE:
+        available = Decimal(parent.commission_rate)
+        if available - share < MIN_RETAINED_RATE:
+            room = max(available - MIN_RETAINED_RATE, Decimal("0"))
             raise BusinessRuleError(
-                f"An agent can be given at most {self._pct(MAX_AGENT_RATE)} — {self._pct(share)} is above the cap"
+                f"{parent.name} holds {self._pct(available)} and must keep at least "
+                f"{self._pct(MIN_RETAINED_RATE)} of it on the deals this agent brings"
+                + (f", so can give at most {self._pct(room)}" if room > 0 else " — there is nothing left to give")
             )
         self._check_login_can_be_created(payload.name, payload.email, payload.phone)
 
@@ -227,8 +231,9 @@ class AgentService(BaseService):
         ))
         self._audit(
             AuditAction.CREATE, agent,
-            summary=f"Agent {agent.code} added under {parent.code} with {self._pct(share)} of their own; "
-                    f"{parent.code} keeps {self._pct(parent.commission_rate)}",
+            summary=f"Agent {agent.code} added under {parent.code} with {self._pct(share)} out of the "
+                    f"{self._pct(available)} {parent.code} holds; {parent.code} keeps "
+                    f"{self._pct(available - share)} on {agent.code}'s deals",
         )
         self._create_login(agent, as_admin=True)
         self.db.commit()

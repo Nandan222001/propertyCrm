@@ -19,27 +19,10 @@ MONEY = Decimal("0.01")
 
 
 def commission_rate_for(override: Decimal | None, default: Decimal) -> Decimal:
-    """The agent's own rate; the organisation's default rate only for an agent that was never given one.
-
-    A rate of ``0`` means the organisation deliberately put this agent at zero (they earn nothing), while a
-    missing rate falls back to the default."""
-    if override is not None:
+    """The agent's own rate; the organisation's default rate when the agent has none."""
+    if override is not None and override > 0:
         return Decimal(override)
     return default
-
-
-def apply_payout_cap(earners: list[tuple[object, Decimal]], cap: Decimal | None) -> list[tuple[object, Decimal]]:
-    """Trim a deal's earners to ``cap`` in path order (the deal's own agent first). ``None`` means no cap."""
-    if cap is None:
-        return earners
-    budget, kept = cap, []
-    for earner, rate in earners:
-        if budget <= 0:
-            break
-        rate = min(rate, budget)
-        kept.append((earner, rate))
-        budget -= rate
-    return kept
 
 
 def split_commission(deal_value: Decimal, rate: Decimal, tds_rate: float | Decimal = TDS_RATE) -> tuple[Decimal, Decimal, Decimal]:
@@ -81,23 +64,6 @@ class CommissionService(BaseService[Commission]):
         except Exception:
             return Decimal(str(TDS_RATE))
         return percent / 100 if 0 <= percent <= 30 else Decimal(str(TDS_RATE))
-
-    def _payout_cap(self) -> Decimal | None:
-        """The most the whole chain may earn on one deal, when the organisation caps tree payout (else None)."""
-        from app.services.org_settings import setting_text
-
-        try:
-            enabled = (setting_text(self.db, "tax", "treePayoutCap") or "").strip().lower()
-            if enabled not in {"1", "true", "yes", "on"}:
-                return None
-            percent = Decimal(setting_text(self.db, "tax", "maxTreeCommission") or "0")
-        except Exception:
-            return None
-        return percent / 100 if Decimal("0") < percent <= Decimal("100") else None
-
-    def _apply_payout_cap(self, earners: list[tuple[object, Decimal]]) -> list[tuple[object, Decimal]]:
-        """Trim the chain to the organisation's cap, in path order (the deal's own agent first)."""
-        return apply_payout_cap(earners, self._payout_cap())
 
     # ----------------------------------------------------------------- read
     def paginate(self, page: PaginationContext) -> Paginated[Commission]:
@@ -143,14 +109,14 @@ class CommissionService(BaseService[Commission]):
     def accrue_for_payment(self, booking, payment) -> Commission | None:
         """The agent earns their rate on every payment the customer makes, until the booking is paid up.
 
-        Agents form a hierarchy in which every agent keeps their own rate. The agent who brought the deal earns
-        their rate, and so does everyone above them (a team override) — so whoever onboarded an agent shares in
-        every deal that agent closes, however deep the tree runs.
+        A hierarchy is one commission pool, and a deal pays only the one path that brought it: the selling
+        agent earns the slice they hold, and each upline earns what is left of their own rate on that deal.
+        Parallel agents (the other branches of the same pool holder) earn nothing, and the path never pays out
+        more than the pool.
 
-        By default the chain is paid the sum of the rates on the path (a 20% agent who onboarded agents on
-        10% and 5% pays out 35% on their deals). An organisation that wants the old shared-pot behaviour — the
-        whole chain together never earning more than the top agent's own rate — switches on the
-        ``tax.treePayoutCap`` setting; the cap is then applied to each earner's rate in path order.
+        Example: the pool holder holds 20% and gives one agent 14%, who gives their own agent 8%. The 14% agent
+        keeps 6% on that branch, so the bottom agent's deal pays 8% + 6% + 6% = 20%; a deal by the 14% agent
+        pays 14% + 6% = 20%; and if another agent under the pool holder holds 4%, their deals pay 4% + 16%.
 
         Idempotent per payment. A booking that still carries an older whole-deal commission is left alone so the
         same money is never commissioned twice. Returns the booking agent's own commission."""
@@ -172,11 +138,16 @@ class CommissionService(BaseService[Commission]):
         received = Decimal(payment.amount)
         tds_rate = self._tds_rate()
 
+        # The seller earns their slice; each upline earns what is left of their own rate on this one path.
         earners: list[tuple[object, Decimal]] = [(agent, commission_rate_for(Decimal(agent.commission_rate), default_rate))]
+        child = agent
         for upline_agent in self.agents.upline(agent):
-            if Decimal(upline_agent.commission_rate) > 0:
-                earners.append((upline_agent, Decimal(upline_agent.commission_rate)))
-        earners = self._apply_payout_cap(earners)
+            held = Decimal(upline_agent.commission_rate)
+            promised = Decimal(child.assigned_rate if child.assigned_rate is not None else child.commission_rate)
+            kept = held - promised
+            if kept > 0:
+                earners.append((upline_agent, kept.quantize(Decimal("0.0001"))))
+            child = upline_agent
 
         own: Commission | None = None
         for earner, rate in earners:
