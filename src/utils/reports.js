@@ -80,6 +80,17 @@ export function buildReport(key, data, { period = 'All time', project = 'All pro
     };
   }
 
+  if (key === 'expense') {
+    const rows = (data.expenses || [])
+      .filter((e) => inPeriod(e.expense_date, range))
+      .map((e) => [e.expense_date, e.category, e.description || '', e.paid_to || '', e.payment_mode || '', e.reference || '', parseAmt(e.amount)]);
+    return {
+      filename: `expense-report-${stamp}`,
+      headers: ['Date', 'Category', 'Description', 'Paid to', 'Mode', 'Reference', 'Amount'],
+      rows,
+    };
+  }
+
   // tax: TDS & commission payroll
   const rows = data.commissions
     .filter((c) => inProject(c[1], project))

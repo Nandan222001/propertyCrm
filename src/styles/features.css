@@ -74,6 +74,21 @@
 .bill-sign i{display:block;border-top:1px solid #222;margin-bottom:5px;width:85%}
 .sheet-terms{font-size:12px;line-height:1.6;padding-left:17px;margin:0}
 
+/* printed reports (sales / expense / commission) */
+.report-sheet{background:#fff;color:#111;padding:22px 26px;font-family:'DM Sans',Arial,sans-serif;overflow-x:auto}
+.report-sheet-head{display:flex;justify-content:space-between;align-items:flex-start;gap:14px;border-bottom:2px solid #172033;padding-bottom:10px;margin-bottom:12px}
+.report-sheet-head h2{font:800 17px Manrope;margin:0}
+.report-sheet-head p{font-size:12px;margin:3px 0 0;color:#555}
+.report-sheet-title{text-align:right;display:flex;flex-direction:column;gap:3px;font-size:12px;color:#555}
+.report-sheet-title b{font:800 14px Manrope;letter-spacing:1px;color:#111}
+.report-sheet-table{width:100%;border-collapse:collapse;font-size:11px}
+.report-sheet-table th,.report-sheet-table td{border:1px solid #cfd4de;padding:5px 7px;text-align:left;vertical-align:top}
+.report-sheet-table th{background:#f4f5f8;font-weight:700}
+.report-sheet-table .num{text-align:right;white-space:nowrap}
+.report-sheet-table tfoot td{font-weight:800;background:#f4f5f8}
+.report-sheet-table tr{break-inside:avoid;page-break-inside:avoid}
+.report-sheet-table thead{display:table-header-group}
+
 @media print{
   @page{size:A4;margin:10mm}
   html,body{background:#fff!important}
