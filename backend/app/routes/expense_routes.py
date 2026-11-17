@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
+from datetime import date
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Query, status
 
 from app.controllers import expense_controller as controller
 from app.core.constants import Permission
@@ -23,8 +24,10 @@ def list_expenses(page: PaginationDep, service: controller.ExpenseServiceDep, _:
 
 
 @router.get("/expenses/profit-summary", summary="Collected − commission − expenses = company profit till date")
-def profit_summary(service: controller.ExpenseServiceDep, _: VIEW = None):
-    return controller.profit_summary(service)
+def profit_summary(service: controller.ExpenseServiceDep, _: VIEW = None,
+                   date_from: date | None = Query(default=None, description="Start of the period (inclusive)"),
+                   date_to: date | None = Query(default=None, description="End of the period (inclusive)")):
+    return controller.profit_summary(service, date_from, date_to)
 
 
 @router.post("/expenses", status_code=status.HTTP_201_CREATED, summary="Record an expense")

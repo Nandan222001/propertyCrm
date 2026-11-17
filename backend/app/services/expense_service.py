@@ -50,11 +50,15 @@ class ExpenseService(BaseService[Expense]):
             values.pop("expense_date")
         return self.update(expense_id, values)
 
-    def profit_summary(self) -> dict[str, str]:
+    def profit_summary(self, date_from: date | None = None, date_to: date | None = None) -> dict[str, str]:
+        """Till date by default; with a date range, only what was collected / accrued / spent inside it."""
         self._authorise("view")
-        collected = self.bookings.totals(None)["collected"]
-        commissions = self.expenses.commissions_total()
-        expenses = self.expenses.total()
+        if date_from or date_to:
+            collected = self.expenses.collected_between(date_from, date_to)
+        else:
+            collected = self.bookings.totals(None)["collected"]
+        commissions = self.expenses.commissions_total(date_from, date_to)
+        expenses = self.expenses.total(date_from, date_to)
         profit = Decimal(collected) - commissions - expenses
         return {
             "collected": str(collected),

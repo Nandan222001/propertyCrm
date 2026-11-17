@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+from datetime import date
 from decimal import Decimal
 
 from sqlalchemy import func, select
 
 from app.models.expense import Expense
-from app.models.payment import Commission
+from app.core.constants import PaymentStatus
+from app.models.payment import Commission, Payment
 from app.repositories.base_repository import BaseRepository
 
 
@@ -23,16 +25,30 @@ class ExpenseRepository(BaseRepository[Expense]):
     }
     default_sort = "expense_date"
 
-    def total(self) -> Decimal:
-        value = self.db.execute(
-            select(func.coalesce(func.sum(Expense.amount), 0)).where(Expense.is_deleted.is_(False))
-        ).scalar_one()
-        return Decimal(str(value or 0))
+    def total(self, date_from: date | None = None, date_to: date | None = None) -> Decimal:
+        stmt = select(func.coalesce(func.sum(Expense.amount), 0)).where(Expense.is_deleted.is_(False))
+        if date_from:
+            stmt = stmt.where(Expense.expense_date >= date_from)
+        if date_to:
+            stmt = stmt.where(Expense.expense_date <= date_to)
+        return Decimal(str(self.db.execute(stmt).scalar_one() or 0))
 
-    def commissions_total(self) -> Decimal:
-        """Gross commission accrued on deals, rejected ones excluded."""
-        value = self.db.execute(
-            select(func.coalesce(func.sum(Commission.gross_amount), 0))
-            .where(Commission.is_deleted.is_(False), Commission.status != "REJECTED")
-        ).scalar_one()
-        return Decimal(str(value or 0))
+    def commissions_total(self, date_from: date | None = None, date_to: date | None = None) -> Decimal:
+        """Gross commission accrued on deals, rejected ones excluded (optionally only what accrued in the period)."""
+        stmt = select(func.coalesce(func.sum(Commission.gross_amount), 0)).where(
+            Commission.is_deleted.is_(False), Commission.status != "REJECTED")
+        if date_from:
+            stmt = stmt.where(func.date(Commission.created_at) >= date_from)
+        if date_to:
+            stmt = stmt.where(func.date(Commission.created_at) <= date_to)
+        return Decimal(str(self.db.execute(stmt).scalar_one() or 0))
+
+    def collected_between(self, date_from: date | None, date_to: date | None) -> Decimal:
+        """Customer money received (cancelled payments excluded) with a received date inside the period."""
+        stmt = select(func.coalesce(func.sum(Payment.amount), 0)).where(
+            Payment.is_deleted.is_(False), Payment.status != PaymentStatus.CANCELLED.value)
+        if date_from:
+            stmt = stmt.where(Payment.received_on >= date_from)
+        if date_to:
+            stmt = stmt.where(Payment.received_on <= date_to)
+        return Decimal(str(self.db.execute(stmt).scalar_one() or 0))

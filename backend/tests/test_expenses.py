@@ -53,3 +53,16 @@ def test_expense_rules(client, accounts_headers):
     assert client.post("/api/v1/expenses", headers=accounts_headers, json={**EXPENSE, "amount": -5}).status_code == 422
     assert client.post("/api/v1/expenses", headers=accounts_headers, json={**EXPENSE, "expense_date": tomorrow}).status_code == 422
     assert client.post("/api/v1/expenses", headers=accounts_headers, json={**EXPENSE, "description": ""}).status_code == 422
+
+
+def test_profit_summary_can_be_limited_to_a_date_range(client, accounts_headers):
+    old_day = (date.today() - timedelta(days=400)).isoformat()
+    assert client.post("/api/v1/expenses", headers=accounts_headers,
+                       json={**EXPENSE, "amount": 777, "expense_date": old_day}).status_code == 201
+    window = client.get("/api/v1/expenses/profit-summary", headers=accounts_headers,
+                        params={"date_from": old_day, "date_to": old_day})
+    assert window.status_code == 200, window.text
+    assert Decimal(window.json()["data"]["expenses"]) == Decimal("777")
+    recent = client.get("/api/v1/expenses/profit-summary", headers=accounts_headers,
+                        params={"date_from": (date.today() - timedelta(days=7)).isoformat()})
+    assert Decimal(recent.json()["data"]["expenses"]) <= Decimal(summary(client, accounts_headers)["expenses"]) - Decimal("777")

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import date
 from typing import Annotated
 
 from fastapi import Depends
@@ -39,5 +40,5 @@ def delete_expense(expense_id: int, service: ExpenseServiceDep) -> dict:
     return success(None, "Expense deleted")
 
 
-def profit_summary(service: ExpenseServiceDep) -> dict:
-    return success(service.profit_summary(), "Company profit till date")
+def profit_summary(service: ExpenseServiceDep, date_from: date | None = None, date_to: date | None = None) -> dict:
+    return success(service.profit_summary(date_from, date_to), "Company profit till date" if not (date_from or date_to) else "Company profit for the period")

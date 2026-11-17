@@ -89,6 +89,33 @@
 .report-sheet-table tr{break-inside:avoid;page-break-inside:avoid}
 .report-sheet-table thead{display:table-header-group}
 
+/* cash-book style expense statement */
+.cashbook-sheet{background:#fff;color:#111;font-family:'DM Sans',Arial,sans-serif;padding:0 0 18px;overflow-x:auto}
+.cashbook-head{background:#f1f3ff;padding:14px 20px;display:flex;flex-direction:column;gap:4px}
+.cashbook-head b{font:700 16px Manrope}
+.cashbook-head span{font-size:11px;color:#444}
+.cashbook-title{font:600 16px Manrope;margin:20px 20px 12px}
+.cashbook-box{margin:0 20px 16px;border:1px solid #cfd4de;padding:11px 14px;font-size:13px}
+.cashbook-totals{margin:0 20px 18px;display:grid;grid-template-columns:repeat(3,1fr);border:1px solid #cfd4de}
+.cashbook-totals div{padding:12px 14px;border-right:1px solid #cfd4de;display:flex;flex-direction:column;gap:8px}
+.cashbook-totals div:last-child{border-right:0}
+.cashbook-totals small{color:#666;font-size:12px}
+.cashbook-totals b{font:700 16px Manrope}
+.cashbook-totals.four{grid-template-columns:repeat(4,1fr)}
+.print-toolbar-actions .period-select,.print-toolbar-actions input[type=date]{height:32px;padding:0 8px;border:1px solid #d6dae3;border-radius:8px;font:500 12px Manrope;background:#fff}
+.cashbook-note{margin:-8px 20px 18px;font-size:11px;color:#666}
+.cashbook-table + .cashbook-title{margin-top:24px}
+.cashbook-sheet .red{color:#d33a3a}
+.cashbook-sheet .green{color:#0d8a5f}
+.cashbook-sheet .amber{color:#b7791f}
+.cashbook-table{width:calc(100% - 40px);margin:0 20px;border-collapse:collapse;font-size:11px}
+.cashbook-table th,.cashbook-table td{border:1px solid #cfd4de;padding:8px;text-align:left;vertical-align:top}
+.cashbook-table th{background:#f1f3ff;font-weight:700}
+.cashbook-table .num{text-align:right;white-space:nowrap}
+.cashbook-table tr.final td{background:#f1f3ff}
+.cashbook-table tr{break-inside:avoid;page-break-inside:avoid}
+.cashbook-table thead{display:table-header-group}
+
 @media print{
   @page{size:A4;margin:10mm}
   html,body{background:#fff!important}
