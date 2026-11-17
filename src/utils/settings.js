@@ -24,6 +24,7 @@ export const DEFAULT_SETTINGS = {
   tax: {
     receiptPrefix: 'RCT', defaultGst: '0.18', tdsRate: '5', dueDays: '15',
     holdDays: '7', installmentDays: '30', defaultCommission: '2',
+    treePayoutCap: '0', maxTreeCommission: '25',
   },
   bank: { bankName: '', accountName: '', accountNumber: '', ifsc: '', upi: '' },
 };

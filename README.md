@@ -96,6 +96,11 @@ The platform hosts many organisations ("tenants"); each one is fully isolated.
   (`GET /invoices/{id}/pdf`) — the SPA also renders the same PDF offline in
   demo mode, so "download bill" works without a backend.
 * **Commissions** — accrual on confirmation, TDS split, approval and payout.
+* **Agent hierarchy** — every agent sits under one parent and keeps their own
+  commission rate (up to 25%); an agent on 20% can give 10%, 5%, 8% and 4% to
+  four different agents and stays on 20%. A deal pays the whole chain its own
+  rate, and each agent earns theirs on every payment the customer makes.
+  `tax.treePayoutCap` optionally caps what one chain may pay on a deal.
 * **Customers** — master data, per-customer 360° profile, portal access, consent,
   data-subject requests.
 * **Governance** — audit trail, security events, notification follow-ups,
