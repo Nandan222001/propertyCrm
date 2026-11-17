@@ -88,7 +88,10 @@ class PlotCreate(PlotBase):
 
 
 class PlotBulkCreate(PlotBase):
-    """Add a run of plots to a project: ``A-1`` … ``A-20`` from prefix ``A-``, start 1, count 20."""
+    """Add a run of plots to a project: ``1`` … ``20`` from prefix ``""``, start 1, count 20.
+
+    The plot map matches plots on their number alone, so a run is numbered with digits. A prefix is allowed for
+    labelling, but it never changes which plot of the drawing the plot maps to ("COMM-01" is plot 1)."""
 
     project_id: int = Field(gt=0)
     prefix: str = Field(default="", max_length=30)

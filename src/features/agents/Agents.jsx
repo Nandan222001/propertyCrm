@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Eye, Edit2, X, Check, Plus, Trash2, KeyRound } from 'lucide-react';
 import { ConfirmDialog } from '../../components/common/ConfirmDialog';
 import { fmtINR, parseAmt, isValidMobile, normaliseMobile, MOBILE_HINT } from '../../utils';
@@ -13,6 +13,9 @@ import { RoleContextBanner } from '../../components/layout/RoleContextBanner';
 import { limitMobile, MOBILE_INPUT } from '../../utils/phone';
 import { usePageLoading } from '../../hooks';
 import { pageCache } from '../../utils/pageCache';
+import { useSelector } from 'react-redux';
+import { selectCurrentUser } from '../../store/selectors';
+import { AgentTree } from './AgentTree';
 
 const SEES_RATES = ['ADMIN', 'ACCOUNTS', 'SALES MANAGER'];
 const pct = (rate) => `${Number((Number(rate) * 100).toFixed(2))}%`;
@@ -133,7 +136,11 @@ export function Agents({ search, notify, role, onView, bookings = [], project = 
   const live = hasSession();
   const canEditRate = isAdmin(role) && live;
   const showRate = live && SEES_RATES.includes(role);
+  const meAgentCode = useSelector((state) => selectCurrentUser(state)?.agentCode || '');
   const [rows, setRows] = useState(() => pageCache.get('agents') ?? null);       // null until the first load (live mode)
+  const [raw, setRaw] = useState([]);                                            // the API rows, with parent links
+  const [layout, setLayout] = useState('list');                                  // list | tree
+  const meAgentId = useMemo(() => raw.find((r) => r.code === meAgentCode)?.id ?? null, [raw, meAgentCode]);
   const [editing, setEditing] = useState(null);
   const [adding, setAdding] = useState(false);
   const [removing, setRemoving] = useState(null);
@@ -153,6 +160,7 @@ export function Agents({ search, notify, role, onView, bookings = [], project = 
         };
       }).sort((x, y) => y.sales - x.sales));
       setRows(pageCache.set('agents', fresh));
+      setRaw(list.data || []);
     } catch (error) {
       notify(`Could not load agents: ${error.message}`);
       setRows([]);
@@ -219,10 +227,32 @@ export function Agents({ search, notify, role, onView, bookings = [], project = 
         {canEditRate && (
           <div className="crud-heading">
             <div><h2>Sales agents</h2><p>Add agents and edit their details and commission rate. Only the admin can do this.</p></div>
-            <button className="button button-primary small-btn" onClick={() => setAdding(true)}><Plus size={13} /> Add Agent</button>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button
+                className={`button small-btn ${layout === 'tree' ? 'button-primary' : 'button-white'}`}
+                onClick={() => setLayout(layout === 'tree' ? 'list' : 'tree')}
+                title="Show the sales-agent hierarchy as a tree"
+              >
+                {layout === 'tree' ? 'List view' : 'Hierarchy tree'}
+              </button>
+              <button className="button button-primary small-btn" onClick={() => setAdding(true)}><Plus size={13} /> Add Agent</button>
+            </div>
           </div>
         )}
-        {live && rows === null ? <p className="empty-note">Loading agents…</p> : (
+        {live && layout === 'tree' ? (
+          <AgentTree
+            rows={raw.filter((r) => [r.name, r.code].join(' ').toLowerCase().includes(search.toLowerCase()))}
+            meId={meAgentId}
+            onView={(row) => {
+              const found = shown.find((r) => r.id === row.id);
+              if (found && onView) {
+                onView([found.name, found.code, found.deals, `₹${fmtINR(found.sales)}`, `₹${fmtINR(found.collected)}`,
+                  `₹${fmtINR(found.commission)}`, '', found.phone || '—', Number(found.rate),
+                  { deals: found.deals, sales: found.sales, collected: found.collected, commission: found.commission }]);
+              }
+            }}
+          />
+        ) : live && rows === null ? <p className="empty-note">Loading agents…</p> : (
           <Table
             label="agents"
             headers={headers}

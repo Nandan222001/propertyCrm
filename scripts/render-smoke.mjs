@@ -90,7 +90,7 @@ for (const role of ROLES) {
 }
 
 // 3. Deep links on the heavier pages.
-for (const [role, route] of [['ADMIN', '/bookings'], ['ACCOUNTS', '/payments'], ['ACCOUNTS', '/billing'], ['CUSTOMER', '/billing'], ['ADMIN', '/projects-plots'], ['SUPER ADMIN', '/user-roles'], ['CUSTOMER', '/documents'], ['ADMIN', '/reports'], ['ADMIN', '/administration'], ['SUPER ADMIN', '/reports'], ['ACCOUNTS', '/reports'], ['ADMIN', '/approvals'], ['ADMIN', '/commissions'], ['ADMIN', '/agents'], ['ADMIN', '/notifications'], ['ACCOUNTS', '/expenses'], ['ADMIN', '/expenses']]) {
+for (const [role, route] of [['ADMIN', '/bookings'], ['ACCOUNTS', '/payments'], ['ACCOUNTS', '/billing'], ['CUSTOMER', '/billing'], ['ADMIN', '/projects-plots'], ['SUPER ADMIN', '/user-roles'], ['CUSTOMER', '/documents'], ['ADMIN', '/reports'], ['ADMIN', '/administration'], ['SUPER ADMIN', '/reports'], ['ACCOUNTS', '/reports'], ['ADMIN', '/approvals'], ['ADMIN', '/commissions'], ['ADMIN', '/agents'], ['ADMIN', '/notifications'], ['ACCOUNTS', '/expenses'], ['ADMIN', '/expenses'], ['ADMIN', '/plot-map']]) {
   try {
     const store = createStore();
     store.dispatch(signedIn({ role, user: { name: `${role} Tester`, role } }));

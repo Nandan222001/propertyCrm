@@ -1,5 +1,9 @@
 import React, { useState } from 'react';
 import { ModalShell } from '../../components/common/ModalShell';
+import { PLOT_LAYOUT } from '../../data/plotLayout';
+import { plotMapKey } from '../../utils/plotNumber';
+
+const MAP_PLOTS = new Set(PLOT_LAYOUT.map((p) => String(p.no)));
 
 const FACINGS = ['East', 'West', 'North', 'South', 'North-East', 'North-West', 'South-East', 'South-West'];
 
@@ -19,6 +23,8 @@ export function AddPlotsModal({ projects, defaultProject = '', close, save }) {
   const picked = real.find((p) => p[0] === form.project);
   const count = Number(form.count);
   const area = Math.round(Number(form.length) * Number(form.width) * 100) / 100;   // plot area = length × width
+  // Only the number decides which plot of the layout map a plot lights up ("COMM-01" -> plot 1).
+  const mapKey = plotMapKey(`${form.prefix}${form.start}`);
   const first = `${form.prefix.trim().toUpperCase()}${Number(form.start)}`;
   const last = `${form.prefix.trim().toUpperCase()}${Number(form.start) + Math.max(count - 1, 0)}`;
 
@@ -62,6 +68,15 @@ export function AddPlotsModal({ projects, defaultProject = '', close, save }) {
           <label className="span-2">Price of each (₹)<input value={form.price} onChange={set('price')} inputMode="numeric" /></label>
         </div>
         {count >= 1 && <p className="field-hint">This creates {count} plot{count === 1 ? '' : 's'}: {first}{count > 1 ? ` … ${last}` : ''}, all available for booking.</p>}
+        {form.prefix || Number(form.start) ? (
+          <p className={`field-hint${MAP_PLOTS.has(mapKey) ? '' : ' muted-text'}`}>
+            On the plot map this {count > 1 ? 'run maps' : 'plot maps'} to plot <b>{mapKey || '—'}</b>
+            {Number(form.start) >= 0 && form.prefix
+              ? ' — the prefix is only a label; the map matches the number alone.'
+              : ''}
+            {MAP_PLOTS.has(mapKey) ? '' : ' (not a plot number on the drawing).'}
+          </p>
+        ) : null}
         {error && <p className="form-error">{error}</p>}
         <div className="modal-actions">
           <button type="button" className="button button-white" onClick={close}>Cancel</button>

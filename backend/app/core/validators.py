@@ -32,6 +32,20 @@ DANGEROUS_RE = re.compile(
 CONTROL_RE = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")
 
 
+_NON_DIGIT = re.compile(r"\D")
+
+
+def plot_number_key(value: str | None) -> str:
+    """The digits-only key a plot number maps to its plot on the layout map.
+
+    A plot entered as "COMM-01", "A/01" or "01" all map to plot 1 of the drawing, so the map only ever needs the
+    number. A plot number with no digits keeps its letters, lower-cased, as its key.
+    """
+    text = str(value or "").strip()
+    digits = _NON_DIGIT.sub("", text)
+    return digits.lstrip("0") or ("0" if digits else text.lower())
+
+
 def clean_text(value: str, *, max_length: int = 500, allow_newlines: bool = False) -> str:
     """Strip markup, control characters and SQL/script-shaped payloads."""
     if value is None:

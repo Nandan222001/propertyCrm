@@ -370,7 +370,10 @@ def test_public_plot_map_exposes_only_free_or_booked_and_only_for_linked_tenants
         data = response.json()["data"]
         assert data["map"] == "the-index" and data["plots"]
         assert {p["status"] for p in data["plots"]} <= {"AVAILABLE", "BOOKED"}
-        assert all(set(p) == {"number", "status", "project"} for p in data["plots"])
+        assert all(set(p) == {"number", "map_key", "status", "project"} for p in data["plots"])
+        # The layout map is matched on the digits of the plot number alone ("COMM-01" and "01" are both plot 1).
+        assert all(p["map_key"] == ("".join(ch for ch in p["number"] if ch.isdigit()).lstrip("0") or "0")
+                   for p in data["plots"])
         mine = client.get("/api/v1/plots", headers=admin_headers, params={"page_size": 200}).json()["data"]
         assert len(data["plots"]) == len(mine)  # only that organisation's plots
     finally:

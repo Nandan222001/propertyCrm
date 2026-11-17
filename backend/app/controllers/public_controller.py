@@ -15,6 +15,7 @@ from sqlalchemy.orm import Session
 from app.core.constants import PLOT_MAPS, PlotStatus
 from app.core.exceptions import NotFoundError
 from app.core.responses import success
+from app.core.validators import plot_number_key
 from app.db.tenancy import set_scope
 from app.models.property import Plot, Project
 from app.models.tenant import Tenant
@@ -34,7 +35,13 @@ def plot_map(db: Session, slug: str) -> dict:
         .where(Plot.is_deleted == 0)
     ).all()
     plots = [
-        {"number": number, "status": "AVAILABLE" if status == PlotStatus.AVAILABLE.value else "BOOKED", "project": project}
+        {
+            "number": number,
+            #: The number the layout map knows the plot by ("COMM-01" -> "1").
+            "map_key": plot_number_key(number),
+            "status": "AVAILABLE" if status == PlotStatus.AVAILABLE.value else "BOOKED",
+            "project": project,
+        }
         for number, status, project in rows
     ]
     return success({"name": tenant.name, "map": tenant.plot_map, "label": PLOT_MAPS[tenant.plot_map], "plots": plots},
