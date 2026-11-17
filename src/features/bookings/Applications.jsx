@@ -13,7 +13,7 @@ const dayLabel = (iso) => (iso ? new Date(iso).toLocaleDateString('en-GB', { day
 /** An application as the payment receipt prints it: no plot yet, and what the money was for. */
 export const asReceipt = (a, customer) => ({
   mobile: customer?.mobile || '', address: customer?.address || '',
-  no: a.receipt_number, date: dayLabel(a.received_on), dateTime: dayLabel(a.received_on), customer: a.customer_name || '—',
+  no: a.receipt_number, date: dayLabel(a.received_on), dateTime: dayLabel(a.received_on), dateLabel: 'Enrolment Date', customer: a.customer_name || '—',
   project: a.project_name || '—', plot: 'Not specified', amount: fmtINR(Number(a.total)), mode: a.payment_mode, reference: a.reference || '',
   paidTo: a.paid_to || '',
   paymentType: a.payment_type || 'Application Fee + Enrollment',
@@ -33,13 +33,16 @@ export function ApplicationModal({ customers, projects, defaultProject, close, s
     if (typeof project?.[6] !== 'number') return setError('Select the project.');
     const appFee = parseAmt(d.application_fee || 0);
     const enrolFee = parseAmt(d.enrollment_fee || 0);
+    const today = new Date().toISOString().slice(0, 10);
+    if (!d.enrolment_date) return setError('Select the enrolment date.');
+    if (d.enrolment_date > today) return setError('The enrolment date cannot be in the future.');
     if (appFee + enrolFee <= 0) return setError('Enter the application fee and / or the enrollment fee received.');
     setBusy(true);
     try {
       const response = await api.applications.create({
         customer_id: Number(d.customer), project_id: project[6],
         application_fee: appFee, enrollment_fee: enrolFee,
-        payment_type: d.payment_type, payment_mode: d.mode, ...(d.txn ? { reference: d.txn.trim() } : {}), ...(d.paidTo ? { paid_to: d.paidTo.trim() } : {}),
+        received_on: d.enrolment_date, payment_type: d.payment_type, payment_mode: d.mode, ...(d.txn ? { reference: d.txn.trim() } : {}), ...(d.paidTo ? { paid_to: d.paidTo.trim() } : {}),
       });
       notify(response.message || 'Application recorded');
       saved(response.data);
@@ -79,12 +82,15 @@ export function ApplicationModal({ customers, projects, defaultProject, close, s
             <label>Payment mode
               <select name="mode" defaultValue="UPI">{MODES.map((m) => <option key={m}>{m}</option>)}</select></label>
             <label>Transaction details<input name="txn" maxLength={80} placeholder="e.g. TXN123456" /></label>
+            <label>Enrolment date
+              <input name="enrolment_date" type="date" defaultValue={new Date().toISOString().slice(0, 10)} max={new Date().toISOString().slice(0, 10)} />
+              <small className="field-hint">Date the fees were received — shown on the receipt.</small></label>
+            <label>Payment type
+              <select name="payment_type" defaultValue={TYPES[0]}>{TYPES.map((t) => <option key={t}>{t}</option>)}</select>
+              <small className="field-hint">Shown on the receipt.</small></label>
             <label className="span-2">Paid to<input name="paidTo" maxLength={80} list="paid-to-options-app" placeholder="e.g. Company bank account" />
               <datalist id="paid-to-options-app"><option value="Company bank account" /><option value="Office cash" /><option value="Director" /><option value="Agent" /></datalist>
               <small className="field-hint">Who received the money — shown as 'In favour of' on the receipt.</small></label>
-            <label className="span-2">Payment type
-              <select name="payment_type" defaultValue={TYPES[0]}>{TYPES.map((t) => <option key={t}>{t}</option>)}</select>
-              <small className="field-hint">Shown on the receipt.</small></label>
           </div>
           {error && <p className="form-error" role="alert">{error}</p>}
           <div className="modal-actions">
@@ -111,7 +117,7 @@ function ApplicationDetail({ application: a, booking, receipts, onPrint, onOpenB
         </div>
         <h3 className="inv2-h">Step 1 — Application</h3>
         <div className="form-grid">
-          {row('Received on', dayLabel(a.received_on))}
+          {row('Enrolment date', dayLabel(a.received_on))}
           {row('Payment mode', a.payment_mode)}
           {row('Application fee', `₹${fmtINR(Number(a.application_fee))}`)}
           {row('Enrollment fee', `₹${fmtINR(Number(a.enrollment_fee))}`)}

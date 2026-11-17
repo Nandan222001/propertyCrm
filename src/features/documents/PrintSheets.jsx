@@ -61,7 +61,7 @@ function BillCopy({ receipt, copy }) {
         <dl className="rc-details inv2-box">
           <dt className="rc-dh">Receipt Details</dt>
           <dt>Receipt No:</dt><dd>{receipt.no}</dd>
-          <dt>Date &amp; Time:</dt><dd>{receipt.dateTime || receipt.date}</dd>
+          <dt>{receipt.dateLabel || 'Date & Time'}:</dt><dd>{receipt.dateTime || receipt.date}</dd>
           <dt>Payment Mode:</dt><dd>{modeLabel(receipt.mode)}</dd>
           {reference && <><dt>Transaction Details:</dt><dd>{reference}</dd></>}
           <dt>In Favour Of:</dt><dd>{receipt.paidTo || COMPANY.name}</dd>
