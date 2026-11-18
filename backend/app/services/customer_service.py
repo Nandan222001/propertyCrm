@@ -16,7 +16,7 @@ from app.core.validators import mask_address, mask_email, mask_name, mask_phone
 from app.db.base import utcnow
 from app.models.booking import Booking
 from app.models.customer import Customer, CustomerConsent
-from app.models.property import Project
+from app.models.property import Document, Project
 from app.models.user import User
 from app.repositories.customer_repository import (
     CustomerConsentRepository,
@@ -33,6 +33,7 @@ from app.schemas.customer import (
     DataSubjectRequestCreate,
 )
 from app.services.base_service import BaseService
+from app.services.customer_purge import purge_customer_data
 from app.services.notification_service import agent_user_id, emit
 
 
@@ -223,28 +224,32 @@ class CustomerService(BaseService[Customer]):
         self.db.flush()
 
     def delete_customer(self, customer_id: int) -> Customer:
-        """Remove a customer file. Agents may only remove their own, not-yet-approved entries."""
+        """Remove a customer and everything they own: bookings, payments, receipts, applications, invoices …
+
+        Their documents stay. Agents may only remove their own, not-yet-approved entries."""
         self._authorise("delete")
         customer = self.get(customer_id, scope_clause=self.scope_clause())
         if not self.actor.can(Permission.CUSTOMER_APPROVE) and customer.status == ApprovalStatus.APPROVED.value:
             raise PermissionDeniedError("An approved customer can only be removed by an administrator")
-        live = self.db.execute(
-            select(func.count(Booking.id)).where(
-                Booking.customer_id == customer.id, Booking.is_deleted.is_(False),
-                Booking.status.notin_([BookingStatus.CANCELLED.value, BookingStatus.REJECTED.value]),
-            )
-        ).scalar_one()
-        if live:
-            raise BusinessRuleError("This customer still has active bookings — cancel or remove those first")
-        self._audit(AuditAction.DELETE, customer, before=self._snapshot(customer), summary="Customer removed")
+        if not self.actor.can(Permission.CUSTOMER_APPROVE):
+            has_deals = self.db.execute(
+                select(func.count(Booking.id)).where(Booking.customer_id == customer.id, Booking.is_deleted.is_(False))
+            ).scalar_one()
+            if has_deals:
+                raise BusinessRuleError("This customer has bookings — only an administrator can remove them")
+        snapshot = self._snapshot(customer)
+        self._audit(AuditAction.DELETE, customer, before=snapshot, summary="Customer and all their records removed")
         self._drop_portal_login(customer, hard=True)
-        # Really remove the row so the same person can be added again. A customer who has paperwork
-        # (cancelled bookings, applications, receipts …) cannot be erased without breaking it — that one stays hidden.
-        try:
-            with self.db.begin_nested():
-                self.customers.delete(customer, hard=True)
-        except IntegrityError:
+        removed = purge_customer_data(self.db, customer.id)
+        kept_documents = self.db.execute(
+            select(func.count(Document.id)).where(Document.customer_id == customer.id)
+        ).scalar_one()
+        if kept_documents:
+            # The documents keep their owner, so the (now empty) customer file stays hidden behind them.
             self.customers.delete(customer, actor=self.actor.name)
+        else:
+            self.customers.delete(customer, hard=True)
+        self._removed = removed
         return customer
 
     def update_customer(self, customer_id: int, payload: CustomerUpdate) -> Customer:

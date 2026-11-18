@@ -41,13 +41,33 @@ def test_agent_cannot_touch_another_agents_customer(client, agent_headers, admin
     assert client.delete(f"/api/v1/customers/{other['id']}", headers=agent_headers).status_code == 403
 
 
-def test_customer_with_active_booking_cannot_be_deleted(client, admin_headers, agent_approved_customer, available_plot):
+def test_deleting_a_customer_erases_their_deals_and_money_but_keeps_their_documents(
+        client, admin_headers, agent_approved_customer, available_plot):
+    customer_id = agent_approved_customer["id"]
     booking = client.post("/api/v1/bookings", headers=admin_headers,
-                          json={"customer_id": agent_approved_customer["id"], "plot_id": available_plot["id"],
-                                "final_price": available_plot["price"]})
+                          json={"customer_id": customer_id, "plot_id": available_plot["id"],
+                                "final_price": available_plot["price"], "token_amount": "50000", "payment_mode": "upi"})
     assert booking.status_code == 201, booking.text
-    blocked = client.delete(f"/api/v1/customers/{agent_approved_customer['id']}", headers=admin_headers)
-    assert blocked.status_code in (400, 409, 422), blocked.text
+    booking_id = booking.json()["data"]["id"]
+    doc = client.post("/api/v1/documents", headers=admin_headers,
+                      json={"title": "Aadhaar copy", "kind": "KYC", "customer_id": customer_id})
+    assert doc.status_code in (200, 201), doc.text
+    receipts_before = [r for r in client.get("/api/v1/receipts", headers=admin_headers, params={"page_size": 200}).json()["data"]
+                       if r["booking_id"] == booking_id]
+    assert receipts_before
+
+    assert client.delete(f"/api/v1/customers/{customer_id}", headers=admin_headers).status_code == 200
+
+    bookings = client.get("/api/v1/bookings", headers=admin_headers, params={"page_size": 200}).json()["data"]
+    assert booking_id not in {b["id"] for b in bookings}
+    receipts = client.get("/api/v1/receipts", headers=admin_headers, params={"page_size": 200}).json()["data"]
+    assert booking_id not in {r["booking_id"] for r in receipts}
+    ledger = client.get("/api/v1/ledger", headers=admin_headers, params={"page_size": 200}).json()["data"]
+    assert all(row["booking_number"] != booking.json()["data"]["booking_number"] for row in ledger)
+    plots = client.get("/api/v1/plots", headers=admin_headers, params={"page_size": 200}).json()["data"]
+    assert next(p for p in plots if p["id"] == available_plot["id"])["status"] == "AVAILABLE"
+    documents = client.get("/api/v1/documents", headers=admin_headers, params={"page_size": 200}).json()["data"]
+    assert doc.json()["data"]["id"] in {d["id"] for d in documents}      # the customer's documents stay
 
 
 def test_agent_removes_own_pending_booking_and_plot_is_released(client, agent_headers, admin_headers,

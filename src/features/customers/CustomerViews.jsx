@@ -96,7 +96,7 @@ export function CustomersPage({ customers, bookings, role, search, project, onOp
       {removing && (
         <ConfirmDialog
           title="Delete customer"
-          message={`Delete ${removing.name}? Their file is removed from the directory. This is blocked while they have an active booking.`}
+          message={`Delete ${removing.name}? This permanently erases everything for this customer — bookings, payments and receipts, applications, invoices and the commission earned on them — and frees their plots. Only their uploaded documents are kept. This cannot be undone.`}
           onConfirm={() => onDelete(removing)}
           onCancel={() => setRemoving(null)}
         />
