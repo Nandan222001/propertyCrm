@@ -166,6 +166,35 @@ class PaymentCreate(SafeText):
         return self
 
 
+class PaymentUpdate(SafeText):
+    """Correct a payment entered with a mistake. Only the fields sent are changed."""
+
+    amount: Money | None = None
+    mode: str | None = Field(default=None, max_length=24)
+    reference: str | None = Field(default=None, max_length=80)
+    paid_to: str | None = Field(default=None, max_length=80)
+    bank_name: str | None = Field(default=None, max_length=80)
+    instrument_date: date | None = None
+    received_on: date | None = None
+    notes: str | None = Field(default=None, max_length=2000)
+
+    @field_validator("mode")
+    @classmethod
+    def _mode(cls, value: str | None) -> str | None:
+        return normalise_enum(value, PAYMENT_MODES, field="mode") if value else None
+
+    @field_validator("received_on", "instrument_date", mode="before")
+    @classmethod
+    def _dates(cls, value, info):
+        return to_date(value, field=info.field_name.replace("_", " ")) if value else None
+
+    @model_validator(mode="after")
+    def _amount_rules(self) -> PaymentUpdate:
+        if self.amount is not None and (self.amount <= 0 or self.amount > Decimal("1000000000")):
+            raise ValueError("payment amount must be greater than zero and within the per-transaction ceiling")
+        return self
+
+
 class PaymentResponse(TimestampedResponse):
     public_id: str
     booking_id: int
@@ -221,6 +250,8 @@ class ReceiptResponse(TimestampedResponse):
     paid_to: str | None = None
     payment_status: str | None = None
     payment_type: str | None = None
+    bank_name: str | None = None
+    instrument_date: date | None = None
     is_shared_with_customer: bool = False
 
 

@@ -24,6 +24,11 @@ def list_applications(page: PaginationDep, service: ApplicationServiceDep) -> di
     return success([service.serialise(a).model_dump(mode="json") for a in result.items], meta=result.meta.model_dump())
 
 
+def update_application(application_id: int, payload, service: ApplicationServiceDep) -> dict:
+    application = service.update_application(application_id, payload)
+    return success(service.serialise(application).model_dump(mode="json"), "Application updated")
+
+
 def create_application(payload: ApplicationCreate, service: ApplicationServiceDep) -> dict:
     application = service.record(payload)
     return success(service.serialise(application).model_dump(mode="json"),

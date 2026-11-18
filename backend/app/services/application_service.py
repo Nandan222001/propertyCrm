@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import date
+from decimal import Decimal
 
 from sqlalchemy.orm import Session
 
@@ -80,6 +81,31 @@ class ApplicationService(BaseService[Application]):
         self.applications.create(application)
         self._audit(AuditAction.CREATE, application, after={"receipt": application.receipt_number, "total": str(application.total)},
                     summary=f"Application {application.receipt_number}: ₹{application.total} received for {project.name}")
+        return application
+
+    def update_application(self, application_id: int, payload) -> Application:
+        """Correct the fees, mode, date or reference of an application receipt entered with a mistake."""
+        if not self.actor.can(Permission.PAYMENT_APPROVE):
+            raise PermissionDeniedError("Only an approver can edit an application receipt")
+        application = self.applications.get_or_404(application_id)
+        values = payload.model_dump(exclude_unset=True)
+        before = {"application_fee": str(application.application_fee), "enrollment_fee": str(application.enrollment_fee),
+                  "mode": application.payment_mode, "received_on": str(application.received_on)}
+        for key in ("application_fee", "enrollment_fee", "payment_type", "payment_mode", "received_on"):
+            if values.get(key) is not None:
+                setattr(application, key, values[key])
+        for key in ("reference", "paid_to"):
+            if key in values:
+                setattr(application, key, (values[key] or "").strip() or None)
+        if application.received_on and application.received_on > date.today():
+            raise BusinessRuleError("The enrolment date cannot be in the future")
+        if Decimal(application.application_fee) + Decimal(application.enrollment_fee) <= 0:
+            raise BusinessRuleError("Enter the application fee and / or the enrollment fee received")
+        self.db.flush()
+        self._audit(AuditAction.UPDATE, application, before=before,
+                    after={"application_fee": str(application.application_fee), "enrollment_fee": str(application.enrollment_fee),
+                           "mode": application.payment_mode, "received_on": str(application.received_on)},
+                    summary=f"Application {application.receipt_number} corrected")
         return application
 
     def allot(self, application_id: int, booking) -> Application:

@@ -40,6 +40,11 @@ def record_payment(payload: PaymentCreate, service: PaymentServiceDep) -> dict:
     )
 
 
+def update_payment(payment_id: int, payload, service: PaymentServiceDep) -> dict:
+    payment = service.update_payment(payment_id, payload)
+    return success(service.serialise(payment).model_dump(), "Payment updated")
+
+
 def cancel_payment(payment_id: int, reason: str, service: PaymentServiceDep) -> dict:
     payment = service.cancel_payment(payment_id, reason)
     return success(service.serialise(payment).model_dump(), f"₹{payment.amount} payment cancelled")

@@ -16,9 +16,10 @@ import { Badge } from '../../components/common/Badge';
 import { Mini } from '../../components/common/StatTile';
 import { RoleContextBanner } from '../../components/layout/RoleContextBanner';
 
-export function Payments({ pays, receipts, project, search, filter, F, D, notify, role, onOpenBill, onShare, onRemind, onStatus, onDueDate, onCancelPayment }) {
+export function Payments({ pays, receipts, project, search, filter, F, D, notify, role, onOpenBill, onShare, onRemind, onStatus, onDueDate, onCancelPayment, onEditPayment }) {
   const [dueFor, setDueFor] = useState(null);
   const [cancelling, setCancelling] = useState(null);
+  const [editing, setEditing] = useState(null);
   const [view, setView] = useState('ledger');
   const canBill = canManageBills(role);
   const customerView = role === 'CUSTOMER';
@@ -137,6 +138,11 @@ export function Payments({ pays, receipts, project, search, filter, F, D, notify
                   <button className="icon-action" onClick={() => onOpenBill(r)} title="View / print bill (office + customer copy)">
                     <Printer size={14} />
                   </button>
+                  {canApprove(role) && onEditPayment && !r.cancelled && typeof r.paymentId === 'number' && (
+                    <button className="icon-action" onClick={() => setEditing(r)} title="Edit this payment (correct a mistake)">
+                      <Edit2 size={14} />
+                    </button>
+                  )}
                   {canBill && onCancelPayment && !r.cancelled && typeof r.paymentId === 'number' && (
                     <button className="button button-white small-btn" onClick={() => setCancelling(r)} title="Cancel this payment (entered by mistake)">
                       <X size={12} /> Cancel
@@ -157,9 +163,65 @@ export function Payments({ pays, receipts, project, search, filter, F, D, notify
           </>
         )}
       </div>
+      {editing && <EditPaymentModal receipt={editing} close={() => setEditing(null)} save={onEditPayment} />}
       {cancelling && <CancelPaymentModal receipt={cancelling} close={() => setCancelling(null)} save={onCancelPayment} />}
       {dueFor && <DueDateModal payment={dueFor} close={() => setDueFor(null)} save={onDueDate} />}
     </>
+  );
+}
+
+/** Correct a payment entered with a mistake (amount, mode, cheque details, date, reference). */
+function EditPaymentModal({ receipt, close, save }) {
+  const today = new Date().toISOString().slice(0, 10);
+  const [form, setForm] = useState({
+    amount: String(receipt.rawAmount ?? ''), mode: String(receipt.mode || 'UPI').toUpperCase(),
+    received_on: receipt.rawDate || today, reference: receipt.reference || '', paid_to: receipt.paidTo || '',
+    bank_name: receipt.bankName || '', instrument_date: receipt.chequeDate || '',
+  });
+  const [error, setError] = useState('');
+  const set = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }));
+  const cheque = form.mode === 'CHEQUE';
+  const submit = async (e) => {
+    e.preventDefault();
+    if (!(Number(form.amount) > 0)) { setError('Enter an amount greater than zero.'); return; }
+    if (cheque && (!form.bank_name.trim() || !form.instrument_date)) { setError('A cheque needs the bank name and the cheque receiving date.'); return; }
+    const problem = await save(receipt, {
+      amount: form.amount, mode: form.mode, received_on: form.received_on, reference: form.reference.trim() || null,
+      paid_to: form.paid_to.trim() || null, ...(cheque ? { bank_name: form.bank_name.trim(), instrument_date: form.instrument_date } : {}),
+    });
+    if (problem) setError(problem); else close();
+  };
+  return (
+    <div className="modal-backdrop" onMouseDown={(e) => e.target === e.currentTarget && close()}>
+      <form className="modal view-modal" onSubmit={submit} noValidate>
+        <div className="modal-head">
+          <div>
+            <span className="modal-kicker">EDIT PAYMENT</span>
+            <h2>{receipt.no} · {receipt.customer}</h2>
+            <p>{receipt.project} · Plot {receipt.plot}. The balance, receipt and the agent's commission follow the corrected amount.</p>
+          </div>
+          <button type="button" className="modal-close" onClick={close} aria-label="Close"><X size={16} /></button>
+        </div>
+        <div className="form-grid">
+          <label>Amount (₹)<input type="number" min="1" step="0.01" value={form.amount} onChange={set('amount')} autoFocus /></label>
+          <label>Payment date<input type="date" max={today} value={form.received_on} onChange={set('received_on')} /></label>
+          <label>Mode
+            <select value={form.mode} onChange={set('mode')}>
+              {['CASH', 'UPI', 'NEFT', 'RTGS', 'CHEQUE', 'CARD', 'TOKEN_ADVANCE'].map((m) => <option key={m} value={m}>{m.replace('_', ' ')}</option>)}
+            </select>
+          </label>
+          <label>{cheque ? 'Cheque number' : 'Reference'}<input value={form.reference} onChange={set('reference')} maxLength={80} /></label>
+          {cheque && <label>Bank name<input value={form.bank_name} onChange={set('bank_name')} maxLength={80} /></label>}
+          {cheque && <label>Cheque receiving date<input type="date" value={form.instrument_date} onChange={set('instrument_date')} /></label>}
+          <label>Paid to<input value={form.paid_to} onChange={set('paid_to')} maxLength={80} /></label>
+        </div>
+        {error && <p className="form-error" role="alert">{error}</p>}
+        <div className="modal-actions">
+          <button type="button" className="button button-white" onClick={close}>Cancel</button>
+          <button type="submit" className="button button-primary">Save changes</button>
+        </div>
+      </form>
+    </div>
   );
 }
 

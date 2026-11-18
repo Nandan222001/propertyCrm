@@ -496,6 +496,18 @@ export const cancelPaymentLive = (receipt, reason) => async (dispatch) => {
   }
 };
 
+/** Correct a payment entered with a mistake: the balance, schedule, receipt and commission follow. */
+export const updatePaymentLive = (receipt, changes) => async (dispatch) => {
+  try {
+    await actions.updatePayment(receipt.paymentId, changes);
+    await dispatch(hydrateWorkspace({ silent: true }));
+    dispatch(toastPushed(`Payment ${receipt.no} updated`));
+    return '';
+  } catch (error) {
+    return error.message || 'Could not update the payment.';
+  }
+};
+
 export const markReceiptShared = (receipt) => async (dispatch, getState) => {
   if (getState().auth.mode === 'live' && typeof receipt.id === 'number') {
     // Only the server flag makes the bill visible in the customer's own login.

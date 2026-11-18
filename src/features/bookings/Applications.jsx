@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Eye, Plus, Printer, X } from 'lucide-react';
+import { Edit2, Eye, Plus, Printer, X } from 'lucide-react';
 import { api, hasSession } from '../../api';
 import { fmtINR, parseAmt } from '../../utils';
 import { Table } from '../../components/common/DataTable';
@@ -103,6 +103,68 @@ export function ApplicationModal({ customers, projects, defaultProject, close, s
   );
 }
 
+/** Correct an application receipt entered with a mistake (e.g. the application and enrollment amounts swapped). */
+function EditApplicationModal({ application: a, close, saved, notify }) {
+  const today = new Date().toISOString().slice(0, 10);
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
+  const modes = MODES.some((m) => m.toUpperCase() === String(a.payment_mode).toUpperCase()) ? MODES : [...MODES, a.payment_mode];
+
+  async function submit(e) {
+    e.preventDefault();
+    const d = Object.fromEntries(new FormData(e.currentTarget));
+    const appFee = parseAmt(d.application_fee || 0);
+    const enrolFee = parseAmt(d.enrollment_fee || 0);
+    if (appFee + enrolFee <= 0) return setError('Enter the application fee and / or the enrollment fee received.');
+    if (!d.received_on || d.received_on > today) return setError('Choose a valid enrolment date (not in the future).');
+    setBusy(true);
+    try {
+      await api.applications.update(a.id, {
+        application_fee: appFee, enrollment_fee: enrolFee, received_on: d.received_on, payment_mode: d.mode,
+        payment_type: d.payment_type, reference: d.txn.trim() || null, paid_to: d.paidTo.trim() || null,
+      });
+      notify(`Application ${a.receipt_number} updated`);
+      saved();
+    } catch (err) {
+      setError(err.message || 'Could not update the application.');
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="modal-backdrop" onMouseDown={(e) => e.target === e.currentTarget && close()}>
+      <div className="modal">
+        <div className="modal-head">
+          <div>
+            <span className="modal-kicker">EDIT APPLICATION</span>
+            <h2>{a.receipt_number} · {a.customer_name}</h2>
+            <p>{a.project_name}. Correct the amounts or details entered by mistake — the receipt shows the corrected values.</p>
+          </div>
+          <button className="modal-close" onClick={close} aria-label="Close"><X size={17} /></button>
+        </div>
+        <form onSubmit={submit} noValidate>
+          <div className="form-grid">
+            <label>Application fee (₹)<input name="application_fee" inputMode="numeric" defaultValue={Number(a.application_fee)} autoFocus /></label>
+            <label>Enrollment fee (₹)<input name="enrollment_fee" inputMode="numeric" defaultValue={Number(a.enrollment_fee)} /></label>
+            <label>Payment mode
+              <select name="mode" defaultValue={MODES.find((m) => m.toUpperCase() === String(a.payment_mode).toUpperCase()) || a.payment_mode}>{modes.map((m) => <option key={m}>{m}</option>)}</select></label>
+            <label>Transaction details<input name="txn" maxLength={80} defaultValue={a.reference || ''} /></label>
+            <label>Enrolment date<input name="received_on" type="date" max={today} defaultValue={String(a.received_on).slice(0, 10)} /></label>
+            <label>Payment type
+              <select name="payment_type" defaultValue={a.payment_type || TYPES[0]}>{TYPES.map((t) => <option key={t}>{t}</option>)}</select></label>
+            <label className="span-2">Paid to<input name="paidTo" maxLength={80} defaultValue={a.paid_to || ''} /></label>
+          </div>
+          {error && <p className="form-error" role="alert">{error}</p>}
+          <div className="modal-actions">
+            <button type="button" className="button button-white" onClick={close}>Cancel</button>
+            <button type="submit" className="button button-primary" disabled={busy}>{busy ? 'Saving…' : 'Save changes'}</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 /** The "Applications" tab of the Bookings page (the modal that creates one lives on the page itself). */
 /** Everything about one application: step 1 receipt, and (once allotted) the booking and its receipts. */
 function ApplicationDetail({ application: a, booking, receipts, onPrint, onOpenBill, close }) {
@@ -158,9 +220,10 @@ function ApplicationDetail({ application: a, booking, receipts, onPrint, onOpenB
   );
 }
 
-export function ApplicationsPanel({ project, search, canCreate, onNewApplication, onAllot, reloadKey, onPrint, notify, bookings = [], receipts = [], onOpenBill }) {
+export function ApplicationsPanel({ project, search, canCreate, canEdit, onNewApplication, onAllot, reloadKey, onPrint, notify, bookings = [], receipts = [], onOpenBill }) {
   const live = hasSession();
   const [viewed, setViewed] = useState(null);
+  const [editing, setEditing] = useState(null);
   const [rows, setRows] = useState(null);
 
   const load = useCallback(async () => {
@@ -197,6 +260,9 @@ export function ApplicationsPanel({ project, search, canCreate, onNewApplication
             <div className="row-actions" key={a.id}>
               <button className="icon-action" onClick={() => setViewed(a)} title="View application, booking and receipts"><Eye size={14} /></button>
               <button className="icon-action" onClick={() => onPrint(a)} title="View / print receipt"><Printer size={14} /></button>
+              {canEdit && (
+                <button className="icon-action" onClick={() => setEditing(a)} title="Edit this application receipt (correct a mistake)"><Edit2 size={14} /></button>
+              )}
               {canCreate && a.status === 'OPEN' && (
                 <button className="button button-white small-btn" onClick={() => onAllot(a)} title="Allot a plot to this customer (step 2)">Allot plot</button>
               )}
@@ -204,6 +270,7 @@ export function ApplicationsPanel({ project, search, canCreate, onNewApplication
           ])}
         />
       )}
+      {editing && <EditApplicationModal application={editing} close={() => setEditing(null)} notify={notify} saved={() => { setEditing(null); load(); window.dispatchEvent(new Event('erp:applications-changed')); }} />}
       {viewed && (
         <ApplicationDetail
           application={viewed} close={() => setViewed(null)} onPrint={onPrint} onOpenBill={onOpenBill}

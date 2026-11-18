@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends, status
 from app.controllers import payment_controller as controller
 from app.core.constants import Permission
 from app.core.dependencies import PaginationDep, require
-from app.schemas.finance import PaymentCancel, PaymentCreate
+from app.schemas.finance import PaymentCancel, PaymentCreate, PaymentUpdate
 
 router = APIRouter(tags=["Collections"])
 
@@ -28,6 +28,11 @@ def list_payments(page: PaginationDep, service: controller.PaymentServiceDep, _:
              summary="Record a collection and issue a numbered receipt")
 def record_payment(payload: PaymentCreate, service: controller.PaymentServiceDep, _: CREATE = None):
     return controller.record_payment(payload, service)
+
+
+@router.patch("/payments/{payment_id}", summary="Correct a payment entered with a mistake")
+def update_payment(payment_id: int, payload: PaymentUpdate, service: controller.PaymentServiceDep, _: APPROVE = None):
+    return controller.update_payment(payment_id, payload, service)
 
 
 @router.post("/payments/{payment_id}/cancel", summary="Cancel a payment (reverses the balance and the agent's commission)")

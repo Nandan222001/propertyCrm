@@ -70,4 +70,12 @@ def purge_customer_data(db: Session, customer_id: int) -> dict[str, int]:
         result = db.execute(delete(table).where(pk.in_(ids)))
         removed[table.name] = int(result.rowcount or 0)
     db.flush()
+    # The rows were deleted with Core statements; drop their ORM copies so a later flush does not try to
+    # UPDATE (e.g. null the customer_id of) bookings that no longer exist.
+    gone = {t for t in removed}
+    for obj in list(db.identity_map.values()):
+        table = getattr(obj, "__table__", None)
+        if table is not None and table.name in gone and table.name != "customers":
+            if obj in db:  # an earlier expunge may already have cascaded to it
+                db.expunge(obj)
     return removed

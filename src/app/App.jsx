@@ -22,7 +22,7 @@ import {
 import { hasSession } from '../api';
 import {
   createBooking, createCustomer, decideBooking, decideCustomer, deleteRecord, hydrateWorkspace, restoreSession,
-  markReceiptShared, cancelPaymentLive, recordPayment, saveProject, setInvoiceStatus, setPaymentStatus, setNextDueDate, changeMyPassword, saveRecord, setFollowUp, updateCustomerLive, deleteCustomerLive, updateBookingLive, deleteBookingLive, deleteProjectLive, deletePlotLive, updatePlotLive, addPlotsLive, resetUserPasswordLive,
+  markReceiptShared, cancelPaymentLive, updatePaymentLive, recordPayment, saveProject, setInvoiceStatus, setPaymentStatus, setNextDueDate, changeMyPassword, saveRecord, setFollowUp, updateCustomerLive, deleteCustomerLive, updateBookingLive, deleteBookingLive, deleteProjectLive, deletePlotLive, updatePlotLive, addPlotsLive, resetUserPasswordLive,
   setRegistryStatus, actionNotification, loadNotifications, signIn, signOut, saveInvoice, issueInvoice, cancelInvoice, payInvoice,
   shareInvoice, downloadInvoicePdf,
 } from '../store/thunks';
@@ -459,6 +459,7 @@ export function App() {
               onOpenBill={(receipt) => dispatch(billOpened(receipt.no))}
               onShare={shareReceipt}
               onCancelPayment={auth.mode === 'live' ? (receipt, reason) => dispatch(cancelPaymentLive(receipt, reason)) : undefined}
+              onEditPayment={auth.mode === 'live' ? (receipt, changes) => dispatch(updatePaymentLive(receipt, changes)) : undefined}
               onStatus={(payment, status) => dispatch(setPaymentStatus(payment, status))}
               onDueDate={auth.mode === 'live' ? (payment, date) => dispatch(setNextDueDate(payment, date)) : undefined}
               onRemind={(row) => openWhatsApp(

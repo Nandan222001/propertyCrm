@@ -149,6 +149,14 @@ class Receipt(Base, PkMixin, PublicIdMixin, TenantMixin, TimestampMixin):
         return self.payment.payment_type if self.payment is not None else None
 
     @property
+    def bank_name(self) -> str | None:
+        return self.payment.bank_name if self.payment is not None else None
+
+    @property
+    def instrument_date(self):
+        return self.payment.instrument_date if self.payment is not None else None
+
+    @property
     def payment_status(self) -> str | None:
         return self.payment.status if self.payment is not None else None
 

@@ -56,6 +56,35 @@ class ApplicationCreate(SafeText):
         return self
 
 
+class ApplicationUpdate(SafeText):
+    """Correct an application receipt entered with a mistake. Only the fields sent are changed."""
+
+    application_fee: Decimal | None = Field(default=None, ge=0, le=Decimal("100000000"))
+    enrollment_fee: Decimal | None = Field(default=None, ge=0, le=Decimal("100000000"))
+    payment_type: str | None = Field(default=None, max_length=40)
+    payment_mode: str | None = Field(default=None, max_length=24)
+    reference: str | None = Field(default=None, max_length=80)
+    paid_to: str | None = Field(default=None, max_length=80)
+    received_on: date | None = None
+
+    @field_validator("received_on", mode="before")
+    @classmethod
+    def _date(cls, value):
+        return to_date(value, field="date") if value else None
+
+    @field_validator("payment_type", mode="before")
+    @classmethod
+    def _type(cls, value):
+        return normalise_choice(value) if value else None
+
+    @field_validator("payment_mode", mode="before")
+    @classmethod
+    def _mode(cls, value):
+        from app.schemas.finance import PAYMENT_MODES
+
+        return normalise_enum(value, tuple(m for m in PAYMENT_MODES if m != "TOKEN_ADVANCE"), field="payment mode") if value else None
+
+
 class ApplicationResponse(TimestampedResponse):
     public_id: str
     receipt_number: str

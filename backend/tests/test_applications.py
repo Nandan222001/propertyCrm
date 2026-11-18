@@ -50,3 +50,15 @@ def test_a_rejected_booking_reopens_the_application(client, agent_headers, admin
     rows = client.get("/api/v1/applications", headers=admin_headers, params={"page_size": 200}).json()["data"]
     reopened = next(a for a in rows if a["id"] == application["id"])
     assert reopened["status"] == "OPEN" and reopened["booking_id"] is None
+
+
+def test_an_application_receipt_with_swapped_fees_can_be_corrected(client, agent_headers, admin_headers, agent_approved_customer, available_plot):
+    made = apply(client, agent_headers, agent_approved_customer, available_plot, application_fee="5000", enrollment_fee="500").json()["data"]
+    url = f"/api/v1/applications/{made['id']}"
+    fixed = client.patch(url, headers=admin_headers, json={"application_fee": "500", "enrollment_fee": "5000", "payment_mode": "cash"})
+    assert fixed.status_code == 200, fixed.text
+    data = fixed.json()["data"]
+    assert (float(data["application_fee"]), float(data["enrollment_fee"]), data["payment_mode"]) == (500, 5000, "CASH")
+    # only an approver may correct it, and it cannot be zeroed
+    assert client.patch(url, headers=agent_headers, json={"application_fee": "1"}).status_code == 403
+    assert client.patch(url, headers=admin_headers, json={"application_fee": "0", "enrollment_fee": "0"}).status_code in (409, 422)

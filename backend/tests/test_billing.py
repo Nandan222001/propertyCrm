@@ -450,3 +450,32 @@ def test_booking_rejects_an_unknown_payment_mode(client, admin_headers, approved
         headers=admin_headers,
     )
     assert bad.status_code == 422
+
+
+def test_a_mistaken_instalment_can_be_corrected(client, admin_headers, approved_customer, available_plot):
+    created = client.post(
+        "/api/v1/bookings",
+        json={"customer_id": approved_customer["id"], "plot_id": available_plot["id"], "final_price": "1000000",
+              "token_amount": "50000", "payment_mode": "upi"},
+        headers=admin_headers,
+    )
+    booking_id = created.json()["data"]["id"]
+    paid = client.post("/api/v1/payments", headers=admin_headers,
+                       json={"booking_id": booking_id, "amount": "100000", "mode": "UPI"})
+    assert paid.status_code == 201, paid.text
+    payment_id = paid.json()["data"]["id"]
+
+    fixed = client.patch(f"/api/v1/payments/{payment_id}", headers=admin_headers,
+                         json={"amount": "120000", "mode": "CHEQUE", "bank_name": "SBI",
+                               "instrument_date": "2026-11-01", "reference": "CHQ 77"})
+    assert fixed.status_code == 200, fixed.text
+    data = fixed.json()["data"]
+    assert (float(data["amount"]), data["mode"], float(data["balance_after"])) == (120000, "CHEQUE", 830000)
+    receipts = client.get("/api/v1/receipts", headers=admin_headers, params={"page_size": 200}).json()["data"]
+    mine = [r for r in receipts if r["booking_id"] == booking_id and float(r["amount"]) == 120000]
+    assert mine and float(mine[0]["balance"]) == 830000 and mine[0]["mode"] == "CHEQUE"
+
+    # A cheque still needs its bank; an amount over the price is refused.
+    assert client.patch(f"/api/v1/payments/{payment_id}", headers=admin_headers, json={"bank_name": ""}).status_code in (409, 422)
+    assert client.patch(f"/api/v1/payments/{payment_id}", headers=admin_headers,
+                        json={"amount": "9000000"}).status_code in (409, 422)

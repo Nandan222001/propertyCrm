@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends, status
 from app.controllers import application_controller as controller
 from app.core.constants import Permission
 from app.core.dependencies import PaginationDep, require
-from app.schemas.application import ApplicationCreate
+from app.schemas.application import ApplicationCreate, ApplicationUpdate
 
 router = APIRouter(tags=["Applications"])
 
@@ -25,3 +25,9 @@ def list_applications(page: PaginationDep, service: controller.ApplicationServic
 @router.post("/applications", status_code=status.HTTP_201_CREATED, summary="Record an application and issue its receipt")
 def create_application(payload: ApplicationCreate, service: controller.ApplicationServiceDep, _: CREATE = None):
     return controller.create_application(payload, service)
+
+
+@router.patch("/applications/{application_id}", summary="Correct an application receipt entered with a mistake")
+def update_application(application_id: int, payload: ApplicationUpdate, service: controller.ApplicationServiceDep,
+                       _: Annotated[None, Depends(require(Permission.PAYMENT_APPROVE))] = None):
+    return controller.update_application(application_id, payload, service)

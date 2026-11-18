@@ -70,7 +70,7 @@ export function Bookings({ bookings, project, search, tab, TB, role, onNew, onNe
 
         {onApplications ? (
           <ApplicationsPanel
-            project={project} search={search} canCreate={canCreateBooking(role)} reloadKey={appsReload}
+            project={project} search={search} canCreate={canCreateBooking(role)} canEdit={isAdmin(role)} reloadKey={appsReload}
             onNewApplication={onNewApplication} onAllot={onAllot} onPrint={onPrintApplication} notify={notify}
             bookings={bookings} receipts={receipts} onOpenBill={onOpenBill}
           />

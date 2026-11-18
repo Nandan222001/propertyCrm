@@ -289,6 +289,102 @@ class PaymentService(BaseService[Payment]):
                     summary=f"₹{payment.amount} payment on {booking.booking_number} cancelled: {reason}")
         return payment
 
+    def update_payment(self, payment_id: int, payload) -> Payment:
+        """Correct a payment (amount, mode, cheque details, date, reference …). The booking balance, the payment
+        schedule, the receipt and the agent's commission follow the corrected amount."""
+        if not self.actor.can(Permission.PAYMENT_APPROVE):
+            raise PermissionDeniedError("Only an approver can edit a payment")
+        payment = self.payments.get_or_404(payment_id)
+        if payment.status == PaymentStatus.CANCELLED.value:
+            raise BusinessRuleError("A cancelled payment cannot be edited")
+        values = payload.model_dump(exclude_unset=True)
+        booking = self.bookings.get_or_404(payment.booking_id)
+        before = {"amount": str(payment.amount), "mode": payment.mode, "received_on": str(payment.received_on),
+                  "reference": payment.reference, "bank_name": payment.bank_name}
+
+        mode = values.get("mode", payment.mode)
+        if mode == "CHEQUE":
+            bank = (values["bank_name"] if "bank_name" in values else payment.bank_name) or ""
+            when = values["instrument_date"] if "instrument_date" in values else payment.instrument_date
+            if not bank.strip():
+                raise BusinessRuleError("Bank name is required for a cheque payment")
+            if when is None:
+                raise BusinessRuleError("Cheque receiving date is required for a cheque payment")
+        received_on = values.get("received_on") or payment.received_on
+        if received_on > date.today():
+            raise BusinessRuleError("Payment date cannot be in the future")
+
+        new_amount = values.get("amount")
+        if new_amount is not None and Decimal(new_amount) != Decimal(payment.amount):
+            from app.models.payment import Commission
+
+            commissions = list(self.db.execute(
+                select(Commission).where(Commission.payment_id == payment.id, Commission.is_deleted == 0)).scalars())
+            if any(c.status == "PAID" for c in commissions):
+                raise BusinessRuleError("The agent's commission on this payment is already paid out, so its amount cannot be changed")
+            others = Decimal(booking.paid_amount) - Decimal(payment.amount)
+            if others + Decimal(new_amount) > Decimal(booking.final_price):
+                raise BusinessRuleError("Amount exceeds the booking price")
+            if booking.plan_id is not None:
+                plans = PlanService(self.db, self.actor)
+                plans.release_payment(booking.id, payment.amount)
+                plans.allocate_payment(booking.id, new_amount)
+            for commission in commissions:
+                self.db.delete(commission)
+            self.db.flush()
+            payment.amount = Decimal(new_amount)
+            booking.paid_amount = others + Decimal(new_amount)
+            self.db.flush()
+            # Running balances of this and every later payment follow the corrected figure.
+            running = Decimal("0")
+            for row in sorted(
+                (p for p in self.db.execute(select(Payment).where(
+                    Payment.booking_id == booking.id, Payment.is_deleted == 0)).scalars()
+                 if p.status != PaymentStatus.CANCELLED.value),
+                key=lambda p: (p.received_on, p.id),
+            ):
+                running += Decimal(row.amount)
+                row.balance_after = max(Decimal(booking.final_price) - running, Decimal("0"))
+                if row.receipt is not None:
+                    row.receipt.balance = row.balance_after
+            if booking.plot is not None:
+                if booking.balance <= 0:
+                    booking.plot.status = "SOLD"
+                elif booking.plot.status == "SOLD":
+                    booking.plot.status = "BOOKED"
+            self._maybe_create_commission(booking, payment)
+
+        for key in ("mode", "reference", "paid_to", "notes", "received_on"):
+            if key in values and values[key] is not None:
+                setattr(payment, key, values[key].strip() if isinstance(values[key], str) else values[key])
+        if "reference" in values and values["reference"] is None:
+            payment.reference = None
+        if "paid_to" in values:
+            payment.paid_to = (values["paid_to"] or "").strip() or None
+        if payment.mode == "CHEQUE":
+            if "bank_name" in values:
+                payment.bank_name = (values["bank_name"] or "").strip() or None
+            if "instrument_date" in values:
+                payment.instrument_date = values["instrument_date"]
+        else:
+            payment.bank_name = None
+            payment.instrument_date = None
+
+        receipt = payment.receipt
+        if receipt is not None:
+            receipt.amount = payment.amount
+            receipt.mode = payment.mode
+            receipt.reference = payment.reference
+            receipt.paid_to = payment.paid_to
+            receipt.issued_on = payment.received_on
+        self.db.flush()
+        self._audit(AuditAction.UPDATE, payment, before=before,
+                    after={"amount": str(payment.amount), "mode": payment.mode,
+                           "received_on": str(payment.received_on), "reference": payment.reference,
+                           "bank_name": payment.bank_name},
+                    summary=f"Payment on {booking.booking_number} corrected")
+        return payment
+
     def set_next_due(self, booking_number: str, due: date) -> dict:
         """Move the next instalment's due date. The ledger status (pending / overdue) follows from it."""
         self._authorise("create")

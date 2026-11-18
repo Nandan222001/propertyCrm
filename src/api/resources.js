@@ -96,6 +96,7 @@ actions.addSubAgent = (body) => authedRequest(`${ENDPOINTS.agents.list}/team`, {
 actions.notificationQueue = () => authedRequest(ENDPOINTS.notifications.list);
 actions.notificationAction = (id) => authedRequest(`${ENDPOINTS.notifications.item(id)}/action`, { method: 'POST', body: {} });
 
+actions.updatePayment = (id, body) => authedRequest(ENDPOINTS.payments.item(id), { method: 'PATCH', body });
 actions.cancelPayment = (id, reason) => authedRequest(`${ENDPOINTS.payments.item(id)}/cancel`, { method: 'POST', body: { reason } });
 actions.commissionDecision = (id, body) => authedRequest(`${ENDPOINTS.commissions.item(id)}/decision`, { method: 'POST', body });
 

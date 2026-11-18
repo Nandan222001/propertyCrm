@@ -107,6 +107,10 @@ export function adaptWorkspace({
         // Allotment receipts show the receipt date the admin picked, and say what the money was for.
         ...(r.payment_type ? { paymentType: r.payment_type, dateLabel: 'Receipt Date', dateTime: dateLabel(r.issued_on) } : {}),
         paymentId: r.payment_id ?? null,
+        rawAmount: Number(r.amount),
+        rawDate: r.issued_on,
+        bankName: r.bank_name || '',
+        chequeDate: r.instrument_date || '',
         cancelled: r.payment_status === 'CANCELLED',
         agent: booking?.agent_name || '',
         shared: Boolean(r.is_shared_with_customer),

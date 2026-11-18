@@ -241,6 +241,7 @@ class CustomerService(BaseService[Customer]):
         self._audit(AuditAction.DELETE, customer, before=snapshot, summary="Customer and all their records removed")
         self._drop_portal_login(customer, hard=True)
         removed = purge_customer_data(self.db, customer.id)
+        self.db.expire(customer)  # forget any relationship collections that pointed at the purged rows
         kept_documents = self.db.execute(
             select(func.count(Document.id)).where(Document.customer_id == customer.id)
         ).scalar_one()
