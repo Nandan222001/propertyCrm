@@ -333,6 +333,8 @@ class PaymentService(BaseService[Payment]):
                 self.db.delete(commission)
             self.db.flush()
             payment.amount = Decimal(new_amount)
+            if payment.payment_type == "Allotment":
+                booking.token_amount = Decimal(new_amount)  # the allotment amount on the booking follows
             booking.paid_amount = others + Decimal(new_amount)
             self.db.flush()
             # Running balances of this and every later payment follow the corrected figure.

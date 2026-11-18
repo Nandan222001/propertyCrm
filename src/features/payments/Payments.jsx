@@ -20,6 +20,7 @@ export function Payments({ pays, receipts, project, search, filter, F, D, notify
   const [dueFor, setDueFor] = useState(null);
   const [cancelling, setCancelling] = useState(null);
   const [editing, setEditing] = useState(null);
+  const [historyFor, setHistoryFor] = useState(null); // ledger row whose payments are being reviewed
   const [view, setView] = useState('ledger');
   const canBill = canManageBills(role);
   const customerView = role === 'CUSTOMER';
@@ -45,8 +46,13 @@ export function Payments({ pays, receipts, project, search, filter, F, D, notify
     return () => { live = false; window.removeEventListener('erp:applications-changed', load); };
   }, [customerView]);
   const feeRows = applications.filter((a) => project === 'All projects' || a.project_name === project);
-  const applicationFees = feeRows.reduce((s, a) => s + Number(a.application_fee || 0), 0);
-  const enrollmentFees = feeRows.reduce((s, a) => s + Number(a.enrollment_fee || 0), 0);
+  // The ₹500 application fee is not counted on this page: every other rupee received with an application
+  // (the enrollment fee, plus anything entered above ₹500 in the application-fee box) shows in the total.
+  const APPLICATION_FEE = 500;
+  const enrollmentFees = feeRows.reduce((s, a) => {
+    const application = Number(a.application_fee || 0);
+    return s + Number(a.enrollment_fee || 0) + Math.max(application - APPLICATION_FEE, 0);
+  }, 0);
 
   const total = pays.reduce((s, p) => s + parseAmt(p[3]), 0);
   const paid = pays.reduce((s, p) => s + parseAmt(p[4]), 0);
@@ -56,13 +62,12 @@ export function Payments({ pays, receipts, project, search, filter, F, D, notify
     <>
       <RoleContextBanner role={role} page="Payments" />
 
-      <div className={`mini-stats ${customerView ? 'four' : 'six'}`}>
+      <div className={`mini-stats ${customerView ? 'four' : 'five'}`}>
         <Mini title="TOTAL BOOKING VALUE" value={`₹${fmtINR(total)}`} />
         <Mini title="COLLECTED TO DATE" value={`₹${fmtINR(paid)}`} color="green-text" />
         <Mini title="PENDING" value={`₹${fmtINR(total - paid)}`} color="indigo-text" />
         <Mini title="OVERDUE" value={`₹${fmtINR(overdue)}`} color="amber-text" />
-        {!customerView && <Mini title="APPLICATION FEES" value={`₹${fmtINR(applicationFees)}`} color="green-text" />}
-        {!customerView && <Mini title="ENROLLMENT FEES" value={`₹${fmtINR(enrollmentFees)}`} color="green-text" />}
+        {!customerView && <Mini title="ENROLLMENT FEES (EXCL. ₹500 APPLICATION FEE)" value={`₹${fmtINR(enrollmentFees)}`} color="green-text" />}
       </div>
 
       <div className="panel section-panel">
@@ -107,6 +112,11 @@ export function Payments({ pays, receipts, project, search, filter, F, D, notify
                         {[...new Set([p[7], 'PENDING', ...(parseAmt(p[4]) > 0 ? ['PARTIALLY PAID'] : []), 'OVERDUE'])]
                           .map((s) => <option key={s} value={s}>{s}</option>)}
                       </select>
+                    )}
+                    {canApprove(role) && onEditPayment && (
+                      <button className="icon-action" title="Payments of this booking — edit one if it was entered wrongly" onClick={() => setHistoryFor(p)}>
+                        <Edit2 size={14} />
+                      </button>
                     )}
                     {p[5] !== '0' && (
                       <button className="icon-action wa-icon" onClick={() => onRemind(p)} title="WhatsApp payment reminder">
@@ -163,10 +173,47 @@ export function Payments({ pays, receipts, project, search, filter, F, D, notify
           </>
         )}
       </div>
+      {historyFor && (
+        <BookingPaymentsModal
+          row={historyFor} close={() => setHistoryFor(null)}
+          receipts={receipts.filter((r) => r.bookingNo === historyFor[9])}
+          onEdit={(r) => { setHistoryFor(null); setEditing(r); }}
+        />
+      )}
       {editing && <EditPaymentModal receipt={editing} close={() => setEditing(null)} save={onEditPayment} />}
       {cancelling && <CancelPaymentModal receipt={cancelling} close={() => setCancelling(null)} save={onCancelPayment} />}
       {dueFor && <DueDateModal payment={dueFor} close={() => setDueFor(null)} save={onDueDate} />}
     </>
+  );
+}
+
+/** Every payment taken on one booking (allotment and instalments), each with an Edit button. */
+function BookingPaymentsModal({ row, receipts, close, onEdit }) {
+  return (
+    <div className="modal-backdrop" onMouseDown={(e) => e.target === e.currentTarget && close()}>
+      <div className="modal view-modal">
+        <div className="modal-head">
+          <div>
+            <span className="modal-kicker">PAYMENTS</span>
+            <h2>{row[0]} · Plot {row[1]}</h2>
+            <p>Allotment and instalments received. Pick one to correct a wrong amount, date or mode.</p>
+          </div>
+          <button type="button" className="modal-close" onClick={close} aria-label="Close"><X size={16} /></button>
+        </div>
+        {receipts.length === 0 && <p className="empty-note">No payments yet.</p>}
+        <div className="documents-list">
+          {receipts.map((r) => (
+            <div className="document-row" key={r.no}>
+              <div><b>{r.no}</b><small>{r.date} · {r.mode}{r.paymentType ? ` · ${r.paymentType}` : ' · Instalment'}</small></div>
+              <b>₹{r.amount}</b>
+              {r.cancelled ? <Badge>CANCELLED</Badge> : typeof r.paymentId === 'number' && (
+                <button className="button button-white small-btn" onClick={() => onEdit(r)}><Edit2 size={12} /> Edit</button>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
   );
 }
 
