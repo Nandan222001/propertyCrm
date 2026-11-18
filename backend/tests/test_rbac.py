@@ -171,7 +171,7 @@ def test_public_routes_are_exactly_health_branding_and_auth():
     public_paths = {route["path"] for route in route_inventory() if route["public"]}
     unexpected = {
         path for path in public_paths
-        if not (path.startswith("/auth/") or path == "/public/plot-map/{slug}" or path in {"/health", "/ready", "/metrics", "/branding"})
+        if not (path.startswith("/auth/") or path in {"/public/plot-map", "/public/plot-map/{slug}"} or path in {"/health", "/ready", "/metrics", "/branding"})
     }
     assert not unexpected, f"unexpected public endpoints: {sorted(unexpected)}"
 

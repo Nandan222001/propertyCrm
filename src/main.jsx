@@ -21,8 +21,8 @@ import './styles/features.css';
 /** /plot-map/<organisation> is public: it renders without the sign-in gate (and without touching a session). */
 function Root() {
   const { pathname } = useLocation();
-  const match = pathname.match(/^\/plot-map\/([a-z0-9-]+)\/?$/i);
-  return match ? <PublicPlotMap slug={match[1]} /> : <App />;
+  const match = pathname.match(/^\/plot-map(?:\/([a-z0-9-]+))?\/?$/i);   // /plot-map = the deployment's own organisation
+  return match ? <PublicPlotMap slug={match[1] || ''} /> : <App />;
 }
 
 createRoot(document.getElementById('root')).render(

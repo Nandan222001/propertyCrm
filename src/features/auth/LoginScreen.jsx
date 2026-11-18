@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import {
-  Lock, Mail, ArrowRight, Eye, EyeOff
+  Lock, Mail, ArrowRight, Eye, EyeOff, Map
 } from 'lucide-react';
 import { actions } from '../../api';
 import { ForgotPasswordForm, ResetPasswordForm } from './PasswordResetForms';
@@ -17,6 +17,9 @@ export function LoginScreen({ onLogin, notice: initialNotice = '' }) {
     }).catch(() => {});
     return () => { live = false; };
   }, []);
+  // Public plot map of this organisation: /plot-map/<organisation> ("Lalita Realestate Infra" -> lalita-realestate-infra).
+  const brandSlug = (brand.name || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+  const plotMapHref = brandSlug ? `/plot-map/${brandSlug}` : '/plot-map';
   const [brandFirst, ...brandWords] = (brand.name || '').split(' ');
   const brandRest = brandWords.join(' ');
   const [showPassword, setShowPassword] = useState(false);
@@ -140,6 +143,10 @@ export function LoginScreen({ onLogin, notice: initialNotice = '' }) {
               <button type="button" className="text-button login-forgot" onClick={() => { setError(''); setNotice(''); setResetView('forgot'); }}>
                 Forgot password?
               </button>
+              <a className="button button-white login-view-plots" href={plotMapHref}>
+                <Map size={15} />
+                <span>View plots</span>
+              </a>
             </form>
           )}
         </div>

@@ -85,7 +85,7 @@ api.agents.provisionLogin = (id) => authedRequest(`${ENDPOINTS.agents.item(id)}/
 actions.agentLeaderboard = () => authedRequest(`${ENDPOINTS.agents.list}/leaderboard`);
 
 /** Public (no sign-in): plot availability for an organisation's plot map. */
-actions.publicPlotMap = (slug) => request(`/public/plot-map/${encodeURIComponent(slug)}`, { auth: false });
+actions.publicPlotMap = (slug) => request(slug ? `/public/plot-map/${encodeURIComponent(slug)}` : '/public/plot-map', { auth: false });
 
 /** The agent hierarchy: the caller's own rate, who they report to and everyone below them. */
 actions.agentTeam = () => authedRequest(`${ENDPOINTS.agents.list}/team`);

@@ -27,7 +27,25 @@ def plot_map(db: Session, slug: str) -> dict:
     tenant = db.execute(select(Tenant).where(Tenant.slug == slug.lower())).scalars().first() if _SLUG.match(slug.lower()) else None
     if tenant is None or not tenant.is_active or tenant.plot_map not in PLOT_MAPS:
         raise NotFoundError("Plot map not found")
+    return _serve(db, tenant)
 
+
+def default_plot_map(db: Session) -> dict:
+    """The deployment's own plot map (the sign-in page's "View plots" link, which knows no organisation).
+
+    Of the active organisations linked to a plot map, the one named like the deployment wins; otherwise the oldest."""
+    from app.core.config import settings
+
+    linked = [t for t in db.execute(select(Tenant).order_by(Tenant.id)).scalars().all()
+              if t.is_active and t.plot_map in PLOT_MAPS]
+    if not linked:
+        raise NotFoundError("Plot map not found")
+    brand = (settings.BRAND_NAME or "").strip().lower()
+    tenant = next((t for t in linked if (t.name or "").strip().lower() == brand), linked[0])
+    return _serve(db, tenant)
+
+
+def _serve(db: Session, tenant: Tenant) -> dict:
     set_scope(db, tenant.id)  # everything below is filtered to this organisation
     rows = db.execute(
         select(Plot.plot_number, Plot.status, Project.name)

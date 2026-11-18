@@ -376,6 +376,11 @@ def test_public_plot_map_exposes_only_free_or_booked_and_only_for_linked_tenants
                    for p in data["plots"])
         mine = client.get("/api/v1/plots", headers=admin_headers, params={"page_size": 200}).json()["data"]
         assert len(data["plots"]) == len(mine)  # only that organisation's plots
+        # The sign-in page's "View plots" link knows no organisation: it serves the deployment's own map.
+        own = client.get("/api/v1/public/plot-map")
+        assert own.status_code == 200, own.text
+        assert own.json()["data"]["plots"] == data["plots"]
     finally:
         client.patch(f"/api/v1/tenants/{tenant['id']}", headers=platform_headers, json={"plot_map": None})
     assert client.get("/api/v1/public/plot-map/lalita").status_code == 404
+    assert client.get("/api/v1/public/plot-map").status_code == 404
