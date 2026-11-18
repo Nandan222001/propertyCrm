@@ -107,6 +107,8 @@ export const selectPendingApprovals = createSelector([selectDomain], (domain) =>
   + domain.customers.filter((c) => c.status === 'Pending Approval').length);
 
 /** Document vault — generated from bookings + receipts, never stored twice. */
+const docTime = (label) => { const t = Date.parse(label); return Number.isNaN(t) ? 0 : t; };
+
 export const selectDocuments = createSelector([selectScopedData], ({ bookings, receipts }) => [
   ...bookings.flatMap((b) => [
     { key: `bf-${b[0]}`, title: 'Booking Form', sub: `${b[1]} · ${b[3]}`, date: b[4], kind: 'Booking', bookingId: b[0] },
@@ -116,7 +118,10 @@ export const selectDocuments = createSelector([selectScopedData], ({ bookings, r
       ? [{ key: `ag-${b[0]}`, title: 'Agreement to Sale', sub: `${b[1]} · ${b[3]}`, date: b[4], kind: 'Agreement', bookingId: b[0] }] : []),
   ]),
   ...receipts.map((r) => ({ key: r.no, title: `Receipt ${r.no}`, sub: `${r.customer} · ₹${r.amount}`, date: r.date, kind: 'Receipt', receiptNo: r.no })),
-]);
+// Newest first: the last document issued is at the top (equal dates keep the later-created one first).
+].map((doc, index) => ({ doc, index }))
+  .sort((a, b) => docTime(b.doc.date) - docTime(a.doc.date) || b.index - a.index)
+  .map(({ doc }) => doc));
 
 /** Nav badge rules live here (one place) rather than inside the sidebar JSX. */
 export const selectNavBadge = createSelector(

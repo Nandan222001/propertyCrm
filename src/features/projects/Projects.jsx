@@ -28,6 +28,7 @@ export function Projects({ plots, search, project, filter, F, tab, TB, notify, p
   const [removing, setRemoving] = useState(null); // { kind: 'project' | 'plot', row }
   const [editing, setEditing] = useState(undefined); // undefined = closed, null = new, row = edit
   const [viewPlot, setViewPlot] = useState(null);
+  const [plotOrder, setPlotOrder] = useState('asc'); // plot numbers: 1, 2, 10 … or 10, 2, 1
   const [viewProject, setViewProject] = useState(null);
   const canManage = isAdmin(role) && Boolean(onSaveProject);
   const customerView = role === 'CUSTOMER';
@@ -38,6 +39,10 @@ export function Projects({ plots, search, project, filter, F, tab, TB, notify, p
     const projectMatch = project === 'All projects' || p[8] === project;
     const statusMatch = filter === 'All status' || p[5] === filter.toUpperCase();
     return textMatch && projectMatch && statusMatch;
+  }).sort((a, b) => {
+    // Natural order, so plot 2 comes before plot 10 (and "A-2" before "A-10").
+    const byNumber = String(a[0]).localeCompare(String(b[0]), undefined, { numeric: true, sensitivity: 'base' });
+    return plotOrder === 'desc' ? -byNumber : byNumber;
   });
 
   const plotRows = list.map(p => [
@@ -136,6 +141,12 @@ export function Projects({ plots, search, project, filter, F, tab, TB, notify, p
               {['All status', 'AVAILABLE', 'BOOKED', 'HOLD', 'SOLD'].map(s => (
                 <button key={s} className={`filter-btn ${filter === s ? 'active' : ''}`} onClick={() => F(s)}>
                   {s}
+                </button>
+              ))}
+              <span className="filter-label">SORT:</span>
+              {[['asc', 'Ascending (1 → 9)'], ['desc', 'Descending (9 → 1)']].map(([key, label]) => (
+                <button key={key} className={`filter-btn ${plotOrder === key ? 'active' : ''}`} onClick={() => setPlotOrder(key)}>
+                  {label}
                 </button>
               ))}
             </div>
