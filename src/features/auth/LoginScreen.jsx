@@ -145,7 +145,7 @@ export function LoginScreen({ onLogin, notice: initialNotice = '' }) {
               </button>
               <a className="button button-white login-view-plots" href={plotMapHref}>
                 <Map size={15} />
-                <span>View plots</span>
+                <span>Real life city layout</span>
               </a>
             </form>
           )}

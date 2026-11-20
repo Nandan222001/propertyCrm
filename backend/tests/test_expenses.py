@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 from datetime import date, timedelta
+
+from tests.test_workflows import agent_approved_customer, available_plot  # noqa: F401
 from decimal import Decimal
 
 EXPENSE = {"category": "Office rent", "description": "October office rent", "amount": 25000,
@@ -66,3 +68,15 @@ def test_profit_summary_can_be_limited_to_a_date_range(client, accounts_headers)
     recent = client.get("/api/v1/expenses/profit-summary", headers=accounts_headers,
                         params={"date_from": (date.today() - timedelta(days=7)).isoformat()})
     assert Decimal(recent.json()["data"]["expenses"]) <= Decimal(summary(client, accounts_headers)["expenses"]) - Decimal("777")
+
+
+def test_enrollment_money_counts_as_collection_but_the_flat_500_application_fee_does_not(
+        client, admin_headers, agent_approved_customer, available_plot):
+    before = client.get("/api/v1/expenses/profit-summary", headers=admin_headers).json()["data"]
+    made = client.post("/api/v1/applications", headers=admin_headers, json={
+        "customer_id": agent_approved_customer["id"], "project_id": available_plot["project_id"],
+        "application_fee": "500", "enrollment_fee": "5000", "payment_mode": "UPI"})
+    assert made.status_code == 201, made.text
+    after = client.get("/api/v1/expenses/profit-summary", headers=admin_headers).json()["data"]
+    assert Decimal(after["collected"]) - Decimal(before["collected"]) == Decimal("5000")
+    assert Decimal(after["profit"]) - Decimal(before["profit"]) == Decimal("5000")

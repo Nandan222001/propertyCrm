@@ -5,12 +5,15 @@ from __future__ import annotations
 from datetime import date
 from decimal import Decimal
 
-from sqlalchemy import func, select
+from sqlalchemy import case, func, select
 
 from app.models.expense import Expense
 from app.core.constants import PaymentStatus
 from app.models.payment import Commission, Payment
 from app.repositories.base_repository import BaseRepository
+
+#: The flat application fee; it is not counted as company collection.
+APPLICATION_FEE = Decimal("500")
 
 
 class ExpenseRepository(BaseRepository[Expense]):
@@ -41,6 +44,19 @@ class ExpenseRepository(BaseRepository[Expense]):
             stmt = stmt.where(func.date(Commission.created_at) >= date_from)
         if date_to:
             stmt = stmt.where(func.date(Commission.created_at) <= date_to)
+        return Decimal(str(self.db.execute(stmt).scalar_one() or 0))
+
+    def enrollment_between(self, date_from: date | None = None, date_to: date | None = None) -> Decimal:
+        """Money received with applications that counts as collection: the enrollment fee, plus anything entered
+        above the flat ₹500 application fee (the ₹500 itself is not company collection)."""
+        from app.models.application import Application
+
+        over = case((Application.application_fee > APPLICATION_FEE, Application.application_fee - APPLICATION_FEE), else_=0)
+        stmt = select(func.coalesce(func.sum(Application.enrollment_fee + over), 0)).where(Application.is_deleted.is_(False))
+        if date_from:
+            stmt = stmt.where(Application.received_on >= date_from)
+        if date_to:
+            stmt = stmt.where(Application.received_on <= date_to)
         return Decimal(str(self.db.execute(stmt).scalar_one() or 0))
 
     def collected_between(self, date_from: date | None, date_to: date | None) -> Decimal:

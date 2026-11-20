@@ -57,6 +57,7 @@ class ExpenseService(BaseService[Expense]):
             collected = self.expenses.collected_between(date_from, date_to)
         else:
             collected = self.bookings.totals(None)["collected"]
+        collected = Decimal(collected) + self.expenses.enrollment_between(date_from, date_to)
         commissions = self.expenses.commissions_total(date_from, date_to)
         expenses = self.expenses.total(date_from, date_to)
         profit = Decimal(collected) - commissions - expenses

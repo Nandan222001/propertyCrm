@@ -64,7 +64,7 @@ export function Payments({ pays, receipts, project, search, filter, F, D, notify
 
       <div className={`mini-stats ${customerView ? 'four' : 'five'}`}>
         <Mini title="TOTAL BOOKING VALUE" value={`₹${fmtINR(total)}`} />
-        <Mini title="COLLECTED TO DATE" value={`₹${fmtINR(paid)}`} color="green-text" />
+        <Mini title="COLLECTED TO DATE" value={`₹${fmtINR(paid + (customerView ? 0 : enrollmentFees))}`} color="green-text" />
         <Mini title="PENDING" value={`₹${fmtINR(total - paid)}`} color="indigo-text" />
         <Mini title="OVERDUE" value={`₹${fmtINR(overdue)}`} color="amber-text" />
         {!customerView && <Mini title="ENROLLMENT FEES (EXCL. ₹500 APPLICATION FEE)" value={`₹${fmtINR(enrollmentFees)}`} color="green-text" />}
