@@ -70,7 +70,7 @@ def test_profit_summary_can_be_limited_to_a_date_range(client, accounts_headers)
     assert Decimal(recent.json()["data"]["expenses"]) <= Decimal(summary(client, accounts_headers)["expenses"]) - Decimal("777")
 
 
-def test_enrollment_money_counts_as_collection_but_the_flat_500_application_fee_does_not(
+def test_enrollment_money_counts_as_collection_but_the_application_fee_does_not(
         client, admin_headers, agent_approved_customer, available_plot):
     before = client.get("/api/v1/expenses/profit-summary", headers=admin_headers).json()["data"]
     made = client.post("/api/v1/applications", headers=admin_headers, json={

@@ -46,13 +46,8 @@ export function Payments({ pays, receipts, project, search, filter, F, D, notify
     return () => { live = false; window.removeEventListener('erp:applications-changed', load); };
   }, [customerView]);
   const feeRows = applications.filter((a) => project === 'All projects' || a.project_name === project);
-  // The ₹500 application fee is not counted on this page: every other rupee received with an application
-  // (the enrollment fee, plus anything entered above ₹500 in the application-fee box) shows in the total.
-  const APPLICATION_FEE = 500;
-  const enrollmentFees = feeRows.reduce((s, a) => {
-    const application = Number(a.application_fee || 0);
-    return s + Number(a.enrollment_fee || 0) + Math.max(application - APPLICATION_FEE, 0);
-  }, 0);
+  // The application fee is never counted on this page: only the enrollment fee adds to the collection.
+  const enrollmentFees = feeRows.reduce((s, a) => s + Number(a.enrollment_fee || 0), 0);
 
   const total = pays.reduce((s, p) => s + parseAmt(p[3]), 0);
   const paid = pays.reduce((s, p) => s + parseAmt(p[4]), 0);
@@ -67,7 +62,7 @@ export function Payments({ pays, receipts, project, search, filter, F, D, notify
         <Mini title="COLLECTED TO DATE" value={`₹${fmtINR(paid + (customerView ? 0 : enrollmentFees))}`} color="green-text" />
         <Mini title="PENDING" value={`₹${fmtINR(total - paid)}`} color="indigo-text" />
         <Mini title="OVERDUE" value={`₹${fmtINR(overdue)}`} color="amber-text" />
-        {!customerView && <Mini title="ENROLLMENT FEES (EXCL. ₹500 APPLICATION FEE)" value={`₹${fmtINR(enrollmentFees)}`} color="green-text" />}
+        {!customerView && <Mini title="ENROLLMENT FEES" value={`₹${fmtINR(enrollmentFees)}`} color="green-text" />}
       </div>
 
       <div className="panel section-panel">
