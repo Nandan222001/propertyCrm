@@ -76,3 +76,22 @@ def test_a_cancelled_application_stops_counting_as_collection(client, admin_head
     assert client.post(f"/api/v1/applications/{made['id']}/cancel", headers=admin_headers, json={"reason": "entered twice"}).status_code == 200
     assert collected() == base
     assert client.post(f"/api/v1/applications/{made['id']}/cancel", headers=admin_headers, json={"reason": "again"}).status_code in (409, 422)
+
+
+def test_deleting_a_customer_erases_their_application_fees_too(client, admin_headers, unique_email, unique_phone, available_plot):
+    from decimal import Decimal
+
+    def collected():
+        return Decimal(client.get("/api/v1/expenses/profit-summary", headers=admin_headers).json()["data"]["collected"])
+
+    customer = client.post("/api/v1/customers", headers=admin_headers, json={
+        "name": "Fee Probe", "email": unique_email, "phone": unique_phone, "consent_given": True}).json()["data"]
+    client.post(f"/api/v1/customers/{customer['id']}/approve", headers=admin_headers)
+    base = collected()
+    made = apply(client, admin_headers, customer, available_plot)
+    assert made.status_code == 201, made.text
+    assert collected() - base == Decimal("5000")
+    assert client.delete(f"/api/v1/customers/{customer['id']}", headers=admin_headers).status_code == 200
+    assert collected() == base
+    listed = client.get("/api/v1/applications", headers=admin_headers, params={"page_size": 200}).json()["data"]
+    assert made.json()["data"]["id"] not in {a["id"] for a in listed}

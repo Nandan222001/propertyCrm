@@ -7,6 +7,7 @@ from decimal import Decimal
 
 from sqlalchemy import func, select
 
+from app.models.customer import Customer
 from app.models.expense import Expense
 from app.core.constants import PaymentStatus
 from app.models.payment import Commission, Payment
@@ -48,7 +49,8 @@ class ExpenseRepository(BaseRepository[Expense]):
         from app.models.application import Application
 
         stmt = select(func.coalesce(func.sum(Application.enrollment_fee), 0)).where(
-            Application.is_deleted.is_(False), Application.status != "CANCELLED")
+            Application.is_deleted.is_(False), Application.status != "CANCELLED",
+            Application.customer_id.in_(select(Customer.id).where(Customer.is_deleted.is_(False))))
         if date_from:
             stmt = stmt.where(Application.received_on >= date_from)
         if date_to:

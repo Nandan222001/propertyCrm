@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
-from sqlalchemy import func, select
+from sqlalchemy import Select, func, select
 
 from app.models.application import Application
+from app.models.customer import Customer
 from app.repositories.base_repository import BaseRepository
 
 
@@ -18,6 +19,13 @@ class ApplicationRepository(BaseRepository[Application]):
         "status": Application.status,
     }
     default_sort = "received_on"
+
+    def _base_query(self, include_deleted: bool = False) -> Select:
+        """An application belongs to its customer: once the customer is deleted it is gone from every list."""
+        stmt = super()._base_query(include_deleted)
+        if include_deleted:
+            return stmt
+        return stmt.where(Application.customer_id.in_(select(Customer.id).where(Customer.is_deleted.is_(False))))
 
     def next_number(self, *, year: int) -> str:
         """``APP-2026-0001`` — its own series, separate from the payment receipts."""
