@@ -29,6 +29,12 @@ def update_application(application_id: int, payload, service: ApplicationService
     return success(service.serialise(application).model_dump(mode="json"), "Application updated")
 
 
+def cancel_application(application_id: int, reason: str, service: ApplicationServiceDep) -> dict:
+    application = service.cancel_application(application_id, reason)
+    return success(service.serialise(application).model_dump(mode="json"),
+                   f"Application {application.receipt_number} cancelled")
+
+
 def create_application(payload: ApplicationCreate, service: ApplicationServiceDep) -> dict:
     application = service.record(payload)
     return success(service.serialise(application).model_dump(mode="json"),

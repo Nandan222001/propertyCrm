@@ -108,6 +108,21 @@ class ApplicationService(BaseService[Application]):
                     summary=f"Application {application.receipt_number} corrected")
         return application
 
+    def cancel_application(self, application_id: int, reason: str) -> Application:
+        """Void an application entered by mistake (or refunded): its fees no longer count as collection."""
+        if not self.actor.can(Permission.PAYMENT_APPROVE):
+            raise PermissionDeniedError("Only an approver can cancel an application")
+        application = self.applications.get_or_404(application_id)
+        if application.status == "CANCELLED":
+            raise BusinessRuleError("This application is already cancelled")
+        if application.status != "OPEN":
+            raise BusinessRuleError("A plot is allotted against this application — cancel or delete that booking first")
+        application.status = "CANCELLED"
+        self.db.flush()
+        self._audit(AuditAction.REJECT, application, before={"status": "OPEN"}, after={"status": "CANCELLED"},
+                    summary=f"Application {application.receipt_number} cancelled: {reason}")
+        return application
+
     def allot(self, application_id: int, booking) -> Application:
         """The customer has been allotted a plot: close the application against that booking."""
         application = self.applications.get_or_404(application_id)

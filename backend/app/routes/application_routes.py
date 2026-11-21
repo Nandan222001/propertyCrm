@@ -10,6 +10,7 @@ from app.controllers import application_controller as controller
 from app.core.constants import Permission
 from app.core.dependencies import PaginationDep, require
 from app.schemas.application import ApplicationCreate, ApplicationUpdate
+from app.schemas.finance import PaymentCancel
 
 router = APIRouter(tags=["Applications"])
 
@@ -31,3 +32,9 @@ def create_application(payload: ApplicationCreate, service: controller.Applicati
 def update_application(application_id: int, payload: ApplicationUpdate, service: controller.ApplicationServiceDep,
                        _: Annotated[None, Depends(require(Permission.PAYMENT_APPROVE))] = None):
     return controller.update_application(application_id, payload, service)
+
+
+@router.post("/applications/{application_id}/cancel", summary="Cancel an application (its fees stop counting)")
+def cancel_application(application_id: int, payload: PaymentCancel, service: controller.ApplicationServiceDep,
+                       _: Annotated[None, Depends(require(Permission.PAYMENT_APPROVE))] = None):
+    return controller.cancel_application(application_id, payload.reason, service)

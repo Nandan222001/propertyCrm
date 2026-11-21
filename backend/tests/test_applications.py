@@ -62,3 +62,17 @@ def test_an_application_receipt_with_swapped_fees_can_be_corrected(client, agent
     # only an approver may correct it, and it cannot be zeroed
     assert client.patch(url, headers=agent_headers, json={"application_fee": "1"}).status_code == 403
     assert client.patch(url, headers=admin_headers, json={"application_fee": "0", "enrollment_fee": "0"}).status_code in (409, 422)
+
+
+def test_a_cancelled_application_stops_counting_as_collection(client, admin_headers, agent_approved_customer, available_plot):
+    from decimal import Decimal
+
+    def collected():
+        return Decimal(client.get("/api/v1/expenses/profit-summary", headers=admin_headers).json()["data"]["collected"])
+
+    base = collected()
+    made = apply(client, admin_headers, agent_approved_customer, available_plot).json()["data"]
+    assert collected() - base == Decimal("5000")
+    assert client.post(f"/api/v1/applications/{made['id']}/cancel", headers=admin_headers, json={"reason": "entered twice"}).status_code == 200
+    assert collected() == base
+    assert client.post(f"/api/v1/applications/{made['id']}/cancel", headers=admin_headers, json={"reason": "again"}).status_code in (409, 422)

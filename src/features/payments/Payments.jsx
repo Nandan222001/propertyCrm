@@ -45,7 +45,7 @@ export function Payments({ pays, receipts, project, search, filter, F, D, notify
     window.addEventListener('erp:applications-changed', load);
     return () => { live = false; window.removeEventListener('erp:applications-changed', load); };
   }, [customerView]);
-  const feeRows = applications.filter((a) => project === 'All projects' || a.project_name === project);
+  const feeRows = applications.filter((a) => a.status !== 'CANCELLED' && (project === 'All projects' || a.project_name === project));
   // The application fee is never counted on this page: only the enrollment fee adds to the collection.
   const enrollmentFees = feeRows.reduce((s, a) => s + Number(a.enrollment_fee || 0), 0);
 

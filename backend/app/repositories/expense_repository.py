@@ -47,7 +47,8 @@ class ExpenseRepository(BaseRepository[Expense]):
         fee is never counted."""
         from app.models.application import Application
 
-        stmt = select(func.coalesce(func.sum(Application.enrollment_fee), 0)).where(Application.is_deleted.is_(False))
+        stmt = select(func.coalesce(func.sum(Application.enrollment_fee), 0)).where(
+            Application.is_deleted.is_(False), Application.status != "CANCELLED")
         if date_from:
             stmt = stmt.where(Application.received_on >= date_from)
         if date_to:

@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Edit2, Eye, Plus, Printer, X } from 'lucide-react';
-import { api, hasSession } from '../../api';
+import { api, actions, hasSession } from '../../api';
 import { fmtINR, parseAmt } from '../../utils';
 import { Table } from '../../components/common/DataTable';
 import { Badge } from '../../components/common/Badge';
@@ -99,6 +99,48 @@ export function ApplicationModal({ customers, projects, defaultProject, close, s
           </div>
         </form>
       </div>
+    </div>
+  );
+}
+
+/** Void an application: the fees received with it no longer count in the collections. */
+function CancelApplicationModal({ application: a, close, saved, notify }) {
+  const [reason, setReason] = useState('');
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
+  const submit = async (e) => {
+    e.preventDefault();
+    if (reason.trim().length < 3) return setError('Say why the application is being cancelled.');
+    setBusy(true);
+    try {
+      await actions.cancelApplication(a.id, reason.trim());
+      notify(`Application ${a.receipt_number} cancelled`);
+      saved();
+    } catch (err) {
+      setError(err.message || 'Could not cancel the application.');
+      setBusy(false);
+    }
+  };
+  return (
+    <div className="modal-backdrop" onMouseDown={(e) => e.target === e.currentTarget && close()}>
+      <form className="modal view-modal" onSubmit={submit} noValidate>
+        <div className="modal-head">
+          <div>
+            <span className="modal-kicker">CANCEL APPLICATION</span>
+            <h2>{a.receipt_number} · ₹{fmtINR(Number(a.total))}</h2>
+            <p>{a.customer_name} · {a.project_name}. The enrollment fee stops counting in the collections.</p>
+          </div>
+          <button type="button" className="modal-close" onClick={close} aria-label="Close"><X size={16} /></button>
+        </div>
+        <div className="form-grid">
+          <label>Reason<input value={reason} onChange={(e) => setReason(e.target.value)} maxLength={255} autoFocus /></label>
+        </div>
+        {error && <p className="form-error" role="alert">{error}</p>}
+        <div className="modal-actions">
+          <button type="button" className="button button-white" onClick={close}>Keep application</button>
+          <button type="submit" className="button button-primary" disabled={busy}>{busy ? 'Saving…' : 'Cancel application'}</button>
+        </div>
+      </form>
     </div>
   );
 }
@@ -224,6 +266,7 @@ export function ApplicationsPanel({ project, search, canCreate, canEdit, onNewAp
   const live = hasSession();
   const [viewed, setViewed] = useState(null);
   const [editing, setEditing] = useState(null);
+  const [cancelling, setCancelling] = useState(null);
   const [rows, setRows] = useState(null);
 
   const load = useCallback(async () => {
@@ -256,11 +299,14 @@ export function ApplicationsPanel({ project, search, canCreate, canEdit, onNewAp
           rows={shown.map((a) => [
             <b>{a.receipt_number}</b>, dayLabel(a.received_on), a.customer_name || '—', a.project_name || '—',
             `₹${fmtINR(Number(a.application_fee))}`, `₹${fmtINR(Number(a.enrollment_fee))}`, <b>₹{fmtINR(Number(a.total))}</b>,
-            <div key={`s-${a.id}`}><Badge>{a.status === 'OPEN' ? 'Awaiting allotment' : 'Booked'}</Badge>{a.booking_number && <small className="stage-note">{a.booking_number}</small>}</div>,
+            <div key={`s-${a.id}`}><Badge>{a.status === 'OPEN' ? 'Awaiting allotment' : a.status === 'CANCELLED' ? 'Cancelled' : 'Booked'}</Badge>{a.booking_number && <small className="stage-note">{a.booking_number}</small>}</div>,
             <div className="row-actions" key={a.id}>
               <button className="icon-action" onClick={() => setViewed(a)} title="View application, booking and receipts"><Eye size={14} /></button>
               <button className="icon-action" onClick={() => onPrint(a)} title="View / print receipt"><Printer size={14} /></button>
-              {canEdit && (
+              {canEdit && a.status === 'OPEN' && (
+                <button className="icon-action" onClick={() => setCancelling(a)} title="Cancel this application — its fees stop counting"><X size={14} /></button>
+              )}
+              {canEdit && a.status !== 'CANCELLED' && (
                 <button className="icon-action" onClick={() => setEditing(a)} title="Edit this application receipt (correct a mistake)"><Edit2 size={14} /></button>
               )}
               {canCreate && a.status === 'OPEN' && (
@@ -268,6 +314,12 @@ export function ApplicationsPanel({ project, search, canCreate, canEdit, onNewAp
               )}
             </div>,
           ])}
+        />
+      )}
+      {cancelling && (
+        <CancelApplicationModal
+          application={cancelling} close={() => setCancelling(null)} notify={notify}
+          saved={() => { setCancelling(null); load(); window.dispatchEvent(new Event('erp:applications-changed')); }}
         />
       )}
       {editing && <EditApplicationModal application={editing} close={() => setEditing(null)} notify={notify} saved={() => { setEditing(null); load(); window.dispatchEvent(new Event('erp:applications-changed')); }} />}
