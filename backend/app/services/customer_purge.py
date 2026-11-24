@@ -1,9 +1,9 @@
-"""Erase everything a customer owns — bookings, payments, receipts, applications, invoices, commissions earned on
-their payments and the schedules behind them — and free the plots they held.
+"""Erase everything a customer owns — bookings, payments, receipts, applications, invoices, documents, commissions
+earned on their payments and the schedules behind them — and free the plots they held.
 
-Their documents are the one thing that stays (the vault keeps the customer's files). The walk follows the foreign
-keys from the customer, so a table added later is covered without touching this module; ``SET NULL`` links (audit
-trail, notifications, agent links) are left for the database to null, and the audit log itself is never deleted.
+The walk follows the foreign keys from the customer, so a table added later is covered without touching this
+module; ``SET NULL`` links (audit trail, notifications, agent links) are left for the database to null, and the audit
+log itself is never deleted.
 """
 
 from __future__ import annotations
@@ -15,7 +15,7 @@ from app.core.constants import PlotStatus
 from app.db.base import Base
 
 #: Tables that are never erased with the customer.
-KEEP = {"documents", "audit_logs"}
+KEEP = {"audit_logs"}
 
 
 def _owned_rows(db: Session, customer_id: int) -> dict[str, set]:

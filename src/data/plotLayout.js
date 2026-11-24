@@ -1,5 +1,5 @@
 /**
- * Plot layout of THE INDEX (Bhojpur, Bihar) — the 3D map's own coordinate space (1 unit ≈ 1 ft).
+ * Plot layout of the Real Life City Plot Layout — the 3D map's own coordinate space (1 unit ≈ 1 ft).
  *
  * `plots` are traced from the index drawing: `no` is the plot number printed on the layout, `x`/`z` the plot's
  * centre and `w`/`d` its width and depth in feet. `outline` is the colony boundary. The map in

@@ -1774,3 +1774,11 @@
 .login-forgot{display:block;margin:12px auto 0}
 .login-view-plots{width:100%;height:42px;margin-top:10px;display:flex;align-items:center;justify-content:center;gap:8px;text-decoration:none}
 .login-dev-hint{font-size:11px;color:#8892a4;text-align:center;margin-top:8px}
+
+/* Sign-in "Real Life City Plot Layout" button: emerald (land / plots), so it reads apart from the Sign In action */
+.login-view-plots.button{background:linear-gradient(135deg,#1e9e6a,#14b8a6);border-color:transparent;color:#fff;font-weight:700;box-shadow:0 6px 16px #14a87a40;transition:transform .15s,box-shadow .15s,filter .15s}
+.login-view-plots.button:hover{background:linear-gradient(135deg,#198a5b,#0f9f90);transform:translateY(-1px);box-shadow:0 9px 20px #14a87a55}
+.login-view-plots.button:active{transform:none;filter:brightness(.96)}
+.login-view-plots.button svg{color:#fff}
+.login-view-plots.button{height:50px;font-size:16px;letter-spacing:.2px;border-radius:10px}
+.login-view-plots.button svg{width:20px;height:20px}

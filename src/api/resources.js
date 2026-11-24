@@ -77,6 +77,9 @@ export const actions = {
 /** The expenses API edits with PUT (full record), not PATCH. */
 api.expenses.update = (id, body) => authedRequest(ENDPOINTS.expenses.item(id), { method: 'PUT', body });
 
+/** Audited status change; used to put a plot on (or release it from) company hold. */
+api.plots.setStatus = (id, status, reason) => authedRequest(`${ENDPOINTS.plots.list}/${id}/status`, { method: 'POST', body: { status, reason } });
+
 api.plots.createBulk = (body) => authedRequest(`${ENDPOINTS.plots.list}/bulk`, { method: 'POST', body });
 
 api.agents.provisionLogin = (id) => authedRequest(`${ENDPOINTS.agents.item(id)}/login`, { method: 'POST', body: {} });

@@ -35,6 +35,11 @@ export const adaptCustomer = (c) => ({
   mobile: c.phone || '',
   email: c.email || '',
   address: c.address || [c.city, c.pincode].filter(Boolean).join(' '),
+  addressLine: c.address || '',       // the street address alone (the form's "address for communication")
+  city: c.city || '',
+  pincode: c.pincode || '',
+  profile: c.profile || null,         // application-form details; null when hidden for the viewer's role
+  masked: c.masked !== false,
   agent: c.agent_name || '',
   status: CUSTOMER_STATUS[c.status] || c.status,
   project: c.project_name || '',

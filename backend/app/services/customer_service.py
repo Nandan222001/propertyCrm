@@ -16,7 +16,7 @@ from app.core.validators import mask_address, mask_email, mask_name, mask_phone
 from app.db.base import utcnow
 from app.models.booking import Booking
 from app.models.customer import Customer, CustomerConsent
-from app.models.property import Document, Project
+from app.models.property import Project
 from app.models.user import User
 from app.repositories.customer_repository import (
     CustomerConsentRepository,
@@ -35,6 +35,14 @@ from app.schemas.customer import (
 from app.services.base_service import BaseService
 from app.services.customer_purge import purge_customer_data
 from app.services.notification_service import agent_user_id, emit
+
+
+def _compact(value):
+    """Drop blank entries (and blank nested blocks) so the stored profile holds only what was filled in."""
+    if isinstance(value, dict):
+        cleaned = {k: _compact(v) for k, v in value.items()}
+        return {k: v for k, v in cleaned.items() if v not in (None, "", {}, [])} or None
+    return value
 
 
 class CustomerService(BaseService[Customer]):
@@ -126,6 +134,7 @@ class CustomerService(BaseService[Customer]):
             consent_given=customer.consent_given,
             marketing_opt_in=customer.marketing_opt_in,
             anonymised_at=customer.anonymised_at,
+            profile=None if should_mask else pii.get("profile"),
             masked=should_mask,
             booking_count=len(bookings),
             outstanding=outstanding,
@@ -152,6 +161,7 @@ class CustomerService(BaseService[Customer]):
             raise BusinessRuleError("Unknown project")
 
         values = payload.model_dump(exclude={"agent_code"})
+        values["profile"] = _compact(values.get("profile"))
         values["agent_id"] = agent_id
         # Agents must never be able to self-approve their own data entry; an approver's own entry is approved at once.
         by_approver = self.actor.can(Permission.CUSTOMER_APPROVE)
@@ -226,7 +236,7 @@ class CustomerService(BaseService[Customer]):
     def delete_customer(self, customer_id: int) -> Customer:
         """Remove a customer and everything they own: bookings, payments, receipts, applications, invoices …
 
-        Their documents stay. Agents may only remove their own, not-yet-approved entries."""
+        Their documents and receipts go with them. Agents may only remove their own, not-yet-approved entries."""
         self._authorise("delete")
         customer = self.get(customer_id, scope_clause=self.scope_clause())
         if not self.actor.can(Permission.CUSTOMER_APPROVE) and customer.status == ApprovalStatus.APPROVED.value:
@@ -242,14 +252,7 @@ class CustomerService(BaseService[Customer]):
         self._drop_portal_login(customer, hard=True)
         removed = purge_customer_data(self.db, customer.id)
         self.db.expire(customer)  # forget any relationship collections that pointed at the purged rows
-        kept_documents = self.db.execute(
-            select(func.count(Document.id)).where(Document.customer_id == customer.id)
-        ).scalar_one()
-        if kept_documents:
-            # The documents keep their owner, so the (now empty) customer file stays hidden behind them.
-            self.customers.delete(customer, actor=self.actor.name)
-        else:
-            self.customers.delete(customer, hard=True)
+        self.customers.delete(customer, hard=True)
         self._removed = removed
         return customer
 
@@ -259,6 +262,8 @@ class CustomerService(BaseService[Customer]):
         if customer.anonymised_at is not None:
             raise BusinessRuleError("This record was erased and can no longer be edited")
         values = payload.model_dump(exclude_unset=True, exclude_none=True)
+        if "profile" in values:
+            values["profile"] = _compact(values["profile"])
 
         if "email" in values:
             existing = self.customers.find_by_email(values["email"])

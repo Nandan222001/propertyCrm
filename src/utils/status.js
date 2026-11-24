@@ -14,7 +14,11 @@ export const PLOT_STATUS = {
   HOLD: 'HOLD',
   BOOKED: 'BOOKED',
   SOLD: 'SOLD',
+  COMPANY_HOLD: 'COMPANY_HOLD',   // kept back by the company: not for sale, cannot be booked
 };
+
+/** Plot status as shown to people ("COMPANY_HOLD" -> "Company Hold"). */
+export const plotStatusLabel = (status) => (status === PLOT_STATUS.COMPANY_HOLD ? 'Company Hold' : status);
 
 export const CUSTOMER_STATUS = {
   PENDING: 'Pending Approval',

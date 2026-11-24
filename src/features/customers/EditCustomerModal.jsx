@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { ModalShell } from '../../components/common/ModalShell';
+import { CustomerProfileFields, detailsFromCustomer, detailsToApi, validateDetails } from './CustomerProfileFields';
 import { isValidMobile, normaliseMobile, MOBILE_HINT, limitMobile, MOBILE_INPUT } from '../../utils/phone';
 
 const hidden = (value) => String(value || '').includes('*');
@@ -13,6 +14,9 @@ export function EditCustomerModal({ customer, close, save }) {
   const [form, setForm] = useState({
     name: start(customer.name), phone: start(customer.mobile), email: start(customer.email), address: start(customer.address),
   });
+  const [details, setDetails] = useState(() => detailsFromCustomer(customer));
+  const [initialDetails] = useState(() => JSON.stringify(detailsToApi(detailsFromCustomer(customer))));
+  const full = customer.masked === false;   // the application-form details are only shown to roles that may reveal PII
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const set = (key, fn = (v) => v) => (e) => setForm({ ...form, [key]: fn(e.target.value) });
@@ -28,7 +32,17 @@ export function EditCustomerModal({ customer, close, save }) {
       if (!form.email.includes('@')) return setError('Enter a valid e-mail address.');
       changes.email = form.email.trim();
     }
-    if (form.address.trim() && form.address.trim() !== start(customer.address)) changes.address = form.address.trim();
+    if (full) {
+      const problem = validateDetails(details);
+      if (problem) return setError(problem);
+      const api = detailsToApi(details);
+      if (JSON.stringify(api) !== initialDetails) {
+        changes.address = api.address;
+        if (api.city) changes.city = api.city;
+        if (api.pincode) changes.pincode = api.pincode;
+        changes.profile = api.profile;
+      }
+    } else if (form.address.trim() && form.address.trim() !== start(customer.address)) changes.address = form.address.trim();
     if (!Object.keys(changes).length) return close();
     setBusy(true);
     const problem = await save(customer, changes);
@@ -37,14 +51,15 @@ export function EditCustomerModal({ customer, close, save }) {
   };
 
   return (
-    <ModalShell title="Edit customer" subtitle="Leave a hidden field empty to keep its current value." onClose={close}>
+    <ModalShell title="Edit customer" subtitle="Leave a hidden field empty to keep its current value." onClose={close} wide={full}>
       <form onSubmit={submit} noValidate>
         <div className="form-grid">
           <label>Full name<input value={form.name} onChange={set('name')} placeholder={hidden(customer.name) ? 'Hidden — type to change' : ''} autoFocus /></label>
           <label>Mobile<input value={form.phone} onChange={set('phone', limitMobile)} {...MOBILE_INPUT} placeholder={hidden(customer.mobile) ? 'Hidden — type to change' : ''} /></label>
           <label>E-mail<input value={form.email} onChange={set('email')} placeholder={hidden(customer.email) ? 'Hidden — type to change' : ''} /></label>
-          <label>Address<input value={form.address} onChange={set('address')} placeholder={hidden(customer.address) ? 'Hidden — type to change' : ''} /></label>
+          {!full && <label>Address<input value={form.address} onChange={set('address')} placeholder={hidden(customer.address) ? 'Hidden — type to change' : ''} /></label>}
         </div>
+        {full && <CustomerProfileFields value={details} onChange={setDetails} />}
         {error && <p className="form-error">{error}</p>}
         <div className="modal-actions">
           <button type="button" className="button button-white" onClick={close}>Cancel</button>

@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { CustomerProfileFields, emptyDetails, detailsToApi, validateDetails } from '../customers/CustomerProfileFields';
 import { X, ChevronRight } from 'lucide-react';
 import { api, actions, hasSession } from '../../api';
 import { PlanBreakdown } from '../projects/PlanBreakdown';
@@ -318,6 +319,7 @@ export function PaymentModal({ bookings, pays, close, save }) {
 // --------------------------------------------------------------- customer
 export function CustomerModal({ agentName, byAdmin = false, customers, projects = [], defaultProject = '', close, save }) {
   const [error, setError] = useState('');
+  const [details, setDetails] = useState(emptyDetails);
   const [agents, setAgents] = useState([]);                 // the admin may tag the customer to an agent
   useEffect(() => {
     if (!byAdmin || !hasSession()) return;
@@ -330,10 +332,12 @@ export function CustomerModal({ agentName, byAdmin = false, customers, projects 
     const mobile = normaliseMobile(d.mobile);
     if (customers.some(c => c.mobile === mobile)) return setError('A customer with this mobile number already exists.');
     if (projects.length && !d.project) return setError('Choose the project this customer is for.');
-    save({ name: d.name.trim(), mobile, email: d.email.trim(), address: d.address.trim(), agent: byAdmin ? '' : agentName, agentCode: byAdmin ? (d.agent || '') : '', project: d.project || '' });
+    const problem = validateDetails(details);
+    if (problem) return setError(problem);
+    save({ name: d.name.trim(), mobile, email: d.email.trim(), ...detailsToApi(details), agent: byAdmin ? '' : agentName, agentCode: byAdmin ? (d.agent || '') : '', project: d.project || '' });
   }
   return (
-    <Shell kicker="ERP · CUSTOMERS" title="Add New Customer" sub={byAdmin ? 'Added by the admin: the customer is approved straight away.' : 'Sales agents add customers. The admin approves every new customer.'} close={close}>
+    <Shell kicker="ERP · CUSTOMERS" title="Add New Customer" sub={byAdmin ? 'Added by the admin: the customer is approved straight away.' : 'Sales agents add customers. The admin approves every new customer.'} close={close} wide>
       <form onSubmit={submit}>
         <div className="form-grid">
           <Field label="Full name"><input name="name" required placeholder="Full name" /></Field>
@@ -355,8 +359,8 @@ export function CustomerModal({ agentName, byAdmin = false, customers, projects 
               </select>
             </Field>
           )}
-          <Field label="Address" wide><input name="address" placeholder="Area, City" /></Field>
         </div>
+        <CustomerProfileFields value={details} onChange={setDetails} />
         {error && <p className="form-error">{error}</p>}
         <div className="modal-actions">
           <button type="button" className="button button-white" onClick={close}>Cancel</button>

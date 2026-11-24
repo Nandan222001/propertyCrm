@@ -29,6 +29,7 @@ const STATUS_ORDER = [
   ['BOOKED', 'Booked', '#25a879'],
   ['SOLD', 'Sold', '#f59e0b'],
   ['HOLD', 'On hold', '#94a3b8'],
+  ['COMPANY_HOLD', 'Company hold', '#8b5cf6'],
 ];
 
 export function inventoryStats(plots = []) {

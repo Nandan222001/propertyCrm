@@ -41,7 +41,7 @@ def test_agent_cannot_touch_another_agents_customer(client, agent_headers, admin
     assert client.delete(f"/api/v1/customers/{other['id']}", headers=agent_headers).status_code == 403
 
 
-def test_deleting_a_customer_erases_their_deals_and_money_but_keeps_their_documents(
+def test_deleting_a_customer_erases_their_deals_money_receipts_and_documents(
         client, admin_headers, agent_approved_customer, available_plot):
     customer_id = agent_approved_customer["id"]
     booking = client.post("/api/v1/bookings", headers=admin_headers,
@@ -67,7 +67,26 @@ def test_deleting_a_customer_erases_their_deals_and_money_but_keeps_their_docume
     plots = client.get("/api/v1/plots", headers=admin_headers, params={"page_size": 200}).json()["data"]
     assert next(p for p in plots if p["id"] == available_plot["id"])["status"] == "AVAILABLE"
     documents = client.get("/api/v1/documents", headers=admin_headers, params={"page_size": 200}).json()["data"]
-    assert doc.json()["data"]["id"] in {d["id"] for d in documents}      # the customer's documents stay
+    assert doc.json()["data"]["id"] not in {d["id"] for d in documents}      # their documents go with them
+
+
+def test_deleting_a_booking_with_its_payments_removes_its_receipts(client, admin_headers, agent_approved_customer,
+                                                                   available_plot):
+    booking = client.post("/api/v1/bookings", headers=admin_headers,
+                          json={"customer_id": agent_approved_customer["id"], "plot_id": available_plot["id"],
+                                "final_price": available_plot["price"], "token_amount": "50000", "payment_mode": "upi"})
+    assert booking.status_code == 201, booking.text
+    booking_id = booking.json()["data"]["id"]
+
+    def receipts():
+        rows = client.get("/api/v1/receipts", headers=admin_headers, params={"page_size": 200}).json()["data"]
+        return [r for r in rows if r["booking_id"] == booking_id]
+
+    assert receipts()
+    gone = client.post(f"/api/v1/bookings/{booking_id}/delete", headers=admin_headers,
+                       json={"password": "Demo@12345", "delete_payments": True})
+    assert gone.status_code == 200, gone.text
+    assert receipts() == []
 
 
 def test_agent_removes_own_pending_booking_and_plot_is_released(client, agent_headers, admin_headers,

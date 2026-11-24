@@ -199,6 +199,8 @@ class PlotStatus(StrEnum):
     HOLD = "HOLD"
     BOOKED = "BOOKED"
     SOLD = "SOLD"
+    #: Kept back by the company (admin): not for sale and cannot be booked until the admin releases it.
+    COMPANY_HOLD = "COMPANY_HOLD"
 
 
 class BookingStatus(StrEnum):
@@ -295,4 +297,4 @@ INVOICE_GST_RATES = (Decimal("0"), Decimal("0.05"), Decimal("0.12"), Decimal("0.
 
 
 #: Interactive plot maps a super admin can link to a tenant (key -> label). The artwork lives in the SPA.
-PLOT_MAPS: dict[str, str] = {"the-index": "THE INDEX — Bhojpur, Bihar"}
+PLOT_MAPS: dict[str, str] = {"the-index": "Real Life City Plot Layout"}

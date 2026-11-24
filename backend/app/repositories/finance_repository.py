@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import date
 from decimal import Decimal
 
-from sqlalchemy import and_, func, select
+from sqlalchemy import Select, and_, func, select
 
 from app.core.constants import PaymentStatus
 from app.models.payment import Agent, Commission, Payment, Receipt
@@ -213,6 +213,13 @@ class ReceiptRepository(BaseRepository[Receipt]):
         "receipt_number": Receipt.receipt_number,
     }
     default_sort = "issued_on"
+
+    def _base_query(self, include_deleted: bool = False) -> Select:
+        """A receipt belongs to its booking: once the booking is deleted its receipts are gone too."""
+        from app.models.booking import Booking
+
+        return super()._base_query(include_deleted).where(
+            Receipt.booking_id.in_(select(Booking.id).where(Booking.is_deleted.is_(False))))
 
     def next_number(self, *, year: int) -> str:
         from app.services.org_settings import get_value

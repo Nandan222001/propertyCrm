@@ -228,17 +228,28 @@ class PlotService(BaseService[Plot]):
             values["status"] = (
                 values["status"].value if isinstance(values["status"], PlotStatus) else str(values["status"])
             )
+        if values.get("status") == PlotStatus.COMPANY_HOLD.value:
+            self._guard_company_hold(plot)
         before = {"status": plot.status, "price": str(plot.price)}
         self.plots.update(plot, values)
         self._audit(AuditAction.UPDATE, plot, before=before,
                     after={"status": plot.status, "price": str(plot.price)}, summary="Plot updated")
         return plot
 
+    @staticmethod
+    def _guard_company_hold(plot: Plot) -> None:
+        """Only a free plot can be kept back: a held, booked or sold plot already belongs to a booking."""
+        if plot.status not in (PlotStatus.AVAILABLE.value, PlotStatus.COMPANY_HOLD.value):
+            raise BusinessRuleError(
+                f"Plot {plot.plot_number} is {plot.status.lower()} — only an available plot can be put on company hold")
+
     def set_status(self, plot_id: int, payload: PlotStatusUpdate) -> Plot:
         """Manual status override (admin correction) — full audit entry."""
         self._authorise("update")
         plot = self.plots.get_or_404(plot_id)
         before = plot.status
+        if payload.status == PlotStatus.COMPANY_HOLD.value:
+            self._guard_company_hold(plot)
         if payload.status == PlotStatus.AVAILABLE.value:
             self.plots.release(plot)
         else:

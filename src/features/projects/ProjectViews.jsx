@@ -2,6 +2,7 @@ import React from 'react';
 import { X } from 'lucide-react';
 import { projectFormValues } from '../../utils/projects';
 import { Badge } from '../../components/common/Badge';
+import { plotStatusLabel } from '../../utils/status';
 
 function Shell({ kicker, title, sub, close, children, footer }) {
   return (
@@ -48,7 +49,7 @@ export function PlotViewModal({ plot, close, onBook }) {
     >
       <Facts rows={[
         ['Project', project], ['Layout', layout], ['Area', area ? `${area} sq.ft` : ''], ['Facing', facing],
-        ['Price', price ? `₹${price}` : ''], ['Status', <Badge key="s">{status}</Badge>],
+        ['Price', price ? `₹${price}` : ''], ["Status", <Badge key="s" tone={status === "COMPANY_HOLD" ? "purple" : undefined}>{plotStatusLabel(status)}</Badge>],
         ['Customer', customer && customer !== '—' ? customer : ''], ['Sales agent', agent && agent !== '—' ? agent : ''],
       ]}
       />
@@ -77,8 +78,8 @@ export function ProjectViewModal({ project, plots, close, onEdit }) {
       ]}
       />
       <div className="view-plot-counts">
-        {['AVAILABLE', 'BOOKED', 'HOLD', 'SOLD'].map((s) => (
-          <span key={s}><b>{count(s)}</b><small>{s}</small></span>
+        {['AVAILABLE', 'BOOKED', 'HOLD', 'COMPANY_HOLD', 'SOLD'].map((s) => (
+          <span key={s}><b>{count(s)}</b><small>{plotStatusLabel(s)}</small></span>
         ))}
       </div>
     </Shell>

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+
 from sqlalchemy import or_, select
 
 from app.core.constants import ApprovalStatus
@@ -39,6 +41,9 @@ class CustomerRepository(BaseRepository[Customer]):
             phone = "".join(ch for ch in str(data["phone"]) if ch.isdigit())
             data["phone_index"] = blind_index(phone) if phone else None
             data["phone"] = encrypt(phone) if phone else None
+        if "profile" in data:
+            profile = data["profile"]
+            data["profile"] = encrypt(json.dumps(profile, ensure_ascii=False)) if profile else None
         for column in ("address", "kyc_reference", "pan_number"):
             if column in data and data[column] is not None:
                 data[column] = encrypt(str(data[column]))
@@ -52,7 +57,17 @@ class CustomerRepository(BaseRepository[Customer]):
             "address": decrypt(customer.address),
             "kyc_reference": decrypt(customer.kyc_reference),
             "pan_number": decrypt(customer.pan_number),
+            "profile": self._profile(customer),
         }
+
+    @staticmethod
+    def _profile(customer: Customer) -> dict | None:
+        raw = decrypt(customer.profile)
+        try:
+            data = json.loads(raw) if raw else None
+        except ValueError:
+            return None
+        return data if isinstance(data, dict) else None
 
     def find_by_email(self, email: str) -> Customer | None:
         return self.get_by(email_index=blind_index((email or "").strip().lower()))
@@ -81,6 +96,7 @@ class CustomerRepository(BaseRepository[Customer]):
         customer.address = None
         customer.kyc_reference = None
         customer.pan_number = None
+        customer.profile = None
         customer.email_index = None
         customer.phone_index = None
         if not keep_city:

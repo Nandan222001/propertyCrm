@@ -5,7 +5,7 @@ import { PlotMap3D } from './PlotMap3D';
 const REFRESH_MS = 60000;
 
 /**
- * Public, view-only 3D plot map at /plot-map/<organisation>. No sign-in; the API sends only plot numbers,
+ * Public, view-only plot map at /plot-map/<organisation>. No sign-in; the API sends only plot numbers,
  * their project and whether the plot is free — never prices, customers or agents.
  */
 export function PublicPlotMap({ slug }) {

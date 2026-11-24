@@ -1,11 +1,11 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
-import { PLOT_LAYOUT, PLOT_MAP_OUTLINE } from '../../data/plotLayout';
+import { PLOT_LAYOUT } from '../../data/plotLayout';
 import { plotMapKey } from '../../utils/plotNumber';
 
 /**
- * Interactive 3D plot map of the colony layout.
+ * Interactive flat (2D, top-down) plot map of the colony layout.
  *
  * Every plot of the drawing is coloured from the tenant's live plot inventory: green while it is available,
  * amber while it is on hold, red once it is booked or sold. Plots are matched on the digits of their number
@@ -20,6 +20,7 @@ const STATUS = {
   HOLD: { label: 'On hold', hex: 0xf5a623, css: '#f5a623' },
   BOOKED: { label: 'Booked', hex: 0xd62828, css: '#d62828' },
   SOLD: { label: 'Sold', hex: 0x8e1b1b, css: '#8e1b1b' },
+  COMPANY_HOLD: { label: 'Company hold', hex: 0x7c3aed, css: '#7c3aed' },
 };
 const UNLISTED = { label: 'Not in the ERP', hex: 0xc3ccd6, css: '#c3ccd6' };
 
@@ -87,9 +88,11 @@ export function PlotMap3D({ plots = [], project = 'All projects' }) {
 
       const scene = new THREE.Scene();
       scene.background = new THREE.Color(0xeef1f5);
-      const camera = new THREE.PerspectiveCamera(45, 1, 5, 6000);
       const centre = new THREE.Vector3(520, 0, 420);
-      camera.position.set(centre.x + 380, 760, centre.z + 760);
+      const HALF_H = 470;   // world units visible above/below the centre at zoom 1
+      const camera = new THREE.OrthographicCamera(-HALF_H, HALF_H, HALF_H, -HALF_H, 1, 4000);
+      camera.up.set(0, 0, -1);   // flat plan view: screen-up is -z, as on the drawing
+      camera.position.set(centre.x, 1500, centre.z);
       camera.lookAt(centre);
 
       const controls = new OrbitControls(camera, renderer.domElement);
@@ -97,9 +100,12 @@ export function PlotMap3D({ plots = [], project = 'All projects' }) {
         controls.target.copy(centre);
         controls.enableDamping = true;
         controls.dampingFactor = 0.08;
-        controls.maxPolarAngle = Math.PI / 2.05;
-        controls.minDistance = 120;
-        controls.maxDistance = 2200;
+        controls.enableRotate = false;   // 2D: drag pans, scroll / pinch zooms
+        controls.screenSpacePanning = true;
+        controls.mouseButtons = { LEFT: THREE.MOUSE.PAN, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.PAN };
+        controls.touches = { ONE: THREE.TOUCH.PAN, TWO: THREE.TOUCH.DOLLY_PAN };
+        controls.minZoom = 0.6;
+        controls.maxZoom = 10;
         controls.update();
       }
 
@@ -107,16 +113,6 @@ export function PlotMap3D({ plots = [], project = 'All projects' }) {
       const sun = new THREE.DirectionalLight(0xffffff, 0.55);
       sun.position.set(400, 900, 300);
       scene.add(sun);
-
-      // Colony boundary: the drawing's outline laid flat (the z axis is flipped, as on the plan).
-      const ground = new THREE.Shape(PLOT_MAP_OUTLINE.map(([x, z]) => new THREE.Vector2(x, -z)));
-      const lawn = new THREE.Mesh(
-        new THREE.ShapeGeometry(ground),
-        new THREE.MeshLambertMaterial({ color: 0x5c9e57, side: THREE.DoubleSide }),
-      );
-      lawn.rotation.x = -Math.PI / 2;
-      lawn.position.y = -0.4;
-      scene.add(lawn);
 
       const slab = (x, y, z, w, h, d, color, opacity = 1) => {
         const mesh = new THREE.Mesh(
@@ -129,7 +125,7 @@ export function PlotMap3D({ plots = [], project = 'All projects' }) {
 
       const plots3d = [];
       PLOT_LAYOUT.forEach((plot) => {
-        const mesh = slab(plot.x, 2, plot.z, plot.w - 1.4, 4, plot.d - 1.4, UNLISTED.hex);
+        const mesh = slab(plot.x, 0.5, plot.z, plot.w - 1.4, 1, plot.d - 1.4, UNLISTED.hex);
         mesh.userData = { ...plot, state: null };
         scene.add(mesh);
 
@@ -139,7 +135,7 @@ export function PlotMap3D({ plots = [], project = 'All projects' }) {
           new THREE.MeshBasicMaterial({ transparent: true }),
         );
         label.rotation.x = -Math.PI / 2;
-        label.position.set(plot.x, 4.2, plot.z);
+        label.position.set(plot.x, 1.2, plot.z);
         scene.add(label);
         plots3d.push({ mesh, label, tone: null });
       });
@@ -148,7 +144,8 @@ export function PlotMap3D({ plots = [], project = 'All projects' }) {
         const width = host.clientWidth || 800;
         const height = host.clientHeight || 520;
         renderer.setSize(width, height, false);
-        camera.aspect = width / height;
+        const half = HALF_H * (width / height);
+        camera.left = -half; camera.right = half; camera.top = HALF_H; camera.bottom = -HALF_H;
         camera.updateProjectionMatrix();
       };
       resize();
@@ -212,19 +209,19 @@ export function PlotMap3D({ plots = [], project = 'All projects' }) {
           const target = plots3d.find((row) => String(row.mesh.userData.no) === String(no))?.mesh.userData;
           if (!target) return;
           controls?.target.set(target.x, 0, target.z);
-          camera.position.set(target.x + 150, 300, target.z + 260);
+          camera.position.set(target.x, 1500, target.z);
+          camera.zoom = 4;
+          camera.updateProjectionMatrix();
           controls?.update();
           if (reduced) renderer.render(scene, camera);
         },
         reset: () => {
           controls?.target.copy(centre);
-          camera.position.set(centre.x + 380, 760, centre.z + 760);
+          camera.position.set(centre.x, 1500, centre.z);
+          camera.zoom = 1;
+          camera.updateProjectionMatrix();
           controls?.update();
-        },
-        top: () => {
-          camera.position.set(centre.x, 1250, centre.z + 1);
-          controls?.target.copy(centre);
-          controls?.update();
+          if (reduced) renderer.render(scene, camera);
         },
       };
       setReady(true);
@@ -243,14 +240,12 @@ export function PlotMap3D({ plots = [], project = 'All projects' }) {
           row.label.material.map?.dispose();
           row.label.material.dispose();
         });
-        lawn.geometry.dispose();
-        lawn.material.dispose();
         renderer.dispose();
         host.innerHTML = '';
         sceneRef.current = null;
       };
     } catch (problem) {
-      setError(problem.message || 'Could not draw the 3D map.');
+      setError(problem.message || 'Could not draw the plot map.');
     }
 
     return () => cleanup();
@@ -265,7 +260,7 @@ export function PlotMap3D({ plots = [], project = 'All projects' }) {
 
   /* ------------------------------------------------------------------------------------------------ toolbox */
   const counts = useMemo(() => {
-    const totals = { AVAILABLE: 0, HOLD: 0, BOOKED: 0, SOLD: 0, unlisted: 0 };
+    const totals = { AVAILABLE: 0, HOLD: 0, BOOKED: 0, SOLD: 0, COMPANY_HOLD: 0, unlisted: 0 };
     legend.forEach((row) => { if (row.state) totals[row.state] += 1; else totals.unlisted += 1; });
     return totals;
   }, [legend]);
@@ -290,7 +285,6 @@ export function PlotMap3D({ plots = [], project = 'All projects' }) {
           onChange={(e) => setQuery(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && find(query)}
         />
         <button className="button button-white small-btn" onClick={() => find(query)}>Find</button>
-        <button className="button button-white small-btn" onClick={() => sceneRef.current?.top()}>Top view</button>
         <button className="button button-white small-btn" onClick={() => { sceneRef.current?.reset(); setPicked(null); }}>Reset</button>
         {projects.length > 1 && (
           <select value={active} onChange={(e) => { setChosen(e.target.value); setPicked(null); }} aria-label="Project">
@@ -321,8 +315,8 @@ export function PlotMap3D({ plots = [], project = 'All projects' }) {
       {error && <p className="empty-note" role="alert">{error}</p>}
 
       <div className="plotmap-scroll">
-        <div className="plotmap-3d" ref={mount} aria-label="3D plot map" />
-        {!ready && !error && <p className="empty-note">Loading the 3D map…</p>}
+        <div className="plotmap-3d" ref={mount} aria-label="Plot map" />
+        {!ready && !error && <p className="empty-note">Loading the plot map…</p>}
         {shown && (
           <div className="plotmap-panel">
             <div>
@@ -335,10 +329,10 @@ export function PlotMap3D({ plots = [], project = 'All projects' }) {
               <span style={{ display: 'inline-block', width: 10, height: 10, borderRadius: 2, background: shown.status.css, marginRight: 5 }} />
               {shown.status.label}
             </div>
-            <div className="sm">Drag to rotate · right-drag to pan · scroll to zoom</div>
+            <div className="sm">Drag to pan · scroll to zoom</div>
           </div>
         )}
-        <span className="plotmap-hint">Drag: rotate · Right-drag / Shift-drag: pan · Scroll / pinch: zoom · Click a plot</span>
+        <span className="plotmap-hint">Drag: pan · Scroll / pinch: zoom · Click a plot</span>
       </div>
     </div>
   );

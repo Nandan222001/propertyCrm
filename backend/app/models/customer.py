@@ -40,6 +40,8 @@ class Customer(Base, PkMixin, PublicIdMixin, TenantMixin, TimestampMixin, SoftDe
     phone: Mapped[str | None] = mapped_column(String(512))
     address: Mapped[str | None] = mapped_column(Text)
     kyc_reference: Mapped[str | None] = mapped_column(String(512))
+    #: Application-form details (date of birth, guardian, addresses, nominee…) as encrypted JSON.
+    profile: Mapped[str | None] = mapped_column(Text)
     # ---- blind indexes for lookup/uniqueness ---------------------------
     email_index: Mapped[str | None] = mapped_column(String(80), index=True)
     phone_index: Mapped[str | None] = mapped_column(String(80), index=True)

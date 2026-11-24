@@ -194,6 +194,11 @@ export const deleteProjectLive = (project) => writeThenRefresh(
   () => api.projects.remove(project[6]), `Project ${project[0]} deleted`);
 export const updatePlotLive = (plot, changes) => writeThenRefresh(
   () => api.plots.update(plot[9], changes), `Plot ${plot[0]} updated`);
+/** Admin keeps a free plot back (company hold) or releases it again; while held nobody can book it. */
+export const setPlotHoldLive = (plot, hold) => writeThenRefresh(
+  () => api.plots.setStatus(plot[9], hold ? PLOT_STATUS.COMPANY_HOLD : PLOT_STATUS.AVAILABLE,
+    hold ? 'Held by the company — not for sale' : 'Released from company hold'),
+  hold ? `Plot ${plot[0]} is on company hold — no one can book it` : `Plot ${plot[0]} released — it is available for booking again`);
 export const addPlotsLive = (body, count) => writeThenRefresh(
   () => api.plots.createBulk(body), `${count} plot${count === 1 ? '' : 's'} added — they are now available for booking`);
 export const deletePlotLive = (plot) => writeThenRefresh(
@@ -342,6 +347,9 @@ export const createCustomer = (form) => async (dispatch, getState) => {
       const projectId = getState().domain.projects.find((p) => p[0] === form.project)?.[6];
       const response = await api.customers.create({
         name: form.name, phone: form.mobile, email: form.email, address: form.address,
+        ...(form.city ? { city: form.city } : {}),
+        ...(form.pincode ? { pincode: form.pincode } : {}),
+        ...(form.profile ? { profile: form.profile } : {}),
         ...(agentCode ? { agent_code: agentCode } : {}),
         ...(projectId ? { project_id: projectId } : {}),
       });

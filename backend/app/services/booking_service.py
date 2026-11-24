@@ -370,12 +370,15 @@ class BookingService(BaseService[Booking]):
         from sqlalchemy import select
 
         from app.models.billing import Invoice
-        from app.models.payment import Commission, Payment
+        from app.models.payment import Commission, Payment, Receipt
 
         for model in (Payment, Invoice, Commission):
             for row in self.db.execute(select(model).where(
                     model.booking_id == booking.id, model.is_deleted.is_(False))).scalars().all():
                 row.soft_delete(self.actor.name)
+        # Receipts are the printed proof of those payments; they have no soft-delete, so they go with them.
+        for receipt in self.db.execute(select(Receipt).where(Receipt.booking_id == booking.id)).scalars().all():
+            self.db.delete(receipt)
         booking.paid_amount = Decimal("0.00")
         self.db.flush()
 

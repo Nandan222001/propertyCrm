@@ -387,3 +387,72 @@ def test_customer_ledger_shows_only_their_own_booking(client, customer_headers):
     assert len(rows) == len(mine) > 0, "a customer with bookings must see them in their ledger"
     assert {r["booking_number"] for r in rows} == {b["booking_number"] for b in mine}
     assert me["customer_id"]
+
+
+def test_company_hold_blocks_booking_until_released(client, admin_headers, approved_customer, available_plot):
+    """The admin can keep a free plot back: nobody can book it until it is released."""
+    plot_id = available_plot["id"]
+    held = client.post(f"/api/v1/plots/{plot_id}/status", json={"status": "COMPANY_HOLD", "reason": "Not for sale"},
+                       headers=admin_headers)
+    assert held.status_code == 200, held.text
+    assert held.json()["data"]["status"] == "COMPANY_HOLD"
+
+    body = {"customer_id": approved_customer["id"], "plot_id": plot_id, "final_price": str(available_plot["price"]),
+            "token_amount": "200000", "payment_plan": "12 monthly installments"}
+    refused = client.post("/api/v1/bookings", json=body, headers=admin_headers)
+    assert refused.status_code == 409, refused.text
+
+    released = client.post(f"/api/v1/plots/{plot_id}/status", json={"status": "AVAILABLE", "reason": "Released"},
+                           headers=admin_headers)
+    assert released.json()["data"]["status"] == "AVAILABLE"
+    assert client.post("/api/v1/bookings", json=body, headers=admin_headers).status_code == 201
+
+    # A plot that is already booked cannot be put on company hold.
+    again = client.post(f"/api/v1/plots/{plot_id}/status", json={"status": "COMPANY_HOLD"}, headers=admin_headers)
+    assert again.status_code == 409, again.text
+
+
+def test_customer_application_form_details_are_stored_and_returned(client, session, admin_headers, unique_email, unique_phone):
+    """Personal + nominee details of the application form round-trip, and blank values are not stored."""
+    profile = {
+        "passbook_no": "PB-1001", "dob": "1990-05-17", "occupation": "Teacher", "guardian_name": "Ramesh Kumar",
+        "address2": "Near market", "state": "Bihar",
+        "permanent": {"address": "Village Road", "city": "Bhojpur", "state": "Bihar", "pincode": "802301", "address2": ""},
+        "nominee": {"name": "Sita Kumar", "relationship": "Spouse", "dob": "1992-01-02", "phone": "9876543210",
+                    "email": "", "city": "Patna", "state": "Bihar", "pincode": "800001"},
+    }
+    created = client.post("/api/v1/customers", json={
+        "name": "Form Customer", "email": unique_email, "phone": unique_phone, "city": "Mumbai", "pincode": "400001",
+        "consent_given": True, "profile": profile}, headers=admin_headers)
+    assert created.status_code == 201, created.text
+    data = created.json()["data"]
+    assert data["profile"]["guardian_name"] == "Ramesh Kumar"
+    assert data["profile"]["nominee"]["relationship"] == "Spouse"
+    assert "email" not in data["profile"]["nominee"] and "address2" not in data["profile"]["permanent"]
+
+    updated = client.patch(f"/api/v1/customers/{data['id']}", json={"profile": {**profile, "occupation": "Doctor"}},
+                           headers=admin_headers)
+    assert updated.status_code == 200, updated.text
+    assert updated.json()["data"]["profile"]["occupation"] == "Doctor"
+
+    bad = client.patch(f"/api/v1/customers/{data['id']}", json={"profile": {"dob": "2999-01-01"}}, headers=admin_headers)
+    assert bad.status_code == 422, bad.text
+
+    # What is in the database: one encrypted column — no readable personal data — that decrypts to what was typed.
+    from app.models.customer import Customer
+    from app.repositories.customer_repository import CustomerRepository
+
+    row = session.get(Customer, data["id"])
+    assert row.profile and "Ramesh" not in row.profile and "Sita" not in row.profile
+    stored = CustomerRepository(session).decrypt_pii(row)["profile"]
+    assert stored["occupation"] == "Doctor" and stored["nominee"]["name"] == "Sita Kumar"
+    assert stored["permanent"]["pincode"] == "802301" and stored["dob"] == "1990-05-17"
+
+    # And what the customer page loads: the list and the single record both carry every detail back.
+    listed = next(c for c in client.get("/api/v1/customers?page_size=200", headers=admin_headers).json()["data"]
+                  if c["id"] == data["id"])
+    single = client.get(f"/api/v1/customers/{data['id']}", headers=admin_headers).json()["data"]
+    for record in (listed, single):
+        assert record["profile"]["guardian_name"] == "Ramesh Kumar" and record["profile"]["state"] == "Bihar"
+        assert record["profile"]["nominee"]["phone"] == "9876543210"
+        assert record["city"] == "Mumbai" and record["pincode"] == "400001"

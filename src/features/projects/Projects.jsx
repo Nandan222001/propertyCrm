@@ -6,12 +6,13 @@ import {
   CalendarDays, Building2, House, Receipt, FileText, Clock3, CheckCircle2,
   AlertCircle, SlidersHorizontal, Send, Eye, Edit2, LockKeyhole, RefreshCw,
   FileSpreadsheet, MapPin, IndianRupee, Mail, Phone, Activity, Trash2, LogOut,
-  Sparkles, Check, CheckCircle, Printer, MessageCircle
+  Sparkles, Check, CheckCircle, Printer, MessageCircle, Lock, LockOpen
 } from 'lucide-react';
 import { parseAmt, fmtINR, amountInWords, agentKey, todayLabel, openWhatsApp, waLink, isAdmin, canCreateBooking, canApprove, canCreateCustomer, canRecordPayment, canManageBills, isCustomer, isPendingStatus } from '../../utils';
 
 import { Table } from '../../components/common/DataTable';
 import { Badge } from '../../components/common/Badge';
+import { plotStatusLabel } from '../../utils/status';
 import { Mini } from '../../components/common/StatTile';
 import { ProjectModal } from './ProjectModal';
 import { PlotViewModal, ProjectViewModal } from './ProjectViews';
@@ -21,7 +22,7 @@ import { PaymentPlansModal } from './PaymentPlansModal';
 import { ConfirmDialog } from '../../components/common/ConfirmDialog';
 import { RoleContextBanner } from '../../components/layout/RoleContextBanner';
 
-export function Projects({ plots, search, project, filter, F, tab, TB, notify, projects, role, onBook, onSaveProject, onDeleteProject, onDeletePlot, onEditPlot, onAddPlots }) {
+export function Projects({ plots, search, project, filter, F, tab, TB, notify, projects, role, onBook, onSaveProject, onDeleteProject, onDeletePlot, onEditPlot, onSetPlotHold, onAddPlots }) {
   const [addingPlots, setAddingPlots] = useState(false);
   const [planFor, setPlanFor] = useState(null);
   const [editingPlot, setEditingPlot] = useState(null);
@@ -45,6 +46,11 @@ export function Projects({ plots, search, project, filter, F, tab, TB, notify, p
     return plotOrder === 'desc' ? -byNumber : byNumber;
   });
 
+  const holdPlot = async (plot, hold) => {
+    const problem = await onSetPlotHold(plot, hold);
+    if (problem) notify(problem);
+  };
+
   const plotRows = list.map(p => [
     <b>{p[0]}</b>,
     p[8],
@@ -52,7 +58,7 @@ export function Projects({ plots, search, project, filter, F, tab, TB, notify, p
     p[2],
     p[3],
     p[11] > 0 ? <span title={`Includes a premium of ₹${fmtINR(p[11])}`}>₹{p[10]} <small className="muted-text">(+₹{fmtINR(p[11])})</small></span> : `₹${p[10] ?? p[4]}`,
-    <Badge>{p[5]}</Badge>,
+    <Badge tone={p[5] === 'COMPANY_HOLD' ? 'purple' : undefined}>{plotStatusLabel(p[5])}</Badge>,
     p[6],
     p[7],
     <div className="table-actions-cell" key={p[0]}>
@@ -61,6 +67,12 @@ export function Projects({ plots, search, project, filter, F, tab, TB, notify, p
       </button>
       {canManage && onEditPlot && typeof p[9] === 'number' && (
         <button className="icon-action" onClick={() => setEditingPlot(p)} title="Edit plot details"><Edit2 size={14} /></button>
+      )}
+      {canManage && onSetPlotHold && typeof p[9] === 'number' && p[5] === 'AVAILABLE' && (
+        <button className="icon-action" onClick={() => holdPlot(p, true)} title="Hold for company — not for sale, no one can book it"><Lock size={14} /></button>
+      )}
+      {canManage && onSetPlotHold && typeof p[9] === 'number' && p[5] === 'COMPANY_HOLD' && (
+        <button className="icon-action" onClick={() => holdPlot(p, false)} title="Release company hold — make it available again"><LockOpen size={14} /></button>
       )}
       {canManage && onDeletePlot && p[5] === 'AVAILABLE' && typeof p[9] === 'number' && (
         <button className="icon-action danger" onClick={() => setRemoving({ kind: 'plot', row: p })} title="Delete plot"><Trash2 size={14} /></button>
@@ -105,6 +117,7 @@ export function Projects({ plots, search, project, filter, F, tab, TB, notify, p
     plots: scopedPlots.length,
     available: scopedPlots.filter(p => p[5] === 'AVAILABLE').length,
     hold: scopedPlots.filter(p => p[5] === 'HOLD').length,
+    companyHold: scopedPlots.filter(p => p[5] === 'COMPANY_HOLD').length,
   };
 
   return (
@@ -138,9 +151,9 @@ export function Projects({ plots, search, project, filter, F, tab, TB, notify, p
           {view === 'Plots' && (
             <div className="table-tools">
               <span className="filter-label">FILTER STATUS:</span>
-              {['All status', 'AVAILABLE', 'BOOKED', 'HOLD', 'SOLD'].map(s => (
+              {['All status', 'AVAILABLE', 'BOOKED', 'HOLD', 'COMPANY_HOLD', 'SOLD'].map(s => (
                 <button key={s} className={`filter-btn ${filter === s ? 'active' : ''}`} onClick={() => F(s)}>
-                  {s}
+                  {plotStatusLabel(s)}
                 </button>
               ))}
               <span className="filter-label">SORT:</span>

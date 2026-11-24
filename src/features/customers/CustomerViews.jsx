@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { CustomerDetailsView } from './CustomerProfileFields';
 import { api, hasSession } from '../../api';
 import { Eye, Printer, MessageCircle, Download, FileText, Check, X as XIcon, Plus, Edit2, Trash2 } from 'lucide-react';
 import { ConfirmDialog } from '../../components/common/ConfirmDialog';
@@ -151,6 +152,8 @@ export function CustomerProfile({
           </button>
         )}
       </div>
+
+      {!portal && <CustomerDetailsView customer={customer} />}
 
       <div className={`mini-stats ${applications.length ? 'five' : 'four'}`} style={{ marginTop: 14 }}>
         <div className="mini-stat"><small>PLOTS OWNED / BOOKED</small><b>{mine.length}</b></div>

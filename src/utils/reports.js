@@ -64,18 +64,18 @@ export function buildReport(key, data, { period = 'All time', project = 'All pro
   if (key === 'inventory') {
     const byProject = new Map();
     data.plots.filter((p) => inProject(p[8], project)).forEach((p) => {
-      const row = byProject.get(p[8]) || { AVAILABLE: 0, HOLD: 0, BOOKED: 0, SOLD: 0, total: 0 };
+      const row = byProject.get(p[8]) || { AVAILABLE: 0, HOLD: 0, COMPANY_HOLD: 0, BOOKED: 0, SOLD: 0, total: 0 };
       row[p[5]] = (row[p[5]] || 0) + 1;
       row.total += 1;
       byProject.set(p[8], row);
     });
     const rows = [...byProject.entries()].map(([name, r]) => [
-      name, r.total, r.SOLD, r.BOOKED, r.HOLD, r.AVAILABLE,
+      name, r.total, r.SOLD, r.BOOKED, r.HOLD, r.COMPANY_HOLD, r.AVAILABLE,
       r.total ? `${Math.round(((r.SOLD + r.BOOKED) / r.total) * 100)}%` : '0%',
     ]);
     return {
       filename: `project-inventory-absorption-${stamp}`,
-      headers: ['Project', 'Total plots', 'Sold', 'Booked', 'On hold', 'Available', 'Absorption'],
+      headers: ['Project', 'Total plots', 'Sold', 'Booked', 'On hold', 'Company hold', 'Available', 'Absorption'],
       rows,
     };
   }
