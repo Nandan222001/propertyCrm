@@ -23,7 +23,7 @@ export const DEFAULT_SETTINGS = {
   company: { name: '', address: '', gstin: '', phone: '', email: '' },
   tax: {
     receiptPrefix: 'RCT', defaultGst: '0.18', tdsRate: '5', dueDays: '15',
-    holdDays: '7', installmentDays: '30', defaultCommission: '2',
+    holdDays: '7', installmentDays: '30', defaultCommission: '2', adminChargeRate: '0',
   },
   bank: { bankName: '', accountName: '', accountNumber: '', ifsc: '', upi: '' },
 };

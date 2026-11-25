@@ -19,6 +19,7 @@ class ExpenseBase(SafeText):
     paid_to: str | None = Field(default=None, max_length=120)
     payment_mode: str | None = Field(default=None, max_length=24)
     reference: str | None = Field(default=None, max_length=80)
+    agent_id: int | None = Field(default=None, gt=0, description="Agent payout: the agent being paid")
 
     @field_validator("expense_date", mode="before")
     @classmethod
@@ -53,3 +54,5 @@ class ExpenseResponse(TimestampedResponse):
     paid_to: str | None = None
     payment_mode: str | None = None
     reference: str | None = None
+    agent_id: int | None = None
+    agent_name: str | None = None

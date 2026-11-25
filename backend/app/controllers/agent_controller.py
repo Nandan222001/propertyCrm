@@ -137,6 +137,109 @@ class AgentService(BaseService):
         self.db.commit()  # the UI reloads the list right away; don't wait for the request-end commit
         return {**self.serialise(agent), "login": login}
 
+    # ------------------------------------------------------------ payouts
+    def payouts(self) -> list[dict]:
+        """The payments the company has made to the signed-in agent (expenses in the "Agent payout" category)."""
+        from sqlalchemy import select
+
+        from app.core.constants import AGENT_PAYOUT_CATEGORY
+        from app.models.expense import Expense
+
+        me = self.actor.agent_id
+        if not me:
+            return []
+        rows = self.db.execute(
+            select(Expense).where(Expense.agent_id == me, Expense.category == AGENT_PAYOUT_CATEGORY, Expense.is_deleted == 0)
+            .order_by(Expense.expense_date.desc(), Expense.id.desc())
+        ).scalars().all()
+        return [{"id": e.id, "date": e.expense_date, "amount": str(e.amount), "mode": e.payment_mode,
+                 "reference": e.reference, "note": e.description} for e in rows]
+
+    # ------------------------------------------------------------- sales
+    def _sale_agent_ids(self, kind: str) -> set[int]:
+        """Whose bookings the "Sales" pages may list: an agent's own, their team's (everyone below them), or both."""
+        me = self.actor.agent_id
+        if not me:
+            return set()
+        team = self.agents.descendant_ids(me)
+        return {"direct": {me}, "team": team}.get(kind, {me} | team)
+
+    def _sale_rows(self, ids: set[int]):
+        from sqlalchemy import select
+
+        from app.models.booking import Booking
+        from app.models.customer import Customer
+        from app.models.payment import Agent
+        from app.models.property import Plot, Project
+
+        if not ids:
+            return []
+        return self.db.execute(
+            select(Booking, Customer.name, Plot, Project, Agent)
+            .join(Customer, Customer.id == Booking.customer_id)
+            .join(Plot, Plot.id == Booking.plot_id)
+            .join(Project, Project.id == Plot.project_id)
+            .join(Agent, Agent.id == Booking.agent_id)
+            .where(Booking.agent_id.in_(ids), Booking.is_deleted == 0)
+            .order_by(Booking.booking_date.desc(), Booking.id.desc())
+        ).all()
+
+    def _sale_customer(self, name: str | None, *, team: bool) -> str | None:
+        """The customer's full name, for direct and team sales alike (masked only for a role without ``pii:reveal``)."""
+        from app.core.validators import mask_name
+
+        return name if self.actor.can(Permission.PII_REVEAL) else mask_name(name)
+
+    def sales(self, kind: str) -> list[dict]:
+        """The sales behind the agent's Direct Sale / Team Sale pages (one row per booking)."""
+        from app.services.plan_calculator import plot_premium
+
+        me = self.actor.agent_id
+        out = []
+        for booking, customer_name, plot, project, agent in self._sale_rows(self._sale_agent_ids(kind)):
+            team = agent.id != me
+            area = Decimal(plot.area_sqft or 0)
+            out.append({
+                "id": booking.id, "booking_number": booking.booking_number, "booking_date": booking.booking_date,
+                "status": booking.status, "project": project.name, "phase": project.phase, "plot": plot.plot_number,
+                "agent_code": agent.code, "agent_name": agent.name, "customer": self._sale_customer(customer_name, team=team),
+                "is_team": team, "down_payment": str(booking.token_amount), "area_sqft": str(area),
+                "rate": str((Decimal(plot.price) / area).quantize(Decimal("0.01"))) if area else "0",
+                "plc": str(plot_premium(project, plot)), "total": str(booking.final_price),
+                "paid": str(booking.paid_amount), "balance": str(booking.balance),
+            })
+        return out
+
+    def sale_payments(self) -> list[dict]:
+        """Every payment received on the agent's own and team's sales, with its receipt."""
+        from sqlalchemy import select
+
+        from app.models.payment import Payment, Receipt
+
+        sales = {row[0].id: row for row in self._sale_rows(self._sale_agent_ids("all"))}
+        if not sales:
+            return []
+        me = self.actor.agent_id
+        payments = self.db.execute(
+            select(Payment, Receipt).outerjoin(Receipt, Receipt.payment_id == Payment.id)
+            .where(Payment.booking_id.in_(sales), Payment.is_deleted == 0)
+            .order_by(Payment.received_on.desc(), Payment.id.desc())
+        ).all()
+        out = []
+        for payment, receipt in payments:
+            booking, customer_name, plot, project, agent = sales[payment.booking_id]
+            team = agent.id != me
+            out.append({
+                "id": payment.id, "receipt_number": receipt.receipt_number if receipt else None,
+                "receipt_date": receipt.issued_on if receipt else None, "booking_number": booking.booking_number,
+                "booking_date": booking.booking_date, "status": booking.status, "project": project.name,
+                "plot": plot.plot_number, "agent_code": agent.code, "agent_name": agent.name,
+                "customer": self._sale_customer(customer_name, team=team), "is_team": team,
+                "down_payment": str(booking.token_amount), "received_on": payment.received_on, "mode": payment.mode,
+                "reference": payment.reference, "amount": str(payment.amount),
+            })
+        return out
+
     # --------------------------------------------------------- hierarchy
     def _my_agent(self):
         agent = self.agents.get(self.actor.agent_id) if self.actor.agent_id else None
@@ -176,6 +279,17 @@ class AgentService(BaseService):
                 .group_by(Commission.agent_id)
             ).all()
         }
+        from app.models.booking import LIVE_BOOKING_STATUSES, Booking
+
+        sold = {
+            agent_id: (int(count or 0), Decimal(str(value or 0)))
+            for agent_id, count, value in self.db.execute(
+                select(Booking.agent_id, func.count(Booking.id), func.sum(Booking.final_price))
+                .where(Booking.agent_id.in_(by_id or {0}), Booking.is_deleted == 0,
+                       Booking.status.in_(LIVE_BOOKING_STATUSES))
+                .group_by(Booking.agent_id)
+            ).all()
+        }
         rows = []
         for agent in sorted(members, key=lambda a: (depth(a), a.name)):
             rows.append({
@@ -184,6 +298,8 @@ class AgentService(BaseService):
                 "parent_name": by_id[agent.parent_agent_id].name if agent.parent_agent_id in by_id else (
                     me.name if me is not None and agent.parent_agent_id == me.id else None),
                 "commission_earned": str(earned.get(agent.id, Decimal("0"))),
+                "deals": sold.get(agent.id, (0, Decimal("0")))[0],
+                "sales_value": str(sold.get(agent.id, (0, Decimal("0")))[1]),
             })
         return {
             "me": self.serialise(me) if me is not None else None,
@@ -374,6 +490,18 @@ def agent_performance(
 
 def my_team(service: AgentServiceDep) -> dict:
     return success(service.team(), "Agent team")
+
+
+def my_sales(kind: str, service: AgentServiceDep) -> dict:
+    return success(service.sales(kind), "Sales")
+
+
+def my_payouts(service: AgentServiceDep) -> dict:
+    return success(service.payouts(), "Payouts")
+
+
+def my_sale_payments(service: AgentServiceDep) -> dict:
+    return success(service.sale_payments(), "Sale payments")
 
 
 def add_sub_agent(payload: SubAgentCreate, service: AgentServiceDep) -> dict:

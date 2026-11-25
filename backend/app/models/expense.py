@@ -22,3 +22,5 @@ class Expense(Base, PkMixin, PublicIdMixin, TenantMixin, TimestampMixin, SoftDel
     payment_mode: Mapped[str | None] = mapped_column(String(24))
     reference: Mapped[str | None] = mapped_column(String(80))
     recorded_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+    #: The agent this expense paid (category "Agent payout" only).
+    agent_id: Mapped[int | None] = mapped_column(ForeignKey("agents.id", ondelete="SET NULL"), index=True)

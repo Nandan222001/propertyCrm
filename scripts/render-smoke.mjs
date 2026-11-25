@@ -119,6 +119,53 @@ for (const role of ['ACCOUNTS', 'ADMIN', 'SALES MANAGER', 'SALES AGENT', 'CUSTOM
   }
 }
 
+// 5. "My Team" is the sales agent's own downline: nobody else gets the page or the menu item.
+for (const role of ['ACCOUNTS', 'ADMIN', 'SALES MANAGER', 'SALES AGENT', 'CUSTOMER']) {
+  try {
+    const store = createStore();
+    store.dispatch(signedIn({ role, user: { name: `${role} Tester`, role } }));
+    store.dispatch(pageChanged('My Team'));
+    const html = render(store, '/my-team');
+    const allowed = role === 'SALES AGENT';
+    if (/Loading your team/.test(html) !== allowed) failures.push(`${role} ${allowed ? 'must' : 'must not'} see the My Team page`);
+    if (/nav-item[^>]*>(?:<[^>]+>)*My Team/.test(html) !== allowed) failures.push(`${role} ${allowed ? 'must' : 'must not'} have a My Team menu item`);
+    console.log(`  ✓ ${role} My Team ${allowed ? 'allowed' : 'blocked'}`);
+  } catch (error) {
+    failures.push(`${role} /my-team render threw: ${error.message}`);
+  }
+}
+
+// 6. "Income" is the sales agent's own commission statement: nobody else gets the page or the menu item.
+for (const role of ['ACCOUNTS', 'ADMIN', 'SALES MANAGER', 'SALES AGENT', 'CUSTOMER']) {
+  try {
+    const store = createStore();
+    store.dispatch(signedIn({ role, user: { name: `${role} Tester`, role } }));
+    store.dispatch(pageChanged('Income'));
+    const html = render(store, '/income');
+    const allowed = role === 'SALES AGENT';
+    if (/nav-item[^>]*>(?:<[^>]+>)*Income/.test(html) !== allowed) failures.push(`${role} ${allowed ? 'must' : 'must not'} have an Income menu item`);
+    console.log(`  ✓ ${role} Income ${allowed ? 'allowed' : 'blocked'}`);
+  } catch (error) {
+    failures.push(`${role} /income render threw: ${error.message}`);
+  }
+}
+
+// 7. The Sales menu (Direct Sale, Team Sale, Sale Payments) is the sales agent's own: nobody else gets it.
+for (const role of ['ACCOUNTS', 'ADMIN', 'SALES MANAGER', 'SALES AGENT', 'CUSTOMER']) {
+  try {
+    const store = createStore();
+    store.dispatch(signedIn({ role, user: { name: `${role} Tester`, role } }));
+    store.dispatch(pageChanged('Team Sale'));
+    const html = render(store, '/sales/team');
+    const allowed = role === 'SALES AGENT';
+    if (/nav-item[^>]*>(?:<[^>]+>)*Sales</.test(html) !== allowed) failures.push(`${role} ${allowed ? 'must' : 'must not'} have a Sales menu`);
+    if (/Your sales are available when/.test(html) !== allowed) failures.push(`${role} ${allowed ? 'must' : 'must not'} see the Team Sale page`);
+    console.log(`  ✓ ${role} Sales menu ${allowed ? 'allowed' : 'blocked'}`);
+  } catch (error) {
+    failures.push(`${role} /sales/team render threw: ${error.message}`);
+  }
+}
+
 rmSync(outDir, { recursive: true, force: true });
 
 if (failures.length) {

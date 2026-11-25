@@ -47,6 +47,22 @@ def my_team(service: controller.AgentServiceDep, _: TEAM = None):
     return controller.my_team(service)
 
 
+@router.get("/sales", summary="Your direct sales (kind=direct) or your team's sales (kind=team)")
+def my_sales(service: controller.AgentServiceDep, kind: str = Query("direct", pattern="^(direct|team)$"),
+             _: TEAM = None):
+    return controller.my_sales(kind, service)
+
+
+@router.get("/payouts", summary="Payments the company has made to you")
+def my_payouts(service: controller.AgentServiceDep, _: TEAM = None):
+    return controller.my_payouts(service)
+
+
+@router.get("/sales/payments", summary="Payments received on your direct and team sales")
+def my_sale_payments(service: controller.AgentServiceDep, _: TEAM = None):
+    return controller.my_sale_payments(service)
+
+
 @router.post("/team", status_code=status.HTTP_201_CREATED,
              summary="Add an agent under you, handing them part of your commission rate")
 def add_sub_agent(payload: SubAgentCreate, service: controller.AgentServiceDep, _: TEAM = None):

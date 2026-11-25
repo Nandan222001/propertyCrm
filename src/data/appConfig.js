@@ -47,7 +47,7 @@ export const roleConfigs = {
     title: 'My Sales Desk & Deal Pipeline',
     subtitle: 'Track your assigned plots, customer visits, deal closures, and commission statements.',
     permissions: ['VIEW_INVENTORY', 'CREATE_BOOKING', 'MY_CUSTOMERS_ONLY', 'MY_COMMISSIONS_ONLY', 'VIEW_BROCHURES'],
-    workspaceNav: ['Overview', 'Projects & plots', 'Bookings', 'Customers', 'Commissions'],
+    workspaceNav: ['Overview', 'Projects & plots', 'Bookings', 'Customers', 'Commissions', 'Direct Sale', 'Team Sale', 'Sale Payments', 'My Team', 'Income'],
     insightsNav: ['Documents', 'Notifications']
   },
   'ACCOUNTS': {

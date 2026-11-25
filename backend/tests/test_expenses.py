@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import date, timedelta
 
-from tests.test_workflows import agent_approved_customer, available_plot  # noqa: F401
+from tests.test_workflows import agent_approved_customer, approved_customer, available_plot  # noqa: F401
 from decimal import Decimal
 
 EXPENSE = {"category": "Office rent", "description": "October office rent", "amount": 25000,
@@ -80,3 +80,49 @@ def test_enrollment_money_counts_as_collection_but_the_application_fee_does_not(
     after = client.get("/api/v1/expenses/profit-summary", headers=admin_headers).json()["data"]
     assert Decimal(after["collected"]) - Decimal(before["collected"]) == Decimal("5000")
     assert Decimal(after["profit"]) - Decimal(before["profit"]) == Decimal("5000")
+
+
+def test_agent_payout_names_the_agent_is_capped_at_what_is_owed_and_is_not_deducted_twice(
+        client, admin_headers, agent_headers, approved_customer, available_plot):
+    agent = next(a for a in client.get("/api/v1/agents", headers=admin_headers, params={"page_size": 200}).json()["data"]
+                 if a["name"] == "S. Patel")
+    booking = client.post("/api/v1/bookings", headers=admin_headers, json={
+        "customer_id": approved_customer["id"], "plot_id": available_plot["id"], "final_price": available_plot["price"],
+        "token_amount": "100000", "agent_code": agent["code"]})
+    assert booking.status_code == 201, booking.text
+
+    position = client.get(f"/api/v1/expenses/agent-payout/{agent['id']}", headers=admin_headers).json()["data"]
+    assert position["agent_name"] == "S. Patel" and Decimal(position["net"]) > 0
+    owed = Decimal(position["balance"])
+    assert owed > 0
+    before = summary(client, admin_headers)
+
+    payout = {**EXPENSE, "category": "Agent payout", "description": "Commission payout", "amount": str(owed)}
+    assert client.post("/api/v1/expenses", headers=admin_headers, json=payout).status_code == 409           # no agent chosen
+    too_much = client.post("/api/v1/expenses", headers=admin_headers, json={**payout, "agent_id": agent["id"], "amount": str(owed + 1)})
+    assert too_much.status_code == 409, too_much.text                                                        # more than is owed
+
+    created = client.post("/api/v1/expenses", headers=admin_headers, json={**payout, "agent_id": agent["id"], "paid_to": None})
+    assert created.status_code == 201, created.text
+    row = created.json()["data"]
+    assert row["agent_id"] == agent["id"] and row["agent_name"] == "S. Patel" and row["paid_to"] == "S. Patel"
+
+    # The agent can see that they were paid, and was told so.
+    seen = client.get("/api/v1/agents/payouts", headers=agent_headers).json()["data"]
+    mine = [r for r in seen if r["id"] == row["id"]]
+    assert len(mine) == 1 and Decimal(mine[0]["amount"]) == owed and mine[0]["mode"] == "Bank transfer"
+    notices = client.get("/api/v1/notifications", headers=agent_headers, params={"page_size": 200}).json()["data"]
+    assert any(n["title"] == "Commission payout received" for n in notices)
+
+    after = summary(client, admin_headers)
+    assert Decimal(after["expenses"]) == Decimal(before["expenses"])                      # not a second cost …
+    assert Decimal(after["profit"]) == Decimal(before["profit"])                          # … so profit does not move
+    assert Decimal(after["agent_payouts"]) - Decimal(before["agent_payouts"]) == owed
+
+    again = client.get(f"/api/v1/expenses/agent-payout/{agent['id']}", headers=admin_headers).json()["data"]
+    assert Decimal(again["balance"]) == 0 and Decimal(again["paid_out"]) >= owed
+    assert client.post("/api/v1/expenses", headers=admin_headers, json={**payout, "agent_id": agent["id"], "amount": "1"}).status_code == 409
+
+    # Other categories carry no agent, whatever was sent.
+    other = client.post("/api/v1/expenses", headers=admin_headers, json={**EXPENSE, "agent_id": agent["id"]})
+    assert other.status_code == 201 and other.json()["data"]["agent_id"] is None

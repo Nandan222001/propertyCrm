@@ -17,7 +17,7 @@ export const pct = (rate) => `${Number((Number(rate) * 100).toFixed(2))}%`;
  * Give a new agent a slice of the pool you hold. Every agent under you is a promise out of the same pool, so a
  * 20% holder can put four agents on 10%, 12%, 14% and 16%: on each of their deals you keep the rest of your 20%.
  */
-function AddTeamAgentModal({ parent, parents, close, save }) {
+export function AddTeamAgentModal({ parent, parents, close, save }) {
   const [form, setForm] = useState({ name: '', phone: '', email: '', share: '', parent: parents ? '' : String(parent.id) });
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);

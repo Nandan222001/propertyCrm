@@ -30,6 +30,12 @@ def profit_summary(service: controller.ExpenseServiceDep, _: VIEW = None,
     return controller.profit_summary(service, date_from, date_to)
 
 
+@router.get("/expenses/agent-payout/{agent_id}", summary="What an agent has earned, been paid and is still owed")
+def agent_payout_position(agent_id: int, service: controller.ExpenseServiceDep, _: VIEW = None,
+                          exclude_expense_id: int | None = Query(default=None, gt=0)):
+    return controller.agent_payout_position(agent_id, service, exclude_expense_id)
+
+
 @router.post("/expenses", status_code=status.HTTP_201_CREATED, summary="Record an expense")
 def create_expense(payload: ExpenseCreate, service: controller.ExpenseServiceDep, _: MANAGE = None):
     return controller.create_expense(payload, service)

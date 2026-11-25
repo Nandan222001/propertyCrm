@@ -1,6 +1,9 @@
 import React, { useState } from 'react';
-import { ChevronDown, KeyRound, LayoutDashboard, LogOut, X } from 'lucide-react';
+import { ChevronDown, KeyRound, LayoutDashboard, LogOut, ShoppingCart, X } from 'lucide-react';
 import { PAGE_ICON } from '../../constants/navigation';
+
+/** These pages share one "Sales" menu with a flyout instead of three separate items. */
+const SALES_GROUP = ['Direct Sale', 'Team Sale', 'Sale Payments'];
 
 /** Left navigation rail: brand, workspace chip, role-aware nav, identity footer. */
 export function Sidebar({
@@ -8,20 +11,44 @@ export function Sidebar({
   session, onNavigate, onClose, onProjectChange, onLogout, onChangePassword,
 }) {
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [salesOpen, setSalesOpen] = useState(false);
   const [brandFirst, ...brandWords] = (tenantName || '').split(' ');
   const brandRest = brandWords.join(' ');
   const pick = (value) => { onProjectChange(value); setPickerOpen(false); };
-  const renderItems = (items) => items.map((name) => {
+  const renderItem = (name, sub = false) => {
     const Icon = PAGE_ICON[name] || LayoutDashboard;
     const badge = badgeFor(name);
     return (
-      <button className={`nav-item ${page === name ? 'active' : ''}`} key={name} onClick={() => onNavigate(name)}>
-        <Icon size={16} />
+      <button className={`nav-item ${sub ? 'nav-sub' : ''} ${page === name ? 'active' : ''}`} key={name} onClick={() => onNavigate(name)}>
+        {!sub && <Icon size={16} />}
         <span>{name}</span>
         {badge && <i className={badge.alert ? 'alert-count' : ''}>{badge.text}</i>}
       </button>
     );
-  });
+  };
+  const renderItems = (items) => {
+    const out = [];
+    let grouped = false;
+    items.forEach((name) => {
+      if (!SALES_GROUP.includes(name)) { out.push(renderItem(name)); return; }
+      if (grouped) return;
+      grouped = true;
+      const children = items.filter((n) => SALES_GROUP.includes(n));
+      const active = children.includes(page);
+      const open = salesOpen || active;
+      out.push(
+        <div className="nav-group" key="sales-group">
+          <button className={`nav-item ${active ? 'active' : ''}`} onClick={() => setSalesOpen(!open)} aria-expanded={open}>
+            <ShoppingCart size={16} />
+            <span>Sales</span>
+            <ChevronDown size={13} style={{ marginLeft: 'auto', transform: open ? 'rotate(180deg)' : 'none' }} />
+          </button>
+          {open && children.map((child) => renderItem(child, true))}
+        </div>,
+      );
+    });
+    return out;
+  };
 
   return (
     <aside className={`sidebar ${mobileOpen ? 'open' : ''}`}>

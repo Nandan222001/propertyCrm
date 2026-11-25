@@ -25,13 +25,37 @@ class ExpenseRepository(BaseRepository[Expense]):
     }
     default_sort = "expense_date"
 
-    def total(self, date_from: date | None = None, date_to: date | None = None) -> Decimal:
+    def total(self, date_from: date | None = None, date_to: date | None = None, *,
+              category: str | None = None, exclude_category: str | None = None) -> Decimal:
         stmt = select(func.coalesce(func.sum(Expense.amount), 0)).where(Expense.is_deleted.is_(False))
+        if category:
+            stmt = stmt.where(Expense.category == category)
+        if exclude_category:
+            stmt = stmt.where(Expense.category != exclude_category)
         if date_from:
             stmt = stmt.where(Expense.expense_date >= date_from)
         if date_to:
             stmt = stmt.where(Expense.expense_date <= date_to)
         return Decimal(str(self.db.execute(stmt).scalar_one() or 0))
+
+    def agent_paid_out(self, agent_id: int, *, exclude_expense_id: int | None = None) -> Decimal:
+        """What has already been paid to the agent as "Agent payout" expenses."""
+        from app.core.constants import AGENT_PAYOUT_CATEGORY
+
+        stmt = select(func.coalesce(func.sum(Expense.amount), 0)).where(
+            Expense.is_deleted.is_(False), Expense.category == AGENT_PAYOUT_CATEGORY, Expense.agent_id == agent_id)
+        if exclude_expense_id:
+            stmt = stmt.where(Expense.id != exclude_expense_id)
+        return Decimal(str(self.db.execute(stmt).scalar_one() or 0))
+
+    def agent_commission(self, agent_id: int) -> tuple[Decimal, Decimal, Decimal]:
+        """(gross, TDS, net) of everything the agent has earned, cancelled and rejected commissions left out."""
+        row = self.db.execute(select(
+            func.coalesce(func.sum(Commission.gross_amount), 0), func.coalesce(func.sum(Commission.tds_amount), 0),
+            func.coalesce(func.sum(Commission.net_amount), 0),
+        ).where(Commission.is_deleted.is_(False), Commission.agent_id == agent_id,
+                Commission.status.notin_(("CANCELLED", "REJECTED")))).one()
+        return tuple(Decimal(str(v or 0)) for v in row)  # type: ignore[return-value]
 
     def commissions_total(self, date_from: date | None = None, date_to: date | None = None) -> Decimal:
         """Gross commission accrued on deals, rejected ones excluded (optionally only what accrued in the period)."""

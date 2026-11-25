@@ -63,6 +63,8 @@ export const actions = {
   invoiceSummary: () => authedRequest(ENDPOINTS.invoices.summary),
   invoicePdf: (id) => requestBlob(ENDPOINTS.invoices.pdf(id)),
   profitSummary: (params) => authedRequest(ENDPOINTS.expenses.summary, { params }),
+  /** What an agent has earned, been paid and is still owed (the "Agent payout" expense). */
+  agentPayoutPosition: (agentId, excludeExpenseId) => authedRequest(`${ENDPOINTS.expenses.list}/agent-payout/${agentId}`, { params: excludeExpenseId ? { exclude_expense_id: excludeExpenseId } : undefined }),
   ledgerSummary: () => authedRequest(ENDPOINTS.ledger.summary),
   approvalQueue: () => authedRequest(ENDPOINTS.bookings.approvals),
   dailyReport: (params) => authedRequest(ENDPOINTS.reports.daily, { params }),
@@ -92,6 +94,11 @@ actions.publicPlotMap = (slug) => request(slug ? `/public/plot-map/${encodeURICo
 
 /** The agent hierarchy: the caller's own rate, who they report to and everyone below them. */
 actions.agentTeam = () => authedRequest(`${ENDPOINTS.agents.list}/team`);
+/** The agent's own sales (kind "direct") or their team's (kind "team"), and the payments received on both. */
+actions.agentSales = (kind) => authedRequest(`${ENDPOINTS.agents.list}/sales?kind=${encodeURIComponent(kind)}`);
+/** What the company has paid the signed-in agent ("Agent payout" expenses). */
+actions.agentPayouts = () => authedRequest(`${ENDPOINTS.agents.list}/payouts`);
+actions.agentSalePayments = () => authedRequest(`${ENDPOINTS.agents.list}/sales/payments`);
 /** Add an agent under yourself, handing them `share` (a fraction, e.g. 0.1) of your own commission rate. */
 actions.addSubAgent = (body) => authedRequest(`${ENDPOINTS.agents.list}/team`, { method: 'POST', body });
 

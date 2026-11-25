@@ -298,3 +298,7 @@ INVOICE_GST_RATES = (Decimal("0"), Decimal("0.05"), Decimal("0.12"), Decimal("0.
 
 #: Interactive plot maps a super admin can link to a tenant (key -> label). The artwork lives in the SPA.
 PLOT_MAPS: dict[str, str] = {"the-index": "Real Life City Plot Layout"}
+
+#: Expense category for paying an agent their commission. The commission is already deducted from company profit as it
+#: accrues, so these payouts are not deducted a second time.
+AGENT_PAYOUT_CATEGORY = "Agent payout"

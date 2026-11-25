@@ -1,4 +1,5 @@
 import React, { useMemo } from 'react';
+import { UserRound } from 'lucide-react';
 import { pct } from '../commissions/CommissionTeam';
 
 /**
@@ -41,6 +42,7 @@ export function AgentTree({ rows = [], meId = null, onView }) {
           {row.assigned_rate != null && Number(row.assigned_rate) > 0 ? (
             <span className="agent-node-meta">given {pct(row.assigned_rate)}</span>
           ) : null}
+          {row.deals != null ? <span className="agent-node-meta">{row.deals} deal{row.deals === 1 ? '' : 's'}</span> : null}
           <span className="agent-node-meta">{kids.length} below</span>
           {onView ? (
             <button className="icon-action" title="View agent profile" onClick={() => onView(row)}>View</button>
@@ -54,6 +56,46 @@ export function AgentTree({ rows = [], meId = null, onView }) {
   return (
     <div className="agent-tree" role="tree" aria-label="Sales agent hierarchy">
       <ul>{branch('root', 0)}</ul>
+    </div>
+  );
+}
+
+/**
+ * The same hierarchy drawn as an org chart: the root on top, its agents in a row beneath it joined by dotted
+ * lines, and theirs beneath them. `rows[0]` is the root; every other row's `parent_agent_id` points inside `rows`.
+ */
+export function AgentOrgChart({ rows = [], meId = null }) {
+  const root = rows[0];
+  const kids = useMemo(() => {
+    const map = new Map();
+    rows.forEach((row) => {
+      if (!map.has(row.parent_agent_id)) map.set(row.parent_agent_id, []);
+      map.get(row.parent_agent_id).push(row);
+    });
+    map.forEach((list) => list.sort((a, b) => a.name.localeCompare(b.name)));
+    return map;
+  }, [rows]);
+  if (!root) return null;
+
+  const seen = new Set();
+  const node = (row) => {
+    seen.add(row.id);
+    const below = (kids.get(row.id) || []).filter((child) => !seen.has(child.id));
+    const tip = `${row.name} (${row.code}) · holds ${pct(row.commission_rate)}${row.assigned_rate != null ? ` · given ${pct(row.assigned_rate)}` : ''} · ${row.deals ?? 0} deals`;
+    return (
+      <li key={row.id}>
+        <div className={`org-node${row.id === meId ? ' me' : ''}${row.is_active === 'INACTIVE' ? ' inactive' : ''}`} title={tip}>
+          <span className="org-avatar"><UserRound size={20} strokeWidth={2.4} /></span>
+          <span className="org-name">({row.code}) {row.name}{row.id === meId ? ' · you' : ''}</span>
+          <span className="org-meta">{pct(row.commission_rate)}{row.deals ? ` · ${row.deals} deal${row.deals === 1 ? '' : 's'}` : ''}</span>
+        </div>
+        {below.length > 0 && <ul>{below.map(node)}</ul>}
+      </li>
+    );
+  };
+  return (
+    <div className="org-chart" role="tree" aria-label={`Downline tree of ${root.name}`}>
+      <ul>{node(root)}</ul>
     </div>
   );
 }

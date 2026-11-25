@@ -11,9 +11,11 @@ import { pageCache } from '../../utils/pageCache';
 import { PrintModal } from '../documents/PrintSheets';
 import { COMPANY } from '../../data/appConfig';
 
+/** Paying an agent their commission: the form asks which agent and shows what they are owed. */
+export const AGENT_PAYOUT = 'Agent payout';
 export const EXPENSE_CATEGORIES = [
   'Office rent', 'Salaries', 'Marketing', 'Legal & registration', 'Land development',
-  'Travel', 'Utilities', 'Maintenance', 'Other',
+  'Travel', 'Utilities', 'Maintenance', AGENT_PAYOUT, 'Other',
 ];
 export const PAYMENT_MODES = ['Cash', 'Bank transfer', 'UPI', 'Cheque'];
 
@@ -49,13 +51,52 @@ function ExpenseModal({ initial, onSave, close }) {
     paid_to: initial?.paid_to || '',
     payment_mode: initial?.payment_mode || PAYMENT_MODES[0],
     reference: initial?.reference || '',
+    agent_id: initial?.agent_id ? String(initial.agent_id) : '',
   });
+  const [agents, setAgents] = useState([]);
+  const [position, setPosition] = useState(null);      // what the chosen agent has earned / been paid / is owed
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const set = (key, transform = (v) => v) => (e) => setForm({ ...form, [key]: transform(e.target.value) });
+  const payout = form.category === AGENT_PAYOUT;
+
+  useEffect(() => {
+    if (!payout || !hasSession()) return;
+    api.agents.list({ page_size: 200 })
+      .then((r) => setAgents((r.data || []).filter((a) => a.is_active !== 'INACTIVE' || String(a.id) === form.agent_id)))
+      .catch(() => setAgents([]));
+  }, [payout]);   // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Choosing the agent shows their commission and fills in the amount still owed (editable).
+  const chooseAgent = async (value) => {
+    setError('');
+    if (!value) { setPosition(null); return setForm({ ...form, agent_id: '' }); }
+    try {
+      const { data } = await actions.agentPayoutPosition(value, initial?.id);
+      setPosition(data);
+      setForm({
+        ...form, agent_id: value, paid_to: data.agent_name,
+        description: form.description.trim() && !form.description.startsWith('Commission payout') ? form.description : `Commission payout — ${data.agent_name}`,
+        amount: String(Number(data.balance)),
+      });
+    } catch (problem) {
+      setPosition(null);
+      setForm({ ...form, agent_id: value });
+      setError(problem.message || 'Could not load the agent\'s commission.');
+    }
+  };
+  useEffect(() => {
+    if (payout && form.agent_id && !position) {
+      actions.agentPayoutPosition(form.agent_id, initial?.id).then((r) => setPosition(r.data)).catch(() => {});
+    }
+  }, [payout]);   // eslint-disable-line react-hooks/exhaustive-deps
 
   const submit = async (e) => {
     e.preventDefault();
+    if (payout && !form.agent_id) return setError('Choose the agent this payout is for.');
+    if (payout && position && Number(form.amount) > Number(position.balance) + 0.005) {
+      return setError(`${position.agent_name} is owed ${rupees(position.balance)} — the payout cannot be more than that.`);
+    }
     if (!form.description.trim()) return setError('Write a short description of the expense.');
     if (!(Number(form.amount) > 0)) return setError('Enter an amount greater than 0.');
     if (!form.expense_date) return setError('Choose the date of the expense.');
@@ -69,6 +110,7 @@ function ExpenseModal({ initial, onSave, close }) {
       paid_to: form.paid_to.trim() || null,
       payment_mode: form.payment_mode,
       reference: form.reference.trim() || null,
+      ...(payout ? { agent_id: Number(form.agent_id) } : {}),
     });
     setBusy(false);
     if (problem) setError(problem); else close();
@@ -87,10 +129,30 @@ function ExpenseModal({ initial, onSave, close }) {
         </div>
         <div className="form-grid">
           <label>Category
-            <select value={form.category} onChange={set('category')}>
+            <select value={form.category} onChange={(e) => { setPosition(null); setForm({ ...form, category: e.target.value, agent_id: '' }); }}>
               {EXPENSE_CATEGORIES.map((c) => <option key={c}>{c}</option>)}
             </select>
           </label>
+          {payout && (
+            <label>Agent
+              <select value={form.agent_id} onChange={(e) => chooseAgent(e.target.value)}>
+                <option value="">Choose agent…</option>
+                {agents.map((a) => <option key={a.id} value={a.id}>{a.name} ({a.code})</option>)}
+              </select>
+            </label>
+          )}
+          {payout && position && (
+            <div className="payout-position" style={{ gridColumn: '1 / -1' }}>
+              <div className="payout-title">Commission of {position.agent_name} <small>({position.agent_code})</small></div>
+              <div className="payout-tiles">
+                <div><small>Commission earned</small><b>{rupees(position.gross)}</b></div>
+                <div><small>TDS</small><b className="amber-text">−{rupees(position.tds)}</b></div>
+                <div><small>Net payable</small><b>{rupees(position.net)}</b></div>
+                <div><small>Already paid out</small><b>{rupees(position.paid_out)}</b></div>
+                <div><small>Balance to pay</small><b className="green-text">{rupees(position.balance)}</b></div>
+              </div>
+            </div>
+          )}
           <label>Amount (₹)
             <input inputMode="decimal" value={form.amount} onChange={set('amount', cleanAmount)} placeholder="0" autoFocus />
           </label>
@@ -187,7 +249,7 @@ function ExpenseSummaryReport({ rows, summary, periodLabel }) {
         <div><small>Total Expenses</small><b className="red">₹{num(summary?.expenses)}</b></div>
         <div><small>Company Profit{periodLabel.startsWith('All time') ? ' Till Date' : ''}</small><b className={profit < 0 ? 'red' : 'green'}>₹{num(profit)}</b></div>
       </div>
-      <p className="cashbook-note">Profit = money collected − total agent commission − expenses.</p>
+      <p className="cashbook-note">Profit = money collected − total agent commission − expenses.{Number(summary?.agent_payouts) > 0 ? ` Agent payouts (₹${num(summary.agent_payouts)}) are listed below but not deducted again — the commission above already includes them.` : ''}</p>
 
       <h3 className="cashbook-title">Expenses by category</h3>
       <table className="cashbook-table">
@@ -344,7 +406,7 @@ export function Expenses({ search = '', notify, role }) {
 
   const needle = search.trim().toLowerCase();
   const visible = useMemo(() => (rows || []).filter((r) => !needle
-    || [r.category, r.description, r.paid_to, r.payment_mode, r.reference].some((v) => String(v || '').toLowerCase().includes(needle))), [rows, needle]);
+    || [r.category, r.description, r.paid_to, r.payment_mode, r.reference, r.agent_name].some((v) => String(v || '').toLowerCase().includes(needle))), [rows, needle]);
   const shownTotal = visible.reduce((t, r) => t + Number(r.amount || 0), 0);
 
   const profit = summary ? Number(summary.profit) : 0;
@@ -360,7 +422,10 @@ export function Expenses({ search = '', notify, role }) {
         <Mini title="TOTAL EXPENSES" value={money('expenses')} color="indigo-text" />
         <Mini title="COMPANY PROFIT TILL DATE" value={summary ? rupees(profit) : '—'} color={profit < 0 ? 'danger-text' : 'green-text'} />
       </div>
-      <p className="field-hint" style={{ marginTop: 8 }}>Profit = money collected − total agent commission − expenses.</p>
+      <p className="field-hint" style={{ marginTop: 8 }}>
+        Profit = money collected − total agent commission − expenses.
+        {summary && Number(summary.agent_payouts) > 0 && ` Agent payouts recorded: ${rupees(summary.agent_payouts)} — that is the commission being paid, which is already deducted above, so it is not deducted again.`}
+      </p>
 
       <div className="panel section-panel">
         <div className="tabs">
@@ -384,7 +449,7 @@ export function Expenses({ search = '', notify, role }) {
               headers={['DATE', 'CATEGORY', 'DESCRIPTION', 'PAID TO', 'MODE', 'REFERENCE', 'AMOUNT', 'ACTIONS']}
               rows={visible.map((r) => [
                 niceDate(r.expense_date),
-                <Badge tone="indigo">{r.category}</Badge>,
+                <span><Badge tone="indigo">{r.category}</Badge>{r.agent_name && <small className="muted-text" style={{ display: 'block' }}>{r.agent_name}</small>}</span>,
                 r.description,
                 r.paid_to || '—',
                 r.payment_mode || '—',

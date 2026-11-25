@@ -49,6 +49,9 @@ import { Billing } from '../features/billing/Billing';
 import { Agents } from '../features/agents/Agents';
 import { PlotMap3D } from '../features/plotmap/PlotMap3D';
 import { Commissions } from '../features/commissions/Commissions';
+import { MyTeam } from '../features/agents/MyTeam';
+import { Income } from '../features/income/Income';
+import { AgentSales, AgentSalePayments } from '../features/sales/AgentSales';
 import { Expenses } from '../features/expenses/Expenses';
 import { Reports } from '../features/reports/Reports';
 import { Notifications } from '../features/notifications/Notifications';
@@ -288,7 +291,7 @@ export function App() {
 
         <div className={`content ${pageLoading ? 'is-loading' : ''}`}>
           <PageHeader title={<>{heading[0]} {page === PAGES.OVERVIEW && <span className="wave">✳</span>}</>} subtitle={heading[1]}>
-            {!scoped.isCustomerRole && !auth.isPlatform && page !== PAGES.EXPENSES && page !== PAGES.PLOT_MAP && (
+            {!scoped.isCustomerRole && !auth.isPlatform && page !== PAGES.EXPENSES && page !== PAGES.PLOT_MAP && page !== PAGES.MY_TEAM && page !== PAGES.INCOME && ![PAGES.DIRECT_SALE, PAGES.TEAM_SALE, PAGES.SALE_PAYMENTS].includes(page) && (
               <button className="button button-white" onClick={notifyExport}>
                 <Download size={14} /> Export CSV
               </button>
@@ -533,6 +536,11 @@ export function App() {
 
           {page === PAGES.AGENTS && <Agents search={ui.search} notify={notify} role={role} bookings={scoped.bookings} project={ui.project} onView={(agent) => dispatch(agentInfoSet(agent))} />}
           {page === PAGES.COMMISSIONS && <Commissions search={ui.search} notify={notify} role={role} bookings={scoped.bookings} project={ui.project} />}
+          {page === PAGES.MY_TEAM && <MyTeam search={ui.search} notify={notify} />}
+          {page === PAGES.DIRECT_SALE && <AgentSales kind="direct" company={auth.user?.tenantName} notify={notify} />}
+          {page === PAGES.TEAM_SALE && <AgentSales kind="team" company={auth.user?.tenantName} notify={notify} />}
+          {page === PAGES.SALE_PAYMENTS && <AgentSalePayments notify={notify} />}
+          {page === PAGES.INCOME && <Income bookings={scoped.bookings} plots={domain.plots} notify={notify} />}
           {page === PAGES.PLOT_MAP && <PlotMap3D plots={domain.plots.map((p) => ({ number: p[0], status: p[5], project: p[8] }))} project={ui.project} />}
           {page === PAGES.EXPENSES && <Expenses search={ui.search} notify={notify} role={role} />}
           {page === PAGES.REPORTS && (

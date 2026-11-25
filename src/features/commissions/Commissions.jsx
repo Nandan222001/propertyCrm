@@ -136,7 +136,7 @@ export function Commissions({ search, notify, role, bookings = [], project = 'Al
     <>
       <RoleContextBanner role={role} page="Commissions" />
 
-      {live && <CommissionTeam role={role} notify={notify} />}
+      {live && role !== 'SALES AGENT' && <CommissionTeam role={role} notify={notify} />}   {/* agents see their team on the My Team page */}
 
       <div className="mini-stats four">
         {stats.map(([title, value, color]) => <Mini key={title} title={title} value={value} color={color || undefined} />)}

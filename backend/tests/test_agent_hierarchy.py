@@ -51,6 +51,11 @@ def test_a_deal_pays_only_the_sellers_chain_and_never_more_than_the_pool(
     team_b = client.get("/api/v1/agents/team", headers=b_headers).json()["data"]
     assert PCT(team_b["me"]["commission_rate"]) == 14
     assert [m["name"] for m in team_b["members"]] == ["Second Agent"]
+    assert team_b["members"][0]["deals"] == 0 and team_b["members"][0]["sales_value"] == "0"   # the My Team page columns
+    # The admin sees every agent's team; an agent only their own branch.
+    names_admin = {m["name"] for m in client.get("/api/v1/agents/team", headers=admin_headers).json()["data"]["members"]}
+    assert {"S. Patel", "Second Agent"} <= names_admin
+    assert "S. Patel" not in {m["name"] for m in team_b["members"]}
 
     # A parallel agent under the same pool holder — it must not earn on the other branch's deal.
     phone_d = "7" + unique_phone[1:][::-1]
@@ -96,6 +101,25 @@ def test_a_deal_pays_only_the_sellers_chain_and_never_more_than_the_pool(
         "booking_id": booking["id"], "amount": "50000", "mode": "UPI"}).status_code == 201
     rows = client.get("/api/v1/commissions", headers=admin_headers, params={"page_size": 200}).json()["data"]
     assert len([c for c in rows if c["booking_id"] == booking["id"]]) == 6
+
+    # Sales pages: the seller sees the deal as a direct sale, the agents above them as a team sale.
+    sales = lambda headers, kind: client.get("/api/v1/agents/sales", headers=headers, params={"kind": kind}).json()["data"]  # noqa: E731
+    mine_direct = sales(c_headers, "direct")
+    assert [r["booking_number"] for r in mine_direct] == [booking["booking_number"]]
+    assert not mine_direct[0]["is_team"] and mine_direct[0]["customer"] == "Chain Customer"
+    assert sales(c_headers, "team") == []
+    for headers in (b_headers, agent_headers):
+        assert booking["booking_number"] not in {r["booking_number"] for r in sales(headers, "direct")}
+        team_sales = [r for r in sales(headers, "team") if r["booking_number"] == booking["booking_number"]]
+        assert len(team_sales) == 1
+        assert team_sales[0]["is_team"] and team_sales[0]["agent_name"] == "Third Agent"
+        assert team_sales[0]["customer"] == "Chain Customer"   # the full name, as on the agent's own sales
+        assert float(team_sales[0]["total"]) == float(available_plot["price"])
+        pays = [r for r in client.get("/api/v1/agents/sales/payments", headers=headers).json()["data"]
+                if r["booking_number"] == booking["booking_number"]]
+        assert len(pays) == 2 and all(r["is_team"] for r in pays)
+    own_pays = client.get("/api/v1/agents/sales/payments", headers=c_headers).json()["data"]
+    assert len(own_pays) == 2 and not any(r["is_team"] for r in own_pays) and own_pays[0]["customer"] == "Chain Customer"
 
     # Each agent sees their own commission only (the override is the second agent's own row).
     for headers, expected in ((c_headers, {"Third Agent"}), (b_headers, {"Second Agent"}), (agent_headers, {"S. Patel"})):

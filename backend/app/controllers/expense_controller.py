@@ -40,5 +40,9 @@ def delete_expense(expense_id: int, service: ExpenseServiceDep) -> dict:
     return success(None, "Expense deleted")
 
 
+def agent_payout_position(agent_id: int, service: ExpenseServiceDep, exclude_expense_id: int | None = None) -> dict:
+    return success(service.agent_payout_position(agent_id, exclude_expense_id=exclude_expense_id), "What the agent is owed")
+
+
 def profit_summary(service: ExpenseServiceDep, date_from: date | None = None, date_to: date | None = None) -> dict:
     return success(service.profit_summary(date_from, date_to), "Company profit till date" if not (date_from or date_to) else "Company profit for the period")

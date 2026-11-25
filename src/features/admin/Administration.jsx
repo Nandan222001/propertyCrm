@@ -51,6 +51,7 @@ const MODULES = [
       ['holdDays', 'Plot hold while a booking awaits approval (days)', 'number', '7', range(1, 365, 'Hold period')],
       ['installmentDays', 'Default gap to the next instalment (days)', 'number', '30', range(1, 365, 'Instalment gap')],
       ['defaultCommission', 'Commission rate for agents without their own (%)', 'number', '2', range(0.1, 25, 'Commission rate')],
+      ['adminChargeRate', 'Admin charge on commission, shown on agents\' income statements (%)', 'number', '0', range(0, 30, 'Admin charge')],
     ],
     summary: (v) => `Prefix ${v.receiptPrefix} · GST ${Number(v.defaultGst) * 100}% · TDS ${v.tdsRate}% · ${v.dueDays} days · hold ${v.holdDays} days`,
     note: 'Used by new receipts, invoices, due dates, plot holds, instalment reminders, commissions and the TDS report.',
