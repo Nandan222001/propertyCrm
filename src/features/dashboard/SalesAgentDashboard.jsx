@@ -7,7 +7,7 @@ import { pageCache } from '../../utils/pageCache';
 
 const pctOf = (rate) => `${Number((Number(rate) * 100).toFixed(2))}%`;
 
-const crLakh = (n) => (n >= 10000000 ? `₹${(n / 10000000).toFixed(2)} Cr` : n >= 100000 ? `₹${(n / 100000).toFixed(2)} L` : `₹${fmtINR(n)}`);
+const rupees = (n) => `₹${fmtINR(n)}`;      // the exact amount, never rounded to lakh / crore
 const OPEN = (b) => b[7] !== 'Rejected' && b[7] !== 'Cancelled';
 
 /**
@@ -81,8 +81,8 @@ export function SalesAgentDashboard({ go, D, notify, agentName = '', bookings = 
             <span className="badge-pill green">{pct}% collected</span>
           </div>
           <div className="spotlight-vals">
-            <h3>{crLakh(sales)} <small>booked value</small></h3>
-            <p>{crLakh(collected)} collected · {crLakh(Math.max(sales - collected, 0))} still to collect</p>
+            <h3>{rupees(sales)} <small>booked value</small></h3>
+            <p>{rupees(collected)} collected · {rupees(Math.max(sales - collected, 0))} still to collect</p>
           </div>
           <div className="spotlight-track"><div className="spotlight-fill" style={{ width: `${pct}%` }} /></div>
           <div className="spotlight-foot">

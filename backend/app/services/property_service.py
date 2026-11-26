@@ -165,6 +165,8 @@ class PlotService(BaseService[Plot]):
             is_corner=plot.is_corner,
             is_commercial=plot.is_commercial,
             is_park_facing=plot.is_park_facing,
+            is_ne_facing=plot.is_ne_facing,
+            is_east_facing=plot.is_east_facing,
             premium=plot_premium(plot.project, plot) if plot.project else Decimal("0"),
             total_price=plot_total_price(plot.project, plot) if plot.project else plot.price,
             created_at=plot.created_at,

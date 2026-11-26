@@ -130,7 +130,7 @@ export function CustomerProfile({
   const byId = typeof customer.id === 'number';
   const mine = bookings.filter(b => (byId && typeof b[11] === 'number' ? b[11] === customer.id : b[1] === customer.name) && b[7] !== 'Rejected');
   const ledger = pays.filter(p => (byId ? mine.some(b => b[0] === p[9]) : p[0] === customer.name));
-  const bills = receipts.filter(r => (byId && typeof r.customerId === 'number' ? r.customerId === customer.id : r.customer === customer.name) && (!portal || r.shared));
+  const bills = receipts.filter(r => (byId && typeof r.customerId === 'number' ? r.customerId === customer.id : r.customer === customer.name) );   // a customer sees every receipt generated for them, shared or not
   const total = mine.reduce((s, b) => s + parseAmt(b[5]), 0);
   const paid = mine.reduce((s, b) => s + parseAmt(b[6]), 0);
   const agentName = mine[0]?.[8] || customer.agent;

@@ -78,8 +78,8 @@ export function ProjectModal({ editing, projects, close, save }) {
         <div className="premium-box">
           <h3>Premium charges <small>(optional, extra per plot)</small></h3>
           <p className="field-hint">
-            A plot marked as corner, commercial, park-facing, or facing north-east / east pays this extra on top of its price.
-            Leave blank for none. Plots get their features when you edit them.
+            A plot ticked as corner, commercial, park-facing, north-east facing or east facing pays this extra on top of its price.
+            Leave blank for none. A plot's Facing alone never adds a charge — tick the feature when you edit the plot.
           </p>
           <div className="form-grid">
             {PREMIUMS.map(([key, , label]) => (

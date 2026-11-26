@@ -2,31 +2,43 @@
  * Plot layout of the Real Life City Plot Layout — the 3D map's own coordinate space (1 unit ≈ 1 ft).
  *
  * `plots` are traced from the index drawing: `no` is the plot number printed on the layout, `x`/`z` the plot's
- * centre and `w`/`d` its width and depth in feet. `outline` is the colony boundary. The map in
+ * centre and `w`/`d` its width and depth in feet. `outline` is the colony boundary (the blue line of the drawing, as [x, -z] points). The map in
  * `src/features/plotmap/PlotMap3D.jsx` draws these, colouring each plot by the live status of the plot whose
  * number matches — a plot number is matched on its digits alone, so a plot entered as "COMM-01" or "A/01"
  * maps to plot 1 of the drawing.
  */
 
 export const PLOT_MAP_OUTLINE = [
-  [500.0, -62.0],
-  [583.0, -44.0],
-  [783.0, -44.0],
-  [798.0, -246.0],
-  [845.0, -240.0],
-  [838.0, -283.0],
-  [582.0, -350.0],
-  [430.0, -425.0],
-  [392.0, -455.0],
-  [390.0, -808.0],
-  [282.0, -808.0],
-  [300.0, -470.0],
-  [268.0, -440.0],
-  [212.0, -290.0],
-  [190.0, -165.0],
-  [330.0, -152.0],
-  [410.0, -118.0],
-  [497.0, -88.0],
+  [627.5, -31.5],
+  [777.4, -37.8],
+  [791.3, -143.1],
+  [796.8, -249.1],
+  [838.0, -243.3],
+  [849.6, -308.9],
+  [591.3, -351.7],
+  [583.5, -367.5],
+  [542.4, -377.7],
+  [490.8, -399.7],
+  [490.8, -414.8],
+  [421.3, -429.1],
+  [388.5, -456.6],
+  [394.6, -623.7],
+  [389.0, -817.1],
+  [388.5, -845.2],
+  [277.9, -853.3],
+  [295.7, -658.2],
+  [296.9, -533.7],
+  [283.5, -529.9],
+  [256.9, -436.3],
+  [205.3, -293.5],
+  [209.7, -287.3],
+  [177.5, -170.8],
+  [192.5, -159.0],
+  [261.4, -142.0],
+  [404.2, -119.7],
+  [408.0, -115.2],
+  [501.9, -83.5],
+  [498.0, -59.4],
 ];
 
 export const PLOT_LAYOUT = [

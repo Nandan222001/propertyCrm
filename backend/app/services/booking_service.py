@@ -181,7 +181,8 @@ class BookingService(BaseService[Booking]):
                 raise BusinessRuleError("This payment scheme is not available for the plot's project")
         if plan is not None:
             # What is paid at booking is the allotment amount: it counts towards the price and the discount applies to the rest.
-            quote = build_quote(PlanTerms.from_model(plan), list_price, booking_day, allotment=payload.token_amount)
+            fees = plans.fees_before_discount(PlanTerms.from_model(plan), payload.application_id, customer.id)
+            quote = build_quote(PlanTerms.from_model(plan), list_price, booking_day, allotment=payload.token_amount, fees=fees)
             expected = quote["total_payable"]
             if payload.final_price != expected:
                 if not approver:
@@ -189,7 +190,7 @@ class BookingService(BaseService[Booking]):
                         f"The final price is fixed at ₹{expected:,.2f} for the '{plan.name}' scheme on plot "
                         f"{plot.plot_number}. Only an admin can set a different price.")
                 quote = build_quote(PlanTerms.from_model(plan), list_price, booking_day, allotment=payload.token_amount,
-                                   total_override=payload.final_price)
+                                   total_override=payload.final_price, fees=fees)
         elif not approver and payload.final_price != list_price:
             raise BusinessRuleError(
                 f"The final price is fixed at the listed price of ₹{list_price:,.2f} for plot {plot.plot_number}. "

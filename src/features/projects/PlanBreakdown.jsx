@@ -17,7 +17,11 @@ export function PlanBreakdown({ quote }) {
         <div><dt>Plot price</dt><dd>{money(quote.price)}</dd></div>
         {Number(quote.allotment_amount) > 0 && <div><dt>Allotment (paid at booking)</dt><dd>{money(quote.allotment_amount)}</dd></div>}
         <div><dt>Balance to pay</dt><dd>{money(quote.balance)}</dd></div>
-        {Number(quote.discount_amount) > 0 && <div className="good"><dt>Discount ({Number(quote.discount_percent)}% of balance after allotment)</dt><dd>− {money(quote.discount_amount)}</dd></div>}
+        {Number(quote.fees_considered) > 0 && <div><dt>Application + enrollment fee (paid earlier)</dt><dd>{money(quote.fees_considered)}</dd></div>}
+        {Number(quote.discount_percent) > 0 && quote.discount_base != null && (
+          <div><dt>Discount applies on</dt><dd>{money(quote.discount_base)}</dd></div>
+        )}
+        {Number(quote.discount_amount) > 0 && <div className="good"><dt>Discount ({Number(quote.discount_percent)}% of {Number(quote.fees_considered) > 0 ? 'the balance after the allotment and fees' : 'the balance after the allotment'})</dt><dd>− {money(quote.discount_amount)}</dd></div>}
         <div className="total"><dt>Total payable</dt><dd>{money(quote.total_payable)}</dd></div>
       </dl>
       <p className="muted-text plan-count">Complete payment schedule · {lines.length} payments</p>

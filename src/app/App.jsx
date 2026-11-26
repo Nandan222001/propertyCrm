@@ -5,7 +5,7 @@
  * role-appropriate page and mounts the shared modals. Business rules live in
  * thunks (`store/thunks.js`), so pages stay presentational.
  */
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Download, Plus } from 'lucide-react';
 
@@ -68,6 +68,8 @@ import {
 } from '../store/tenantThunks';
 import { openWhatsApp } from '../utils/whatsapp';
 import { agentKey } from '../utils/names';
+import { useMyApplications } from '../hooks/useMyApplications';
+import { withApplicationReceipts } from '../utils/customerDocuments';
 import { downloadCsv } from '../utils/csv';
 import { clientAudit } from '../utils/security';
 
@@ -99,7 +101,7 @@ export function App() {
   const roleConfig = useAppSelector(selectRoleConfig);
   const heading = useAppSelector(selectHeading);
   const pendingApprovals = useAppSelector(selectPendingApprovals);
-  const documents = useAppSelector(selectDocuments);
+  const bookDocuments = useAppSelector(selectDocuments);
   const badgeFor = useAppSelector(selectNavBadge);
   const tenants = useAppSelector(selectTenants);
   const tenantsMeta = useAppSelector(selectTenantsMeta);
@@ -108,6 +110,9 @@ export function App() {
   const bookingPrint = useAppSelector(selectBookingForPrint);
   const plotForPrint = useAppSelector(selectPlotForPrint);
   const role = auth.role;
+  // A customer's documents also hold the receipts of their application fee + enrollment (taken before any booking).
+  const myApplications = useMyApplications(auth.mode === 'live' && auth.role === ROLES.CUSTOMER);
+  const documents = useMemo(() => withApplicationReceipts(bookDocuments, myApplications), [bookDocuments, myApplications]);
   const page = allowedPages.includes(ui.page) ? ui.page : PAGES.OVERVIEW;
 
   /* ------------------------------------------------------------- effects */
@@ -560,9 +565,11 @@ export function App() {
               docs={documents}
               search={ui.search}
               notify={notify}
-              onOpenDocument={(doc) => (doc.receiptNo
-                ? dispatch(billOpened(doc.receiptNo))
-                : dispatch(bookingPrintSet({ id: doc.bookingId, kind: doc.kind })))}
+              onOpenDocument={(doc) => (doc.application
+                ? setPrintedApplication(doc.application)
+                : doc.receiptNo
+                  ? dispatch(billOpened(doc.receiptNo))
+                  : dispatch(bookingPrintSet({ id: doc.bookingId, kind: doc.kind })))}
             />
           )}
           {page === PAGES.NOTIFICATIONS && (
@@ -693,7 +700,7 @@ export function App() {
       {bookingPrint && (
         <BookingFormModal
           booking={bookingPrint}
-          customer={domain.customers.find((c) => c.name === bookingPrint[1])}
+          customer={domain.customers.find((c) => (typeof bookingPrint[11] === 'number' ? c.id === bookingPrint[11] : c.name === bookingPrint[1]))}
           plot={plotForPrint}
           kind={ui.bookingDocKind}
           close={() => dispatch(bookingPrintSet(null))}

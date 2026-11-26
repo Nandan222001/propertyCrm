@@ -12,12 +12,15 @@ const KINDS = [
   ['EMI_SPECIAL', 'EMI with special EMIs — regular EMIs plus larger ones in chosen months'],
 ];
 const BLANK = {
-  name: '', kind: 'EMI', discount_percent: '',
+  name: '', kind: 'EMI', application_fee: '', enrollment_fee: '', allotment_amount: '', discount_percent: '',
   outright_days: '30', emi_count: '', special_count: '', special_percent: '', special_months: '', is_active: true,
 };
 
 const toForm = (p) => ({
   name: p.name, kind: p.kind,
+  application_fee: Number(p.application_fee) > 0 ? String(Number(p.application_fee)) : '',
+  enrollment_fee: Number(p.enrollment_fee) > 0 ? String(Number(p.enrollment_fee)) : '',
+  allotment_amount: Number(p.allotment_amount) > 0 ? String(Number(p.allotment_amount)) : '',
   discount_percent: String(Number(p.discount_percent) || ''),
   outright_days: p.outright_days ? String(p.outright_days) : '30', emi_count: p.emi_count ? String(p.emi_count) : '',
   special_count: p.special_count ? String(p.special_count) : '', special_percent: p.special_percent ? String(Number(p.special_percent)) : '',
@@ -27,7 +30,7 @@ const toForm = (p) => ({
 const toBody = (f) => {
   const num = (v) => (String(v).trim() === '' ? 0 : parseAmt(v));
   const body = {
-    name: f.name.trim(), kind: f.kind, discount_percent: Number(f.discount_percent) || 0, is_active: f.is_active,
+    name: f.name.trim(), kind: f.kind, application_fee: num(f.application_fee), enrollment_fee: num(f.enrollment_fee), allotment_amount: num(f.allotment_amount), discount_percent: Number(f.discount_percent) || 0, is_active: f.is_active,
   };
   if (f.kind === 'OUTRIGHT') body.outright_days = Number(f.outright_days) || undefined;
   else body.emi_count = Number(f.emi_count) || undefined;
@@ -70,7 +73,9 @@ const summary = (p) => {
   if (p.kind === 'OUTRIGHT') bits.push(`balance within ${p.outright_days} days`);
   else bits.push(`${p.emi_count} monthly EMIs`);
   if (p.kind === 'EMI_SPECIAL') bits.push(`${p.special_count} special EMIs`);
-  if (Number(p.discount_percent) > 0) bits.push(`${Number(p.discount_percent)}% discount`);
+  if (Number(p.allotment_amount) > 0) bits.push(`₹${fmtINR(Number(p.allotment_amount))} allotment`);
+  if (Number(p.application_fee) + Number(p.enrollment_fee) > 0) bits.push(`₹${fmtINR(Number(p.application_fee))} application + ₹${fmtINR(Number(p.enrollment_fee))} enrollment`);
+  if (Number(p.discount_percent) > 0) bits.push(`${Number(p.discount_percent)}% discount on the rest`);
   return bits.join(' · ');
 };
 
@@ -175,9 +180,15 @@ export function PaymentPlansModal({ project, plots = [], close, notify }) {
               <small className="field-hint">The name agents and customers see when choosing how to pay.</small></label>
             <label className="span-2">How is the balance paid?
               <select value={form.kind} onChange={set('kind')}>{KINDS.map(([k, t]) => <option key={k} value={k}>{t}</option>)}</select>
-              <small className="field-hint">The balance is the plot price minus the allotment paid at booking. The application fee and enrollment are taken earlier, separately.</small></label>
-            <label>Discount on the balance (%)<input value={form.discount_percent} onChange={set('discount_percent')} inputMode="decimal" placeholder="e.g. 10 (or leave blank)" />
-              <small className="field-hint">Taken off what is left after the allotment amount paid at booking. 0 or blank = no discount.</small></label>
+              <small className="field-hint">The balance is the plot price minus the allotment amount. The application fee and enrollment are taken earlier, separately.</small></label>
+            <label>Allotment amount (₹)<input value={form.allotment_amount} onChange={set('allotment_amount')} inputMode="numeric" placeholder="e.g. 1,00,000 (or leave blank)" />
+              <small className="field-hint">Paid when the plot is allotted. It counts towards the price and is taken off first — together with the application and enrollment fee below, the discount applies only to what is left.</small></label>
+            <label>Application fee (₹)<input value={form.application_fee} onChange={set('application_fee')} inputMode="numeric" placeholder="e.g. 500 (or leave blank)" />
+              <small className="field-hint">The customer pays this with the application, before the plot is allotted. It is taken off the price with the allotment before the discount.</small></label>
+            <label>Enrollment fee (₹)<input value={form.enrollment_fee} onChange={set('enrollment_fee')} inputMode="numeric" placeholder="e.g. 5,000 (or leave blank)" />
+              <small className="field-hint">Paid with the application too. Leave both blank to use what the customer actually paid at booking.</small></label>
+            <label>Discount on the rest (%)<input value={form.discount_percent} onChange={set('discount_percent')} inputMode="decimal" placeholder="e.g. 10 (or leave blank)" />
+              <small className="field-hint">Taken off the plot price minus the allotment, application fee and enrollment fee above (not off the full price). 0 or blank = no discount.</small></label>
             {form.kind === 'OUTRIGHT' && <label>Pay the balance within (days)<input value={form.outright_days} onChange={set('outright_days')} inputMode="numeric" placeholder="e.g. 30" />
               <small className="field-hint">The whole balance is due this many days after booking.</small></label>}
             {form.kind !== 'OUTRIGHT' && <label>Number of monthly EMIs<input value={form.emi_count} onChange={set('emi_count')} inputMode="numeric" placeholder="any number, e.g. 12 or 24" />

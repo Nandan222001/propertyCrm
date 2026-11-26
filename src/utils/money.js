@@ -6,8 +6,8 @@
 /** Parse "₹18,40,000" / "1840000" / 1840000 into a Number (0 when unusable). */
 export const parseAmt = (v) => Number(String(v ?? '0').replace(/[^0-9.]/g, '')) || 0;
 
-/** 1840000 -> "18,40,000" (Indian digit grouping, no symbol). */
-export const fmtINR = (n) => Math.round(Number(n) || 0).toLocaleString('en-IN');
+/** 1840000 -> "18,40,000" (Indian digit grouping, no symbol). Paise are kept when there are any: 239.2 -> "239.2". */
+export const fmtINR = (n) => (Number(n) || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 });
 
 /** 1840000 -> "₹18,40,000". */
 export const inr = (n) => `₹${fmtINR(n)}`;

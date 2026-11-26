@@ -85,7 +85,7 @@ export const selectScopedData = createSelector(
         ? domain.customers.filter((c) => c.name === name)
         : domain.customers;
     const receipts = live
-      ? (isCustomerRole ? domain.receipts.filter((r) => r.shared) : domain.receipts)
+      ? domain.receipts            // the server already limits a customer to their own receipts — all of them, shared or not
       : isAgentRole
         ? domain.receipts.filter((r) => r.agent === key)
         : isCustomerRole

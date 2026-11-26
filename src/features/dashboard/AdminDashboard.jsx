@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { ArrowUpRight, ChevronRight, Download, Plus, Search, CalendarDays } from 'lucide-react';
 import { fmtINR } from '../../utils/money';
-import { CHART_RANGES, chartRangeDates, compactINR, inventoryStats, rangeSeries, salesStats } from '../../utils/dashboardStats';
+import { useEnrollmentFees } from '../../hooks/useEnrollmentFees';
+import { CHART_RANGES, chartRangeDates, compactINR, exactINR, inventoryStats, rangeSeries, salesStats } from '../../utils/dashboardStats';
 
 export function AdminDashboard({ bookings: allBookings = [], pays: allPays = [], plots: allPlots = [], receipts: allReceipts = null, project = 'All projects', go, D, notify }) {
   const [chartRange, setChartRange] = useState('Last 6 months');
@@ -13,17 +14,24 @@ export function AdminDashboard({ bookings: allBookings = [], pays: allPays = [],
   const pays = all ? allPays : allPays.filter((p) => p[2] === project);
   const plots = all ? allPlots : allPlots.filter((x) => x[8] === project);
   const sales = salesStats(bookings);
+  // Enrollment fees are collection too (they are not part of any booking's payments).
+  const enrollment = useEnrollmentFees(project);
   const inventory = inventoryStats(plots);
   const receipts = allReceipts && (all ? allReceipts : allReceipts.filter((r) => r.project === project));
   const dates = chartRangeDates(chartRange, custom);
-  const series = rangeSeries(bookings, receipts, ...(dates || chartRangeDates('Last 6 months')));
+  const series = rangeSeries(bookings, receipts, ...(dates || chartRangeDates('Last 6 months')), enrollment.fees);
   const labelEvery = Math.max(Math.ceil(series.buckets.length / 12), 1);
-  const money = (n) => compactINR(n);
+  const money = (n) => exactINR(n);     // the cards show exact amounts; only the chart axis below is abbreviated
   const yTop = compactINR(series.max);
 
   const stats = [
     { title: 'Total sales value', ...money(sales.sales), foot: `${sales.deals} booking${sales.deals === 1 ? '' : 's'}`, type: 'indigo' },
-    { title: 'Total collection', ...money(sales.collected), foot: sales.sales ? `${Math.round((sales.collected / sales.sales) * 100)}% of sales value` : 'No collections yet', type: 'green' },
+    {
+      title: 'Total collection', ...money(sales.collected + enrollment.total),
+      foot: [sales.sales ? `${Math.round((sales.collected / sales.sales) * 100)}% of sales value` : (enrollment.total ? '' : 'No collections yet'),
+        enrollment.total ? `incl. ₹${fmtINR(enrollment.total)} enrollment fees` : ''].filter(Boolean).join(' · '),
+      type: 'green',
+    },
     { title: 'Pending payments', ...money(sales.pending), foot: 'Balance still to collect', type: 'amber' },
     { title: 'Available plots', val: String(inventory.available), unit: `/ ${inventory.total} plots`, type: 'blue' },
   ];

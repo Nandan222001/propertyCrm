@@ -1,12 +1,13 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import { useEnrollmentFees } from '../../hooks/useEnrollmentFees';
 import { Download, Plus, ShieldCheck, RefreshCw } from 'lucide-react';
 import { api, actions, hasSession } from '../../api';
 import { parseAmt, fmtINR } from '../../utils';
-import { compactINR } from '../../utils/dashboardStats';
+import { exactINR } from '../../utils/dashboardStats';
 import { usePageLoading } from '../../hooks';
 import { pageCache } from '../../utils/pageCache';
 
-const money = (n) => { const c = compactINR(n); return `${c.val}${c.unit ? ` ${c.unit}` : ''}`; };
+const money = (n) => exactINR(n).val;
 const DAY = 86400000;
 
 /** Days a ledger row is past its next due date (0 when not due yet / no date). */
@@ -46,7 +47,8 @@ export function AccountsDashboard({ go, D, notify, pays = [], receipts = [] }) {
       .finally(() => setProfitLoaded(true));
   }, [live, pays.length]);
 
-  const collected = pays.reduce((t, r) => t + parseAmt(r[4]), 0);
+  const enrollment = useEnrollmentFees();      // enrollment fees are collection too, though no booking holds them
+  const collected = pays.reduce((t, r) => t + parseAmt(r[4]), 0) + enrollment.total;
   const outstanding = pays.reduce((t, r) => t + parseAmt(r[5]), 0);
   const sameDay = (label) => {
     const d = new Date(String(label || '').replace('Sept', 'Sep'));
@@ -88,7 +90,7 @@ export function AccountsDashboard({ go, D, notify, pays = [], receipts = [] }) {
         <div className="mini-stat">
           <small>TOTAL REALISED COLLECTIONS</small>
           <b className="green-text">{money(collected)}</b>
-          <span className="stat-sub">Across {pays.length} ledger account{pays.length === 1 ? '' : 's'}</span>
+          <span className="stat-sub">Across {pays.length} ledger account{pays.length === 1 ? '' : 's'}{enrollment.total > 0 ? ` · incl. ${money(enrollment.total)} enrollment fees` : ''}</span>
         </div>
         <div className="mini-stat">
           <small>TODAY&apos;S CASH INFLOW</small>

@@ -71,6 +71,8 @@ class PlotBase(SafeText):
     is_corner: bool = False
     is_commercial: bool = False
     is_park_facing: bool = False
+    is_ne_facing: bool = False
+    is_east_facing: bool = False
 
 
 class PlotCreate(PlotBase):
@@ -114,6 +116,8 @@ class PlotUpdate(SafeText):
     is_corner: bool | None = None
     is_commercial: bool | None = None
     is_park_facing: bool | None = None
+    is_ne_facing: bool | None = None
+    is_east_facing: bool | None = None
 
 
 class PlotStatusUpdate(SafeText):
@@ -142,6 +146,8 @@ class PlotResponse(TimestampedResponse):
     is_corner: bool = False
     is_commercial: bool = False
     is_park_facing: bool = False
+    is_ne_facing: bool = False
+    is_east_facing: bool = False
     premium: Decimal = Decimal("0")          # extras for the plot's features, from the project's premium charges
     total_price: Decimal | None = None       # price + premium: what the plot is sold for
 

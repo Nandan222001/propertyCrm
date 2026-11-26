@@ -164,7 +164,25 @@ class PlanService:
             price = request.price
         else:
             raise BusinessRuleError("Give a plot or a price to calculate on")
-        return build_quote(terms, price, request.booking_date or date.today(), allotment=request.allotment_amount)
+        fees = self.fees_before_discount(terms, request.application_id)
+        return build_quote(terms, price, request.booking_date or date.today(), allotment=request.allotment_amount, fees=fees)
+
+    def fees_before_discount(self, terms: PlanTerms, application_id: int | None = None, customer_id: int | None = None) -> Decimal:
+        """The application fee + enrollment fee taken off before the discount. A scheme that states them decides (so the
+        preview on the scheme and the booking always agree); otherwise the customer's own application is used."""
+        scheme_fees = money(terms.application_fee + terms.enrollment_fee)
+        if scheme_fees > 0 or application_id is None:
+            return scheme_fees
+        from app.models.application import Application
+
+        application = self.db.get(Application, application_id)
+        if application is None or application.is_deleted:
+            raise NotFoundError("Application not found")
+        if customer_id is not None and application.customer_id != customer_id:
+            raise BusinessRuleError("This application belongs to a different customer")
+        if application.status == "CANCELLED":
+            return Decimal("0.00")
+        return money(Decimal(application.application_fee) + Decimal(application.enrollment_fee))
 
     # ------------------------------------------------------------ schedules
     def attach_schedule(self, booking: Booking, plan: PaymentPlan, quote: dict) -> None:

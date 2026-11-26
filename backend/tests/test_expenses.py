@@ -78,8 +78,11 @@ def test_enrollment_money_counts_as_collection_but_the_application_fee_does_not(
         "application_fee": "500", "enrollment_fee": "5000", "payment_mode": "UPI"})
     assert made.status_code == 201, made.text
     after = client.get("/api/v1/expenses/profit-summary", headers=admin_headers).json()["data"]
-    assert Decimal(after["collected"]) - Decimal(before["collected"]) == Decimal("5000")
-    assert Decimal(after["profit"]) - Decimal(before["profit"]) == Decimal("5000")
+    assert Decimal(after["collected"]) - Decimal(before["collected"]) == Decimal("5000")      # the 500 application fee is not counted
+    # The agent earns commission on the enrollment fee, so profit rises by that money less the commission on it.
+    commission = Decimal(after["commissions"]) - Decimal(before["commissions"])
+    assert 0 < commission < Decimal("5000")
+    assert Decimal(after["profit"]) - Decimal(before["profit"]) == Decimal("5000") - commission
 
 
 def test_agent_payout_names_the_agent_is_capped_at_what_is_owed_and_is_not_deducted_twice(

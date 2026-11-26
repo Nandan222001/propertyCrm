@@ -71,7 +71,7 @@ export function Income({ bookings = [], plots = [], notify }) {
         const tds = Number(c.tds_amount);
         return {
           id: c.id, date, month: date ? `${date.getFullYear()}-${two(date.getMonth() + 1)}` : '',
-          project: booking?.[2] || '—', plot: booking?.[3] || '—',
+          project: booking?.[2] || c.project_name || '—', plot: booking?.[3] || (c.application_id ? 'Enrollment fee' : '—'),
           size: sizeOf.get(`${booking?.[2]}|${booking?.[3]}`),
           paid: Number(c.deal_value), rate: percent(c.rate), team: Boolean(c.is_override), via: c.source_agent_name || '',
           gross, admin, tds, payable: round2(gross - admin - tds),

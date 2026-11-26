@@ -39,7 +39,7 @@ export function groupDeals(rows, bookingByNo) {
 function CommissionSlip({ deal, close }) {
   const { agent, via, project, plot, rate, dealValue, received, earned, remaining, status, list } = deal;
   const pct = `${Number((rate * 100).toFixed(2))}%`;
-  const upcoming = Math.round(remaining * rate);
+  const upcoming = remaining * rate;
   return (
     <div className="modal-backdrop" onMouseDown={(e) => e.target === e.currentTarget && close()}>
       <div className="modal">
@@ -84,13 +84,14 @@ function CommissionSlip({ deal, close }) {
 }
 
 const STATUS_LABEL = (status) => String(status || '').replace(/_/g, ' ');
-const crLakh = (n) => (n >= 10000000 ? `₹${(n / 10000000).toFixed(2)} Cr` : n >= 100000 ? `₹${(n / 100000).toFixed(2)} L` : `₹${fmtINR(n)}`);
+const rupees = (n) => `₹${fmtINR(n)}`;      // the exact amount, never rounded to lakh / crore
 
 /** One API commission -> the table row ([agent, project, plot, deal, slab, amount, status, id]). */
 export const toRow = (c, bookingById) => {
   const booking = bookingById.get(c.booking_id);
   return [
-    c.agent_name || '—', booking?.[2] || '—', booking?.[3] || '—', fmtINR(c.deal_value),
+    // A commission earned on an enrollment fee has no booking yet: it names the project and says what it was earned on.
+    c.agent_name || '—', booking?.[2] || c.project_name || '—', booking?.[3] || (c.application_id ? 'Enrollment fee' : '—'), fmtINR(c.deal_value),
     `${Number((Number(c.rate) * 100).toFixed(2))}%`, fmtINR(c.gross_amount), STATUS_LABEL(c.status), c.id,
     c.booking_id ?? null, c.received_on || c.created_at || '', Number(c.rate), Number(c.deal_value), Number(c.gross_amount),
     c.is_override ? (c.source_agent_name || 'a sub-agent') : '',
@@ -125,9 +126,9 @@ export function Commissions({ search, notify, role, bookings = [], project = 'Al
   const counted = deals.filter((d) => d.status !== 'CANCELLED');
   const stats = live
     ? [
-      ['COMMISSION EARNED', crLakh(counted.reduce((t, d) => t + d.earned, 0)), 'green-text'],
-      ['PAYMENTS RECEIVED', crLakh(counted.reduce((t, d) => t + d.received, 0)), ''],
-      ['COMMISSION STILL TO COME', crLakh(counted.reduce((t, d) => t + Math.round(d.remaining * d.rate), 0)), 'amber-text'],
+      ['COMMISSION EARNED', rupees(counted.reduce((t, d) => t + d.earned, 0)), 'green-text'],
+      ['PAYMENTS RECEIVED', rupees(counted.reduce((t, d) => t + d.received, 0)), ''],
+      ['COMMISSION STILL TO COME', rupees(counted.reduce((t, d) => t + (d.remaining * d.rate), 0)), 'amber-text'],
       ['DEALS', String(counted.length), ''],
     ]
     : [['COMMISSION EARNED', '—', ''], ['PAYMENTS RECEIVED', '—', ''], ['COMMISSION STILL TO COME', '—', ''], ['DEALS', '—', '']];

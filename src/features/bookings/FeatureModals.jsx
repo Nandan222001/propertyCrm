@@ -73,20 +73,7 @@ export function BookingModal({ role, agentName, customers, plots, projects = [],
   }, [projectId]);
   const plotApiId = selected?.[9];
   useEffect(() => { setQuote(null); setQuoteError(''); }, [planId, plotApiId]);
-  // The amount paid at booking is the allotment: it counts towards the price and the scheme's discount applies to the
-  // rest, so the scheme is worked out again whenever it changes.
   const allotment = parseAmt(tokenEdit ?? '');
-  useEffect(() => {
-    if (!planId || typeof plotApiId !== 'number') return undefined;
-    let live = true;
-    const timer = setTimeout(() => {
-      actions.quotePlan({ plan_id: Number(planId), plot_id: plotApiId, allotment_amount: allotment })
-        .then((r) => { if (live) { setQuote({ ...r.data, forAllotment: allotment }); setQuoteError(''); } })
-        .catch((e) => { if (live) { setQuote(null); setQuoteError(e.message); } });
-    }, 300);
-    return () => { live = false; clearTimeout(timer); };
-  }, [planId, plotApiId, allotment]);
-  useEffect(() => { setTokenEdit(null); }, [planId, plotApiId]);
 
   // Step 1 of the booking: the customer's open applications (application fee + enrollment already received).
   // "Allot plot" on an application row: that application's customer and project are fixed.
@@ -118,6 +105,20 @@ export function BookingModal({ role, agentName, customers, plots, projects = [],
   }, [customerKey, applications]);
   const hasPlans = plans.length > 0;
   const plan = plans.find(p => String(p.id) === planId);
+  // The scheme is worked out again whenever the amount paid at booking or the customer's application changes: the
+  // allotment and the application + enrollment fees are taken off before the scheme's discount.
+  useEffect(() => {
+    if (!planId || typeof plotApiId !== 'number') return undefined;
+    let live = true;
+    const timer = setTimeout(() => {
+      actions.quotePlan({ plan_id: Number(planId), plot_id: plotApiId, allotment_amount: allotment, ...(applicationId ? { application_id: Number(applicationId) } : {}) })
+        .then((r) => { if (live) { setQuote({ ...r.data, forAllotment: allotment, forApplication: applicationId }); setQuoteError(''); } })
+        .catch((e) => { if (live) { setQuote(null); setQuoteError(e.message); } });
+    }, 300);
+    return () => { live = false; clearTimeout(timer); };
+  }, [planId, plotApiId, allotment, applicationId]);
+  // A scheme that sets an allotment amount decides what is paid at booking (and what the discount is taken after).
+  useEffect(() => { setTokenEdit(plan && Number(plan.allotment_amount) > 0 ? String(Number(plan.allotment_amount)) : null); }, [planId, plotApiId, plan?.allotment_amount]);
 
   const finalPrice = price || (plan ? (quote ? fmtINR(Number(quote.total_payable)) : '') : (selected?.[10] ?? selected?.[4])) || '';
   const tokenValue = tokenEdit ?? '';
@@ -130,7 +131,7 @@ export function BookingModal({ role, agentName, customers, plots, projects = [],
     if (!customer) return setError('Select an approved customer first. Agents add customers from the Customers page.');
     if (needsApplication && !applicationId) return setError('This customer has not applied yet. Take the application fee and enrollment first (step 1).');
     if (!selected) return setError('No available plot in this project.');
-    if (plan && (!quote || quote.forAllotment !== allotment)) return setError(quoteError || 'Wait for the payment scheme to be calculated.');
+    if (plan && (!quote || quote.forAllotment !== allotment || quote.forApplication !== applicationId)) return setError(quoteError || 'Wait for the payment scheme to be calculated.');
     if (parseAmt(finalPrice) <= 0) return setError('Enter the final price.');
     if (parseAmt(tokenValue) > parseAmt(finalPrice)) return setError('The amount paid at booking cannot exceed the final price.');
     if (parseAmt(tokenValue) > 0 && !d.receiptDate) return setError('Select the receipt date.');
@@ -194,7 +195,7 @@ export function BookingModal({ role, agentName, customers, plots, projects = [],
           <Field label="Final price for customer (₹)" hint={priceLocked ? (plan ? 'Fixed by the payment scheme — only the admin can change it' : 'Fixed at the plot\'s listed price — only the admin can change it') : undefined}>
             <input value={finalPrice} onChange={e => setPrice(e.target.value)} inputMode="numeric" readOnly={priceLocked} />
           </Field>
-          <Field label="Amount paid at booking (₹)" hint={plan ? 'Allotment amount — counts towards the plot price; the scheme\'s discount applies to the rest' : 'Allotment amount — counts towards the plot price'}>
+          <Field label="Amount paid at booking (₹)" hint={plan ? (Number(plan.allotment_amount) > 0 ? `Allotment amount set by the scheme (₹${fmtINR(Number(plan.allotment_amount))}) — counts towards the plot price; the discount applies only to what is left after it` : 'Allotment amount — counts towards the plot price; the scheme\'s discount applies to the rest') : 'Allotment amount — counts towards the plot price'}>
             <input name="paid" value={tokenValue} onChange={e => setTokenEdit(e.target.value)} inputMode="numeric" placeholder="0" />
           </Field>
           <Field label="Payment mode" hint="Shown on the payment receipt">

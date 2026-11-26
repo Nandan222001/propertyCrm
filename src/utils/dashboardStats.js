@@ -5,6 +5,12 @@ import { fmtINR, parseAmt } from './money';
 const COUNTED = (b) => !['Pending Approval', 'Rejected', 'Cancelled'].includes(b[7]);
 
 /** 12600000 -> { val: '₹1.26', unit: 'Cr' } ; 790000 -> { val: '₹7.9', unit: 'L' } ; 4500 -> { val: '₹4,500', unit: '' } */
+/** The exact amount, never rounded to lakh / crore: 350800 -> { val: '₹3,50,800', unit: '' } (same shape as compactINR). */
+export function exactINR(n) {
+  return { val: `₹${fmtINR(n)}`, unit: '' };
+}
+
+/** Short form (₹3.51 L) — only for chart axes, where there is no room for the exact figure. */
 export function compactINR(n) {
   const value = Number(n) || 0;
   if (value >= 10000000) return { val: `₹${Number((value / 10000000).toFixed(2))}`, unit: 'Cr' };
@@ -79,8 +85,9 @@ const startOfDay = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
  * Sales (bookings, by booking date) and collections (receipts, by receipt date; cancelled payments left out)
  * between `from` and `to`, both days included. Short ranges are bucketed by day, medium ones by week, long ones by month.
  * Without receipts, collections fall back to what each booking has paid so far (on its booking date).
+ * `extra` adds further collections by date (the enrollment fees).
  */
-export function rangeSeries(bookings = [], receipts = null, from, to) {
+export function rangeSeries(bookings = [], receipts = null, from, to, extra = []) {
   const start = startOfDay(from);
   const end = startOfDay(to);
   const days = Math.max(Math.round((end - start) / DAY) + 1, 1);
@@ -111,6 +118,8 @@ export function rangeSeries(bookings = [], receipts = null, from, to) {
     if (!receipts) place(d, 'collected', parseAmt(b[6]));
   });
   (receipts || []).filter((r) => !r.cancelled).forEach((r) => place(parseBookingDate(r.date), 'collected', parseAmt(r.amount)));
+  // Money that is collection but not a booking receipt (the enrollment fees): `[{ date: Date, amount }]`.
+  extra.forEach((e) => place(e.date, 'collected', e.amount));
 
   const max = Math.max(...rows.map((x) => Math.max(x.sales, x.collected)), 0);
   return {

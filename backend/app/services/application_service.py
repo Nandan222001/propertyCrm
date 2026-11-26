@@ -35,10 +35,17 @@ class ApplicationService(BaseService[Application]):
         self.customers = CustomerRepository(db)
         self.projects = ProjectRepository(db)
 
+    def _commissions(self):
+        from app.services.commission_service import CommissionService
+
+        return CommissionService(self.db, self.actor)
+
     def scope_clause(self):
         # Everyone who sees all bookings sees every application; an agent only the ones for their own customers.
         if self.actor.can(Permission.BOOKING_VIEW_ALL):
             return None
+        if self.actor.is_customer_portal:          # a customer sees the receipts of their own applications
+            return Application.customer_id == (self.actor.customer_id or -1)
         return Application.agent_id == (self.actor.agent_id or -1)
 
     def serialise(self, application: Application) -> ApplicationResponse:
@@ -79,6 +86,7 @@ class ApplicationService(BaseService[Application]):
             recorded_by_id=self.actor.user_id,
         )
         self.applications.create(application)
+        self._commissions().accrue_for_application(application)     # the agent earns on the enrollment fee too
         self._audit(AuditAction.CREATE, application, after={"receipt": application.receipt_number, "total": str(application.total)},
                     summary=f"Application {application.receipt_number}: ₹{application.total} received for {project.name}")
         return application
@@ -91,6 +99,11 @@ class ApplicationService(BaseService[Application]):
         values = payload.model_dump(exclude_unset=True)
         before = {"application_fee": str(application.application_fee), "enrollment_fee": str(application.enrollment_fee),
                   "mode": application.payment_mode, "received_on": str(application.received_on)}
+        old_fee = Decimal(application.enrollment_fee)
+        fee_changes = values.get("enrollment_fee") is not None and Decimal(values["enrollment_fee"]) != old_fee
+        if fee_changes:
+            # Refuse before anything changes if the commission on the old fee has already been paid out.
+            self._commissions().withdraw_for_application(application, delete=True)
         for key in ("application_fee", "enrollment_fee", "payment_type", "payment_mode", "received_on"):
             if values.get(key) is not None:
                 setattr(application, key, values[key])
@@ -102,6 +115,8 @@ class ApplicationService(BaseService[Application]):
         if Decimal(application.application_fee) + Decimal(application.enrollment_fee) <= 0:
             raise BusinessRuleError("Enter the application fee and / or the enrollment fee received")
         self.db.flush()
+        if fee_changes:
+            self._commissions().accrue_for_application(application)   # re-accrued on the corrected enrollment fee
         self._audit(AuditAction.UPDATE, application, before=before,
                     after={"application_fee": str(application.application_fee), "enrollment_fee": str(application.enrollment_fee),
                            "mode": application.payment_mode, "received_on": str(application.received_on)},
@@ -117,6 +132,7 @@ class ApplicationService(BaseService[Application]):
             raise BusinessRuleError("This application is already cancelled")
         if application.status != "OPEN":
             raise BusinessRuleError("A plot is allotted against this application — cancel or delete that booking first")
+        self._commissions().withdraw_for_application(application, delete=False)   # its commissions stop counting too
         application.status = "CANCELLED"
         self.db.flush()
         self._audit(AuditAction.REJECT, application, before={"status": "OPEN"}, after={"status": "CANCELLED"},

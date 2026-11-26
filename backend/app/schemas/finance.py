@@ -114,6 +114,9 @@ class CommissionResponse(TimestampedResponse):
     agent_name: str | None = None
     booking_id: int | None = None
     payment_id: int | None = None
+    #: Set when the commission was earned on an application's enrollment fee (project_name tells which project).
+    application_id: int | None = None
+    project_name: str | None = None
     #: Set when this is a team override: the sub-agent whose deal earned it.
     source_agent_id: int | None = None
     source_agent_name: str | None = None

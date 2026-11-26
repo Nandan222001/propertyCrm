@@ -76,10 +76,16 @@ class CommissionService(BaseService[Commission]):
     def serialise(self, commission: Commission) -> CommissionResponse:
         from app.models.payment import Agent, Payment
 
+        from app.models.application import Application
+
         payment = self.db.get(Payment, commission.payment_id) if commission.payment_id else None
         source = self.db.get(Agent, commission.source_agent_id) if commission.source_agent_id else None
+        application = self.db.get(Application, commission.application_id) if commission.application_id else None
+        received_on = payment.received_on if payment is not None else (application.received_on if application is not None else None)
         return CommissionResponse(
-            received_on=payment.received_on if payment is not None else None,
+            received_on=received_on,
+            application_id=commission.application_id,
+            project_name=application.project.name if application is not None and application.project else None,
             id=commission.id,
             public_id=commission.public_id,
             agent_id=commission.agent_id,
@@ -132,10 +138,31 @@ class CommissionService(BaseService[Commission]):
         agent = self.agents.get(booking.agent_id)
         if agent is None:
             raise BusinessRuleError("Booking references an unknown agent")
+        return self._accrue(agent, Decimal(payment.amount), booking_id=booking.id, payment_id=payment.id,
+                            on=f"a ₹{Decimal(payment.amount)} payment")
+
+    def accrue_for_application(self, application) -> Commission | None:
+        """The agent earns their rate on the enrollment fee too (the application fee never earns commission).
+
+        Same hierarchy rules as a payment: the selling agent earns the slice they hold and each upline what is left
+        of their own rate. Idempotent per application; nothing accrues for a cancelled application or a zero fee."""
+        fee = Decimal(application.enrollment_fee or 0)
+        if application.agent_id is None or fee <= 0 or application.status == "CANCELLED":
+            return None
+        existing = self.commissions.list(filters={"application_id": application.id}, limit=100)
+        if existing:
+            return next((c for c in existing if c.agent_id == application.agent_id), existing[0])
+        agent = self.agents.get(application.agent_id)
+        if agent is None:
+            return None
+        return self._accrue(agent, fee, application_id=application.id, on=f"a ₹{fee} enrollment fee")
+
+    def _accrue(self, agent, received: Decimal, *, booking_id: int | None = None, payment_id: int | None = None,
+                application_id: int | None = None, on: str = "a payment") -> Commission | None:
+        """One commission row per person on the selling chain, for money the customer paid."""
         from app.services.org_settings import setting_text
 
         default_rate = Decimal(setting_text(self.db, "tax", "defaultCommission")) / 100
-        received = Decimal(payment.amount)
         tds_rate = self._tds_rate()
 
         # The seller earns their slice; each upline earns what is left of their own rate on this one path.
@@ -155,8 +182,9 @@ class CommissionService(BaseService[Commission]):
             commission = Commission(
                 agent_id=earner.id,
                 source_agent_id=agent.id,
-                booking_id=booking.id,
-                payment_id=payment.id,
+                booking_id=booking_id,
+                payment_id=payment_id,
+                application_id=application_id,
                 deal_value=received,
                 rate=rate,
                 gross_amount=gross,
@@ -170,9 +198,25 @@ class CommissionService(BaseService[Commission]):
             what = "accrued" if earner is agent else f"team override accrued (deal by {agent.name})"
             self.audit.log(
                 action=AuditAction.CREATE, resource=self.resource, resource_id=commission.public_id,
-                summary=f"Commission ₹{net} {what} on a ₹{received} payment at {rate}", actor=self.actor,
+                summary=f"Commission ₹{net} {what} on {on} at {rate}", actor=self.actor,
             )
         return own
+
+    def withdraw_for_application(self, application, *, delete: bool) -> None:
+        """The application's fee was cancelled or corrected: its commissions are cancelled (or removed, to be
+        re-accrued). Refused once any of them has been paid out."""
+        from sqlalchemy import select
+
+        rows = list(self.db.execute(select(Commission).where(
+            Commission.application_id == application.id, Commission.is_deleted == 0)).scalars())
+        if any(c.status == "PAID" for c in rows):
+            raise BusinessRuleError("The agent's commission on this enrollment fee has already been paid out, so it cannot be changed")
+        for commission in rows:
+            if delete:
+                self.db.delete(commission)
+            else:
+                commission.status = "CANCELLED"
+        self.db.flush()
 
     def create_manual(self, payload: CommissionCreate) -> Commission:
         self._authorise("create")

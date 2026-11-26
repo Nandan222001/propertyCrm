@@ -59,6 +59,8 @@ class Commission(Base, PkMixin, PublicIdMixin, TenantMixin, TimestampMixin, Soft
     booking_id: Mapped[int | None] = mapped_column(ForeignKey("bookings.id", ondelete="SET NULL"), index=True)
     #: The customer payment this commission was earned on (None for a manual or legacy whole-deal commission).
     payment_id: Mapped[int | None] = mapped_column(ForeignKey("payments.id", ondelete="SET NULL"), index=True)
+    #: The application whose enrollment fee this commission was earned on (no booking or payment yet).
+    application_id: Mapped[int | None] = mapped_column(ForeignKey("applications.id", ondelete="SET NULL"), index=True)
     #: The agent whose booking generated this commission. Differs from ``agent_id`` on a team override: an upline
     #: agent earns their own rate on every deal their sub-agents close.
     source_agent_id: Mapped[int | None] = mapped_column(ForeignKey("agents.id", ondelete="SET NULL"), index=True)

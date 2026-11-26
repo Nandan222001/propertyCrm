@@ -82,6 +82,9 @@ class Plot(Base, PkMixin, PublicIdMixin, TenantMixin, TimestampMixin, SoftDelete
     is_corner: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     is_commercial: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     is_park_facing: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    # North-East / East facing carry a charge only when ticked here — the plot's `facing` text alone never adds one.
+    is_ne_facing: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    is_east_facing: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
     project = relationship("Project", back_populates="plots", lazy="joined")
     bookings = relationship("Booking", back_populates="plot", lazy="selectin")

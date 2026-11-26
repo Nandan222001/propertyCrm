@@ -1,4 +1,5 @@
 import React from 'react';
+import { ageFrom, detailsFromCustomer } from '../customers/CustomerProfileFields';
 import { createPortal } from 'react-dom';
 import { Printer, X, MessageCircle, Send, Copy, CheckCircle2 } from 'lucide-react';
 import { COMPANY } from '../../data/appConfig';
@@ -121,8 +122,17 @@ const BOOKING_STATUS_CLASS = {
 };
 const bookingStatusClass = (status) => BOOKING_STATUS_CLASS[String(status).toLowerCase()] || 'inv2-draft';
 
+/** "1990-05-17" -> "17/05/1990 (36 yrs)"; "—" when there is none. */
+const born = (iso) => {
+  if (!iso) return '—';
+  const [y, m, day] = String(iso).slice(0, 10).split('-');
+  return `${day}/${m}/${y}${ageFrom(iso) ? ` (${ageFrom(iso)})` : ''}`;
+};
+const place = (...parts) => parts.filter(Boolean).join(', ');
+
 export function BookingFormSheet({ booking, customer, plot }) {
   const [id, name, project, plotNo, date, value, paid, status, agent, plan] = booking;
+  const d = detailsFromCustomer(customer || {});      // the application-form details saved on the customer (blank if none / hidden)
   const balance = parseAmt(value) - parseAmt(paid);
   const rows = [
     ['Booking ID', id], ['Booking date', date],
@@ -147,8 +157,20 @@ export function BookingFormSheet({ booking, customer, plot }) {
       <h3 className="inv2-h">Customer details</h3>
       <table className="inv2-kv">
         <tbody>
-          <tr><th>Name</th><td>{name}</td><th>Mobile</th><td>{customer?.mobile || '—'}</td></tr>
-          <tr><th>Email</th><td>{customer?.email || '—'}</td><th>Address</th><td>{customer?.address || '—'}</td></tr>
+          <tr><th>Applicant name</th><td>{name}</td><th>Date of birth &amp; age</th><td>{born(d.dob)}</td></tr>
+          <tr><th>Occupation</th><td>{d.occupation || '—'}</td><th>Father / Husband / Guardian</th><td>{d.guardian || '—'}</td></tr>
+          <tr><th>Mobile</th><td>{customer?.mobile || '—'}</td><th>Email</th><td>{customer?.email || '—'}</td></tr>
+          <tr><th>Address for communication</th><td colSpan={3}>{place(d.address, d.address2, d.city, d.state, d.pincode) || customer?.address || '—'}</td></tr>
+          <tr><th>Permanent address</th><td colSpan={3}>{place(d.permAddress, d.permAddress2, d.permCity, d.permState, d.permPincode) || '—'}</td></tr>
+        </tbody>
+      </table>
+
+      <h3 className="inv2-h">Nominee details</h3>
+      <table className="inv2-kv">
+        <tbody>
+          <tr><th>Name</th><td>{d.nomName || '—'}</td><th>Relationship</th><td>{d.nomRelation || '—'}</td></tr>
+          <tr><th>Date of birth &amp; age</th><td>{born(d.nomDob)}</td><th>Contact no.(s)</th><td>{d.nomPhone || '—'}</td></tr>
+          <tr><th>Email</th><td>{d.nomEmail || '—'}</td><th>Address</th><td>{place(d.nomAddress, d.nomCity, d.nomState, d.nomPincode) || '—'}</td></tr>
         </tbody>
       </table>
 

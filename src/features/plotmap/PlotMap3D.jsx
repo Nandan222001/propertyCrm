@@ -1,7 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
-import { PLOT_LAYOUT } from '../../data/plotLayout';
+import { PLOT_LAYOUT, PLOT_MAP_OUTLINE } from '../../data/plotLayout';
+import { PLOT_MAP_LABELS } from '../../data/plotRoads';
 import { plotMapKey } from '../../utils/plotNumber';
 
 /**
@@ -39,6 +40,24 @@ function numberTexture(text, tone) {
   ctx.textBaseline = 'middle';
   ctx.fillText(String(text), canvas.width / 2, canvas.height / 2 + 2);
   return new THREE.CanvasTexture(canvas);
+}
+
+/** A road width (red) or khesara number (green) as a texture, plus the shape of the text so it is not stretched. */
+const ROAD_TEXT = { road: { color: '#a3203f', weight: '700', height: 8 }, khesara: { color: '#2e7d4f', weight: '600', height: 5.5 } };
+function roadTexture(text, kind) {
+  const { color, weight } = ROAD_TEXT[kind];
+  const size = 64;
+  const canvas = document.createElement('canvas');
+  const ctx = canvas.getContext('2d');
+  ctx.font = `${weight} ${size}px system-ui, sans-serif`;
+  canvas.width = Math.ceil(ctx.measureText(text).width) + 24;
+  canvas.height = size + 20;
+  ctx.font = `${weight} ${size}px system-ui, sans-serif`;      // resizing the canvas resets the context
+  ctx.fillStyle = color;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(text, canvas.width / 2, canvas.height / 2 + 2);
+  return { texture: new THREE.CanvasTexture(canvas), aspect: canvas.width / canvas.height };
 }
 
 export function PlotMap3D({ plots = [], project = 'All projects' }) {
@@ -140,6 +159,40 @@ export function PlotMap3D({ plots = [], project = 'All projects' }) {
         plots3d.push({ mesh, label, tone: null });
       });
 
+      // The colony boundary: the blue line of the drawing, drawn as a flat ribbon with rounded corners.
+      const BOUNDARY = 3.2;                                             // ribbon width, in feet
+      const boundaryMaterial = new THREE.MeshBasicMaterial({ color: 0x1b3a8f });
+      const boundary = PLOT_MAP_OUTLINE.map(([x, z]) => [x, -z]);       // the outline is stored with z flipped
+      const boundaryMeshes = [];
+      boundary.forEach(([x1, z1], i) => {
+        const [x2, z2] = boundary[(i + 1) % boundary.length];
+        const length = Math.hypot(x2 - x1, z2 - z1);
+        const strip = new THREE.Mesh(new THREE.PlaneGeometry(length, BOUNDARY), boundaryMaterial);
+        strip.rotation.set(-Math.PI / 2, 0, Math.atan2(-(z2 - z1), x2 - x1));
+        strip.position.set((x1 + x2) / 2, 0.2, (z1 + z2) / 2);
+        const joint = new THREE.Mesh(new THREE.CircleGeometry(BOUNDARY / 2, 12), boundaryMaterial);
+        joint.rotation.x = -Math.PI / 2;
+        joint.position.set(x1, 0.2, z1);
+        scene.add(strip, joint);
+        boundaryMeshes.push(strip, joint);
+      });
+
+      // Road details: the width of each road (red) and the khesara numbers (green), where they are on the drawing.
+      const roadLabels = PLOT_MAP_LABELS.map((item) => {
+        const { texture, aspect } = roadTexture(item.text, item.kind);
+        const height = ROAD_TEXT[item.kind].height * (84 / 64);          // the canvas is a little taller than the text
+        const mesh = new THREE.Mesh(
+          new THREE.PlaneGeometry(height * aspect, height),
+          new THREE.MeshBasicMaterial({ map: texture, transparent: true, depthWrite: false }),
+        );
+        // Flat on the map; vertical roads read bottom to top. Khesara numbers sit just above the plots they cross.
+        mesh.rotation.set(-Math.PI / 2, 0, (item.angle * Math.PI) / 180);
+        mesh.position.set(item.x, item.kind === 'khesara' ? 1.4 : 0.4, item.z);
+        mesh.renderOrder = item.kind === 'khesara' ? 3 : 2;
+        scene.add(mesh);
+        return mesh;
+      });
+
       const resize = () => {
         const width = host.clientWidth || 800;
         const height = host.clientHeight || 520;
@@ -233,6 +286,13 @@ export function PlotMap3D({ plots = [], project = 'All projects' }) {
         observer?.disconnect();
         window.removeEventListener('resize', resize);
         controls?.dispose();
+        boundaryMeshes.forEach((mesh) => mesh.geometry.dispose());
+        boundaryMaterial.dispose();
+        roadLabels.forEach((mesh) => {
+          mesh.geometry.dispose();
+          mesh.material.map?.dispose();
+          mesh.material.dispose();
+        });
         plots3d.forEach((row) => {
           row.mesh.geometry.dispose();
           row.mesh.material.dispose();
@@ -297,7 +357,7 @@ export function PlotMap3D({ plots = [], project = 'All projects' }) {
         >
           All <b>{PLOT_LAYOUT.length}</b>
         </button>
-        {Object.entries(STATUS).map(([key, meta]) => (
+        {Object.entries(STATUS).filter(([key]) => key !== 'COMPANY_HOLD').map(([key, meta]) => (   // no filter button for company hold
           <button
             key={key}
             className={`button small-btn ${filter === key ? 'button-primary' : 'button-white'}`}

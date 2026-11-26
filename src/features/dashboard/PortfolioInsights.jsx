@@ -1,9 +1,9 @@
 import React from 'react';
 import { Building, Landmark, TrendingUp } from 'lucide-react';
 import { parseAmt } from '../../utils';
-import { compactINR } from '../../utils/dashboardStats';
+import { exactINR } from '../../utils/dashboardStats';
 
-const money = (n) => { const c = compactINR(n); return `${c.val}${c.unit ? ` ${c.unit}` : ''}`; };
+const money = (n) => exactINR(n).val;
 const LIVE = (b) => !['Pending Approval', 'Rejected', 'Cancelled'].includes(b[7]);
 const asDate = (label) => { const d = new Date(String(label || '').replace('Sept', 'Sep')); return Number.isNaN(d.getTime()) ? null : d; };
 const quarterOf = (d) => `${d.getFullYear()}-Q${Math.floor(d.getMonth() / 3) + 1}`;

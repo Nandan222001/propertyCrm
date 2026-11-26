@@ -8,6 +8,14 @@ instalment schedule a booking is made on. The shape follows a developer's brochu
     balance                     price - allotment, paid as the scheme says
     discount                    a % of the balance (e.g. for paying outright or in a few EMIs)
 
+The allotment is set by the scheme (say ₹1,00,000): it is taken off the price first and the discount applies only to
+what is left. A scheme that sets no allotment falls back to the amount paid at booking.
+
+The application fee and enrollment fee (paid in the earlier step; the scheme states them, else the customer's own
+application) are taken off as well before the discount is worked out, so the discount is a % of
+price - allotment - application fee - enrollment fee. They are only left out of the discount: they are not credited
+against the price, which stays price - discount.
+
     total payable = allotment + (balance - discount)
 
 The application fee and enrollment fee are taken in an earlier step (an Application) and are separate from the price.
@@ -98,17 +106,21 @@ def validate_terms(terms: PlanTerms) -> None:
                 f"Choose exactly {count} different EMI numbers (between 1 and {terms.emi_count}) for the special EMIs")
 
 
-def build_quote(terms: PlanTerms, price, booking_date: date, *, allotment=0, total_override=None) -> dict:
+def build_quote(terms: PlanTerms, price, booking_date: date, *, allotment=0, total_override=None, fees=0) -> dict:
     """The breakdown and schedule for one booking. ``price`` includes premiums.
 
-    ``allotment`` is the amount paid when the plot is allotted (the booking itself): it counts towards the price and
-    the discount applies to what is left. The application fee and enrollment fee are taken earlier, in their own
-    step, and are never part of a plot's price.
+    The allotment is the scheme's own ``allotment_amount`` when it sets one; otherwise ``allotment`` (what is paid when
+    the plot is allotted, the booking itself). Either way it counts towards the price and the discount applies only to
+    what is left. The application fee and enrollment fee are taken earlier, in their own step, and are never part of
+    a plot's price.
+
+    ``fees`` is the customer's application fee + enrollment fee: taken off, with the allotment, before the discount is
+    worked out (the discount applies to what remains).
 
     ``total_override`` (an admin's negotiated total) adjusts only the balance / EMI amounts (never the upfront ones)."""
     validate_terms(terms)
     price = money(price)
-    allotment = money(allotment or 0)
+    allotment = money(terms.allotment_amount) if terms.allotment_amount and terms.allotment_amount > 0 else money(allotment or 0)
     if allotment < 0:
         raise BusinessRuleError("The allotment amount cannot be negative")
     upfront_in_price = allotment
@@ -116,7 +128,9 @@ def build_quote(terms: PlanTerms, price, booking_date: date, *, allotment=0, tot
     if balance <= 0:
         raise BusinessRuleError(
             f"The allotment amount (₹{upfront_in_price:,.2f}) must be less than the plot price (₹{price:,.2f})")
-    discount = money(balance * terms.discount_percent / 100)
+    fees = money(fees or 0)
+    discount_base = max(balance - fees, Decimal("0.00"))
+    discount = money(discount_base * terms.discount_percent / 100)
     payable_balance = balance - discount
 
     lines: list[dict] = []
@@ -176,13 +190,17 @@ def build_quote(terms: PlanTerms, price, booking_date: date, *, allotment=0, tot
     return {
         "plan_name": terms.name, "kind": terms.kind, "price": price,
         "allotment_amount": allotment, "balance": balance,
+        "fees_considered": fees, "discount_base": discount_base,
         "discount_percent": terms.discount_percent, "discount_amount": discount,
         "total_payable": total, "upfront_total": upfront, "schedule": lines,
     }
 
 
 def plot_premium(project, plot) -> Decimal:
-    """Extras for a plot's features, using the project's premium charges (each applies once)."""
+    """Extras for a plot's features, using the project's premium charges (each applies once).
+
+    A charge applies only to a feature that is ticked on the plot. Its ``facing`` is information: a plot that faces
+    East pays no East-facing charge unless ``is_east_facing`` is ticked (likewise North-East)."""
     total = Decimal("0")
     if plot.is_commercial and project.premium_commercial:
         total += Decimal(project.premium_commercial)
@@ -190,10 +208,9 @@ def plot_premium(project, plot) -> Decimal:
         total += Decimal(project.premium_corner)
     if plot.is_park_facing and project.premium_park_facing:
         total += Decimal(project.premium_park_facing)
-    facing = (plot.facing or "").strip().lower().replace("-", " ")
-    if facing in ("north east", "ne") and project.premium_ne_facing:
+    if plot.is_ne_facing and project.premium_ne_facing:
         total += Decimal(project.premium_ne_facing)
-    elif facing == "east" and project.premium_east_facing:
+    if plot.is_east_facing and project.premium_east_facing:
         total += Decimal(project.premium_east_facing)
     return money(total)
 

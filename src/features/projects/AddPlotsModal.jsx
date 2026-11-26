@@ -15,7 +15,7 @@ export function AddPlotsModal({ projects, defaultProject = '', close, save }) {
   const real = projects.filter((p) => typeof p[6] === 'number');
   const [form, setForm] = useState({
     project: real.find((p) => p[0] === defaultProject)?.[0] || real[0]?.[0] || '',
-    prefix: 'A-', start: '1', count: '', layout: '', facing: 'East', length: '', width: '', price: '',
+    prefix: 'A-', start: '1', count: '', layout: '', facing: '', length: '', width: '', price: '',
   });
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
@@ -62,8 +62,12 @@ export function AddPlotsModal({ projects, defaultProject = '', close, save }) {
           <label>Length (ft)<input value={form.length} onChange={set('length')} inputMode="decimal" placeholder="e.g. 50" /></label>
           <label>Width (ft)<input value={form.width} onChange={set('width')} inputMode="decimal" placeholder="e.g. 30" /></label>
           <label>Plot area (length × width)<input value={area > 0 ? `${area} sq.ft` : ''} readOnly placeholder="Calculated automatically" /></label>
-          <label>Facing
-            <select value={form.facing} onChange={set('facing')}>{FACINGS.map((f) => <option key={f}>{f}</option>)}</select>
+          <label>Facing (optional)
+            <select value={form.facing} onChange={set('facing')}>
+              <option value="">No facing</option>
+              {FACINGS.map((f) => <option key={f}>{f}</option>)}
+            </select>
+            <small className="field-hint">Leave it if the plots have none. If you choose one, the project's North-East / East facing charge is added to the plot price.</small>
           </label>
           <label className="span-2">Price of each (₹)<input value={form.price} onChange={set('price')} inputMode="numeric" /></label>
         </div>

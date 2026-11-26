@@ -45,10 +45,13 @@ def purge_customer_data(db: Session, customer_id: int) -> dict[str, int]:
     booking_ids = found.get("bookings", set())
     payment_ids = found.get("payments", set())
 
+    application_ids = found.get("applications", set())
+
     # Commissions earned on those deals are linked with SET NULL, so they would linger as orphans — remove them.
-    if booking_ids or payment_ids:
+    if booking_ids or payment_ids or application_ids:
         stmt = select(Commission.id).where(
-            (Commission.booking_id.in_(booking_ids or {-1})) | (Commission.payment_id.in_(payment_ids or {-1})))
+            (Commission.booking_id.in_(booking_ids or {-1})) | (Commission.payment_id.in_(payment_ids or {-1}))
+            | (Commission.application_id.in_(application_ids or {-1})))
         found.setdefault("commissions", set()).update(db.execute(stmt).scalars().all())
 
     # Plots held by these bookings are free again.

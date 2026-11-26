@@ -2,11 +2,11 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { Target, Users, Plus, AlertCircle } from 'lucide-react';
 import { api, actions, hasSession } from '../../api';
 import { parseAmt, fmtINR } from '../../utils';
-import { compactINR } from '../../utils/dashboardStats';
+import { exactINR } from '../../utils/dashboardStats';
 import { usePageLoading } from '../../hooks';
 import { pageCache } from '../../utils/pageCache';
 
-const money = (n) => { const c = compactINR(n); return `${c.val}${c.unit ? ` ${c.unit}` : ''}`; };
+const money = (n) => exactINR(n).val;
 const LIVE = (b) => !['Pending Approval', 'Rejected', 'Cancelled'].includes(b[7]);
 const monthKey = (label) => { const d = new Date(String(label || '')); return Number.isNaN(d.getTime()) ? '' : `${d.getFullYear()}-${d.getMonth()}`; };
 

@@ -95,3 +95,90 @@ def test_deleting_a_customer_erases_their_application_fees_too(client, admin_hea
     assert collected() == base
     listed = client.get("/api/v1/applications", headers=admin_headers, params={"page_size": 200}).json()["data"]
     assert made.json()["data"]["id"] not in {a["id"] for a in listed}
+
+
+def _enrollment_commissions(client, headers, application_id):
+    rows = client.get("/api/v1/commissions", headers=headers, params={"page_size": 200}).json()["data"]
+    return [c for c in rows if c["application_id"] == application_id]
+
+
+def test_the_agent_earns_commission_on_the_enrollment_fee_but_not_the_application_fee(
+        client, agent_headers, admin_headers, agent_approved_customer, available_plot):
+    made = apply(client, agent_headers, agent_approved_customer, available_plot).json()["data"]     # application 500, enrollment 5000
+    mine = _enrollment_commissions(client, admin_headers, made["id"])
+    assert len(mine) == 1, mine
+    row = mine[0]
+    assert float(row["deal_value"]) == 5000                                    # the enrollment fee only — never the 500
+    assert round(float(row["gross_amount"]), 2) == round(5000 * float(row["rate"]), 2) > 0
+    assert row["status"] == "PAYABLE" and row["project_name"] and row["booking_id"] is None and row["payment_id"] is None
+    seen = _enrollment_commissions(client, agent_headers, made["id"])
+    assert [c["id"] for c in seen] == [row["id"]]                              # the agent sees it on their own list
+
+    # Correcting the enrollment fee recalculates it.
+    assert client.patch(f"/api/v1/applications/{made['id']}", headers=admin_headers, json={"enrollment_fee": "8000"}).status_code == 200
+    again = _enrollment_commissions(client, admin_headers, made["id"])
+    assert len(again) == 1 and float(again[0]["deal_value"]) == 8000
+    # Changing only the application fee leaves the commission alone.
+    assert client.patch(f"/api/v1/applications/{made['id']}", headers=admin_headers, json={"application_fee": "900"}).status_code == 200
+    assert [c["id"] for c in _enrollment_commissions(client, admin_headers, made["id"])] == [again[0]["id"]]
+
+    # Cancelling the application cancels its commission.
+    assert client.post(f"/api/v1/applications/{made['id']}/cancel", headers=admin_headers, json={"reason": "entered twice"}).status_code == 200
+    assert {c["status"] for c in _enrollment_commissions(client, admin_headers, made["id"])} == {"CANCELLED"}
+
+
+def test_a_paid_out_enrollment_commission_cannot_be_changed_or_cancelled(
+        client, agent_headers, admin_headers, accounts_headers, agent_approved_customer, available_plot):
+    made = apply(client, agent_headers, agent_approved_customer, available_plot).json()["data"]
+    commission = _enrollment_commissions(client, admin_headers, made["id"])[0]
+    for status, who in (("APPROVED", admin_headers), ("PAID", accounts_headers)):      # the payout is the accounts desk's step
+        done = client.post(f"/api/v1/commissions/{commission['id']}/decision", headers=who,
+                           json={"status": status, "payout_reference": "NEFT-1", "reason": "ok"})
+        assert done.status_code == 200, done.text
+    url = f"/api/v1/applications/{made['id']}"
+    assert client.patch(url, headers=admin_headers, json={"enrollment_fee": "9000"}).status_code == 409
+    assert client.post(f"{url}/cancel", headers=admin_headers, json={"reason": "entered by mistake"}).status_code == 409
+    assert float(_enrollment_commissions(client, admin_headers, made["id"])[0]["deal_value"]) == 5000
+
+
+def test_enrollment_commission_follows_the_team_chain_and_goes_with_a_deleted_customer(
+        client, agent_headers, admin_headers, unique_phone, available_plot):
+    from tests.test_agent_hierarchy import _add, _agent_named, _sign_in
+
+    top = _agent_named(client, admin_headers, "S. Patel")
+    assert client.patch(f"/api/v1/agents/{top['id']}", headers=admin_headers, json={"commission_rate": "0.20"}).status_code == 200
+    import uuid
+
+    email = f"{uuid.uuid4().hex[:8]}@example.demo"
+    assert client.post("/api/v1/agents/team", headers=agent_headers, json={
+        "name": "Enrol Agent", "email": email, "phone": unique_phone, "share": "0.14"}).status_code == 201
+    sub = _sign_in(client, email, "Enrol Agent", unique_phone)
+    phone = "8" + unique_phone[1:][::-1]
+    customer = client.post("/api/v1/customers", headers=sub, json={
+        "name": "Enrol Customer", "email": f"{uuid.uuid4().hex[:8]}@example.demo", "phone": phone, "city": "Pune",
+        "pincode": "411001", "consent_given": True}).json()["data"]
+    assert client.post(f"/api/v1/customers/{customer['id']}/decision", headers=admin_headers,
+                       json={"status": "APPROVED", "reason": "KYC"}).status_code == 200
+    made = apply(client, sub, customer, available_plot).json()["data"]
+
+    rows = {c["agent_name"]: c for c in _enrollment_commissions(client, admin_headers, made["id"])}
+    assert {k: float(v["gross_amount"]) for k, v in rows.items()} == {"Enrol Agent": 700.0, "S. Patel": 300.0}   # 14% + 6% of 5000
+    assert rows["S. Patel"]["is_override"] and rows["S. Patel"]["source_agent_name"] == "Enrol Agent"
+
+    assert client.delete(f"/api/v1/customers/{customer['id']}", headers=admin_headers).status_code == 200
+    assert _enrollment_commissions(client, admin_headers, made["id"]) == []
+
+
+def test_a_customer_sees_the_receipts_of_their_own_applications_only(
+        client, agent_headers, admin_headers, customer_headers, agent_approved_customer, available_plot):
+    made = apply(client, agent_headers, agent_approved_customer, available_plot).json()["data"]     # another customer's application
+    mine = client.get("/api/v1/applications", headers=customer_headers, params={"page_size": 200})
+    assert mine.status_code == 200, mine.text
+    assert made["id"] not in {a["id"] for a in mine.json()["data"]}                                 # never somebody else's
+    # the seeded portal customer's own application is visible to them
+    data = client.get("/api/v1/auth/me", headers=customer_headers).json()["data"]
+    customer_id = data.get("user", data)["customer_id"]
+    assert customer_id
+    own = apply(client, admin_headers, {"id": customer_id}, available_plot).json()["data"]
+    listed = client.get("/api/v1/applications", headers=customer_headers, params={"page_size": 200}).json()["data"]
+    assert own["id"] in {a["id"] for a in listed} and all(a["customer_id"] == customer_id for a in listed)
